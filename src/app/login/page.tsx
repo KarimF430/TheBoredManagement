@@ -4,17 +4,13 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Lock, Mail, Loader2, AlertCircle, ArrowRight } from 'lucide-react'
 import { motion } from 'framer-motion'
-import Image from 'next/image'
 
 function Logo({ h }: { h: number }) {
   return (
-    <Image
+    <img
       src="/tbm-logo.png"
       alt="The Bored Monkey"
-      width={h * 4.5}
-      height={h}
       style={{ height: h, width: 'auto', display: 'block' }}
-      priority
     />
   )
 }

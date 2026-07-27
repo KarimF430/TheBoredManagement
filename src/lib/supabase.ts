@@ -1,15 +1,25 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+let _supabase: SupabaseClient | null = null
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing Supabase environment variables: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY')
+function getSupabaseClient(): SupabaseClient {
+  if (_supabase) return _supabase
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error('Missing Supabase environment variables: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY')
+  }
+  _supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { persistSession: false },
+    db: { schema: 'public' },
+  })
+  return _supabase
 }
 
-export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: { persistSession: false },
-  db: { schema: 'public' },
+export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
+  get(_, prop) {
+    return (getSupabaseClient() as any)[prop]
+  },
 })
 
 // ── RPC-based SQL execution via Supabase REST API ──
