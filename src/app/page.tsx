@@ -420,10 +420,10 @@ export default function OverviewPage() {
                   </button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {topViews.map((b: any) => {
+                  {topViews.map((b: any, i: number) => {
                     const f = topFreq.find((x: any) => x.name === b.name)
                     return (
-                      <div key={b.name} style={{ background: '#F8FAFC', borderRadius: 8, padding: '12px', border: '1px solid #E2E8F0' }}>
+                      <div key={`${b.name}_${i}`} style={{ background: '#F8FAFC', borderRadius: 8, padding: '12px', border: '1px solid #E2E8F0' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                           <span style={{ fontSize: 13, fontWeight: 800, color: '#0F172A' }}>{b.name}</span>
                           <span style={{ fontSize: 11, fontWeight: 700, color: b.color, background: `${b.color}10`, padding: '2px 8px', borderRadius: 4 }}>{b.pct.toFixed(1)}% View SOV</span>

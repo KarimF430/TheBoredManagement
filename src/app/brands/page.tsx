@@ -211,7 +211,7 @@ export default function BrandIntelligencePage() {
                 </thead>
                 <tbody>
                   {sortedBrands.map((b, i) => (
-                    <tr key={b.name}>
+                    <tr key={`${b.name}_${i}`}>
                       <td style={{ textAlign: 'center' }}>
                         <div style={{
                           width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',

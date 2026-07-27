@@ -204,10 +204,10 @@ export default function SovTrendPage() {
       {/* Brand KPI Strip */}
       {brandStats.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(brandStats.length, 6)}, 1fr)`, gap: 12, marginBottom: 20 }}>
-          {brandStats.slice(0, 6).map(bs => {
+          {brandStats.slice(0, 6).map((bs, i) => {
             const pos = bs.delta >= 0
             return (
-              <div key={bs.brand} className="card" style={{ padding: '14px 16px', borderLeft: `3px solid ${bs.color}` }}>
+              <div key={`${bs.brand}_${i}`} className="card" style={{ padding: '14px 16px', borderLeft: `3px solid ${bs.color}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: bs.color }} />
                   <span style={{ fontSize: 12, fontWeight: 700, color: '#1E293B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bs.brand}</span>
@@ -326,11 +326,11 @@ export default function SovTrendPage() {
           <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>Signal Summary</div>
           <div style={{ fontSize: 11.5, color: '#94A3B8', marginBottom: 14 }}>Accelerating, stable, or declining per brand</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {brandStats.map(bs => {
+            {brandStats.map((bs, i) => {
               const signal = bs.delta > 1 ? 'Accelerating' : bs.delta < -1 ? 'Declining' : 'Stable'
               const signalColor = signal === 'Accelerating' ? '#10B981' : signal === 'Declining' ? '#EF4444' : '#F59E0B'
               return (
-                <div key={bs.brand} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, background: '#FAFBFC', border: '1px solid #F1F5F9' }}>
+                <div key={`${bs.brand}_${i}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, background: '#FAFBFC', border: '1px solid #F1F5FF' }}>
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: bs.color }} />
                   <span style={{ fontSize: 12, fontWeight: 700, color: '#1E293B', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bs.brand}</span>
                   <span style={{ fontSize: 11, fontWeight: 700, color: bs.color, fontFamily: "'JetBrains Mono',monospace" }}>{bs.current.toFixed(1)}%</span>

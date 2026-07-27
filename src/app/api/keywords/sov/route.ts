@@ -24,7 +24,6 @@ export async function GET(req: NextRequest) {
 }
 
 async function fetchKeywordSov(campaignId: string, language: string, type: string, isOurs?: string | null) {
-  // Parallel: brand names + keywords
   const [cbRes, btRes, kwQuery] = await Promise.all([
     supabase.from('campaign_brands').select('name').eq('campaign_id', campaignId),
     supabase.from('brand_tags').select('brand_name').eq('campaign_id', campaignId),
@@ -48,13 +47,11 @@ async function fetchKeywordSov(campaignId: string, language: string, type: strin
 
   const kwIds = keywords.map((k: any) => k.id)
 
-  // Parallel: keyword_videos + keyword_shorts
   const [kvRes, ksRes] = await Promise.all([
     supabase.from('keyword_videos').select('keyword_id, video_id').in('keyword_id', kwIds),
     supabase.from('keyword_shorts').select('keyword_id, video_id').in('keyword_id', kwIds),
   ])
 
-  // Build keyword → video mapping
   const kwVideoMap = new Map<string, Set<string>>()
   for (const kv of kvRes.data || []) {
     if (!kwVideoMap.has(kv.keyword_id)) kwVideoMap.set(kv.keyword_id, new Set())
@@ -67,7 +64,6 @@ async function fetchKeywordSov(campaignId: string, language: string, type: strin
 
   const allVideoIds = [...new Set([...(kvRes.data || []).map((r: any) => r.video_id), ...(ksRes.data || []).map((r: any) => r.video_id)])]
 
-  // Parallel batch fetch videos
   const BATCH = 500
   const videoBatchPromises = []
   for (let i = 0; i < allVideoIds.length; i += BATCH) {
@@ -82,7 +78,6 @@ async function fetchKeywordSov(campaignId: string, language: string, type: strin
     for (const v of (result.data || []) as any[]) videoMap.set(v.id, v)
   }
 
-  // Filter videos by is_ours if specified
   if (isOurs) {
     for (const [id, v] of videoMap) {
       if (isOurs === 'true' && !v.is_ours) videoMap.delete(id)
@@ -90,7 +85,6 @@ async function fetchKeywordSov(campaignId: string, language: string, type: strin
     }
   }
 
-  // Pre-parse tags for all videos once
   const parsedTagsMap = new Map<string, string[]>()
   for (const [id, v] of videoMap) {
     let tagsArr: string[] = []
@@ -99,7 +93,6 @@ async function fetchKeywordSov(campaignId: string, language: string, type: strin
     parsedTagsMap.set(id, tagsArr)
   }
 
-  // Pre-compute lowercase brand names
   const brandLowerMap = new Map<string, string>()
   for (const b of brandNames) brandLowerMap.set(b.toLowerCase(), b)
 
@@ -112,25 +105,40 @@ async function fetchKeywordSov(campaignId: string, language: string, type: strin
     const entry: Record<string, string | number> = {
       keyword: kw.text, total_videos: videos.length,
     }
-    let brandTotal = 0
 
-    for (const bName of brandNames) {
-      const bLower = bName.toLowerCase()
-      const brandViews = videos
-        .filter((v: any) => {
-          const tagsArr = parsedTagsMap.get(v.id) || []
-          return tagsArr.some((t: string) => t.toLowerCase() === bLower) ||
-            (v.title || '').toLowerCase().includes(bLower) ||
-            (v.channel_name || '').toLowerCase().includes(bLower)
-        })
-        .reduce((acc: number, v: any) => acc + (v.view_count || 0), 0)
+    /* ── Fixed attribution: allocate each video to exactly one brand ── */
+    const brandViewAlloc: Record<string, number> = {}
+    let otherViews = 0
 
-      const pct = totalViews > 0 ? parseFloat(((brandViews / totalViews) * 100).toFixed(1)) : 0
-      entry[bName] = pct
-      brandTotal += pct
+    for (const v of videos) {
+      const viewCount = v.view_count || 0
+      const tagsArr = parsedTagsMap.get(v.id) || []
+      const title = (v.title || '').toLowerCase()
+      const channel = (v.channel_name || '').toLowerCase()
+
+      const matchingBrands = brandNames.filter((bName: string) => {
+        const bLower = bName.toLowerCase()
+        return tagsArr.some((t: string) => t.toLowerCase() === bLower) ||
+          title.includes(bLower) ||
+          channel.includes(bLower)
+      })
+
+      if (matchingBrands.length === 0) {
+        otherViews += viewCount
+      } else {
+        const share = viewCount / matchingBrands.length
+        for (const b of matchingBrands) {
+          brandViewAlloc[b] = (brandViewAlloc[b] || 0) + share
+        }
+      }
     }
 
-    entry['Other'] = parseFloat(Math.max(0, 100 - brandTotal).toFixed(1))
+    const total = Object.values(brandViewAlloc).reduce((s, v) => s + v, 0) + otherViews || 1
+    for (const bName of brandNames) {
+      entry[bName] = parseFloat(((brandViewAlloc[bName] || 0) / total * 100).toFixed(1))
+    }
+    entry['Other'] = parseFloat((otherViews / total * 100).toFixed(1))
+
     return entry
   })
 

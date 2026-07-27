@@ -22,6 +22,7 @@ const NAV = [
       { href: '/brand-growth',  label: 'Brand Growth',      dot: 'green' },
       { href: '/sov-trend',     label: 'SOV Trend',         dot: 'violet' },
       { href: '/keyword-sov',   label: 'Keyword SOV',       dot: 'orange' },
+      { href: '/keywords',      label: 'Keywords',          dot: 'violet' },
       { href: '/brands',        label: 'All Brands',        dot: 'blue' },
       { href: '/dropped',       label: 'Dropped Rankings',  dot: 'red' },
       { href: '/multi-keyword', label: 'Multi-Keyword',     dot: 'violet' },

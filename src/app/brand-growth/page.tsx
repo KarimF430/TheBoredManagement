@@ -246,7 +246,7 @@ export default function BrandGrowthPage() {
                   {sorted.map((row, i) => {
                     const color = brandColor(row.brand_name, i)
                     return (
-                      <tr key={row.brand_name}>
+                      <tr key={`${row.brand_name}_${i}`}>
                         <td style={{ textAlign: 'center', fontWeight: 800, color: '#94A3B8' }}>{i + 1}</td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

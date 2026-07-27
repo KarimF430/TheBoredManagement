@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabase, queryAll } from '@/lib/supabase'
 import { authorizeCampaignAccess } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
@@ -20,19 +20,58 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: error.message, keywords: [] }, { status: 500 })
     }
 
-    const enriched = await Promise.all((keywords || []).map(async (kw: any) => {
-      const [kvRes, ksRes, lastRes] = await Promise.all([
-        supabase.from('keyword_videos').select('id').eq('keyword_id', kw.id),
-        supabase.from('keyword_shorts').select('id').eq('keyword_id', kw.id),
-        supabase.from('keyword_videos').select('last_seen_at').eq('keyword_id', kw.id).order('last_seen_at', { ascending: false }).limit(1).maybeSingle(),
-      ])
+    // Batch aggregate: views, best rank, frequency per keyword
+    const [aggRows, lastSeenRows] = await Promise.all([
+      queryAll<{ keyword_id: string; total_views: number; best_rank: number; frequency: number }>(`
+        SELECT
+          kv.keyword_id,
+          COALESCE(SUM(v.view_count), 0)::BIGINT as total_views,
+          COALESCE(MIN(kv.rank), 99)::INT as best_rank,
+          COUNT(*)::INT as frequency
+        FROM keyword_videos kv
+        JOIN videos v ON v.id = kv.video_id
+        WHERE kv.campaign_id = $1 AND v.is_deleted = FALSE
+        GROUP BY kv.keyword_id
+      `, [campaignId]),
+      queryAll<{ keyword_id: string; last_seen_at: string }>(`
+        SELECT DISTINCT ON (keyword_id) keyword_id, last_seen_at
+        FROM keyword_videos
+        WHERE campaign_id = $1
+        ORDER BY keyword_id, last_seen_at DESC
+      `, [campaignId]),
+    ])
+
+    const aggMap = new Map(aggRows.map(r => [r.keyword_id, r]))
+    const lastSeenMap = new Map(lastSeenRows.map(r => [r.keyword_id, r.last_seen_at]))
+
+    const [kvCounts, ksCounts] = await Promise.all([
+      queryAll<{ keyword_id: string; cnt: number }>(`
+        SELECT keyword_id, COUNT(*)::INT as cnt
+        FROM keyword_videos WHERE campaign_id = $1
+        GROUP BY keyword_id
+      `, [campaignId]),
+      queryAll<{ keyword_id: string; cnt: number }>(`
+        SELECT keyword_id, COUNT(*)::INT as cnt
+        FROM keyword_shorts WHERE campaign_id = $1
+        GROUP BY keyword_id
+      `, [campaignId]),
+    ])
+
+    const kvCountMap = new Map(kvCounts.map(r => [r.keyword_id, r.cnt]))
+    const ksCountMap = new Map(ksCounts.map(r => [r.keyword_id, r.cnt]))
+
+    const enriched = (keywords || []).map((kw: any) => {
+      const agg = aggMap.get(kw.id)
       return {
         ...kw,
-        long_form_count: kvRes.data?.length || 0,
-        short_form_count: ksRes.data?.length || 0,
-        last_scraped: lastRes.data?.last_seen_at || kw.last_scraped_at || null,
+        total_views: agg?.total_views || 0,
+        best_rank: agg?.best_rank || 99,
+        frequency: agg?.frequency || 0,
+        long_form_count: kvCountMap.get(kw.id) || 0,
+        short_form_count: ksCountMap.get(kw.id) || 0,
+        last_scraped: lastSeenMap.get(kw.id) || kw.last_scraped_at || null,
       }
-    }))
+    })
 
     return NextResponse.json({ keywords: enriched })
   } catch (e: any) {

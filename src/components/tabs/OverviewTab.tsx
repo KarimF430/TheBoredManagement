@@ -191,6 +191,8 @@ export default function OverviewTab() {
   const [chartCustomTo, setChartCustomTo] = useState('')
   const [chartViewMode, setChartViewMode] = useState<'cumulative' | 'daily_gain'>('cumulative')
   const [hoveredRegion, setHoveredRegion] = useState<any>(null)
+  const [totalVideosTab, setTotalVideosTab] = useState<'24h' | '7d' | '30d'>('24h')
+  const [uniqueVideosTab, setUniqueVideosTab] = useState<'24h' | '7d' | '30d'>('24h')
 
   const distinctLanguages = useMemo(() => {
     const langs = new Set<string>()
@@ -224,16 +226,18 @@ export default function OverviewTab() {
       timeline = buildTimeline(overview?.totalViewership ?? 0, ovTrendDays)
     }
 
-    // Brand summary for sidebar
-    const brandMap = new Map<string, { views: number; freq: number; videoCount: number }>()
+    // Brand summary — freq = unique keywords each brand appears in
+    const brandMap = new Map<string, { views: number; freq: Set<string>; videoCount: number }>()
     videos.forEach((v: any) => {
+      const kws = (v.keywords_appeared || []) as string[]
       ;(v.tags || v.brands || []).forEach((b: string) => {
-        if (!brandMap.has(b)) brandMap.set(b, { views: 0, freq: 0, videoCount: 0 })
-        const m = brandMap.get(b)!; m.views += v.view_count || 0; m.freq += v.keyword_count || 1; m.videoCount++
+        if (!brandMap.has(b)) brandMap.set(b, { views: 0, freq: new Set(), videoCount: 0 })
+        const m = brandMap.get(b)!; m.views += v.view_count || 0; m.videoCount++
+        kws.forEach((k: string) => m.freq.add(k))
       })
     })
     const totalViewsFiltered = Array.from(brandMap.values()).reduce((s, item) => s + item.views, 0) || 1
-    const topViews = Array.from(brandMap.entries()).map(([name, item]) => ({ name, value: item.views, pct: pct(item.views, totalViewsFiltered), videoCount: item.videoCount, color: brandColor(name) })).sort((a, b) => b.value - a.value)
+    const topViews = Array.from(brandMap.entries()).map(([name, item]) => ({ name, value: item.views, freq: item.freq.size, pct: pct(item.views, totalViewsFiltered), videoCount: item.videoCount, color: brandColor(name) })).sort((a, b) => b.value - a.value)
 
     // Creator summary for sidebar
     const creatorChanMap = new Map<string, { name: string; views: number; count: number; kwCount: number; bestRank: number }>()
@@ -244,13 +248,13 @@ export default function OverviewTab() {
     })
     const channels = Array.from(creatorChanMap.values()).sort((a, b) => b.views - a.views)
 
+    const langLabel: Record<string, string> = { en: 'English', hi: 'Hinglish', ta: 'Tamil', te: 'Telugu', ml: 'Malayalam', kn: 'Kannada', bn: 'Bengali', mr: 'Marathi', gu: 'Gujarati', pa: 'Punjabi', es: 'Spanish', pt: 'Portuguese', fr: 'French', de: 'German', ja: 'Japanese' }
+    const langColors: Record<string, string> = { hi: '#E45756', ta: '#4C78A8', te: '#54A24B', ml: '#B279A2', kn: '#EECA3B', en: '#72B7B2', bn: '#9D755D', mr: '#FF9DA6', gu: '#D67195', pa: '#6C8EBF' }
     const langMap: Record<string, number> = {}
     keywords.forEach((k: any) => { const l = k.language || 'en'; langMap[l] = (langMap[l] || 0) + 1 })
-    const langData = Object.entries(langMap).map(([name, value], i) => ({ name: name.toUpperCase(), value, fill: C[i % C.length] }))
-
-    const typeMap: Record<string, number> = {}
-    keywords.forEach((k: any) => { typeMap[k.type || 'generic'] = (typeMap[k.type || 'generic'] || 0) + 1 })
-    const keywordTypeData = Object.entries(typeMap).map(([name, value], i) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), value, fill: C[i % C.length] }))
+    let langData = Object.entries(langMap).map(([code, value], i) => ({ code, name: langLabel[code] || code.toUpperCase(), value, fill: langColors[code] || C[i % C.length] }))
+    langData = langData.sort((a, b) => b.value - a.value)
+    const topLang = langData[0]
 
     // Regional
     const regionalData = languageRegions.map((region) => {
@@ -273,6 +277,8 @@ export default function OverviewTab() {
     }
     if (filteredTimeline.length === 0) filteredTimeline = timeline
 
+    const typeMap: Record<string, number> = {}
+    keywords.forEach((k: any) => { typeMap[k.type || 'generic'] = (typeMap[k.type || 'generic'] || 0) + 1 })
     let maxType = 'Generic', maxCount = 0
     Object.entries(typeMap).forEach(([t, count]) => { if (count > maxCount) { maxCount = count; maxType = t } })
     const topCategory = maxType.charAt(0).toUpperCase() + maxType.slice(1)
@@ -281,11 +287,25 @@ export default function OverviewTab() {
     videos.filter((v: any) => (v.best_rank || 99) <= 10).forEach((v: any) => { (v.keywords_appeared || []).forEach((k: string) => coveredKws.add(k)) })
     const coverageRate = keywords.length > 0 ? pct(coveredKws.size, keywords.length) : 0
     const untaggedRatio = overview?.totalVideos > 0 ? pct(overview?.untaggedVideos ?? 0, overview.totalVideos) : 0
+    const activeKwCount = keywords.length
 
-    return { timeline, filteredTimeline, topViews, channels, regionalData, langData, keywordTypeData, topCategory, coverageRate, untaggedRatio }
+    return { timeline, filteredTimeline, topViews, channels, regionalData, langData, topLang, topCategory, coverageRate, untaggedRatio, activeKwCount }
   }, [data, overview, videos, keywords, ovTrendDays, chartTimeRange, chartCustomFrom, chartCustomTo, distinctLanguages])
 
-  const { timeline, filteredTimeline, topViews, channels, regionalData, topCategory } = analytics
+  const { timeline, filteredTimeline, topViews, channels, regionalData, topCategory, activeKwCount, langData, topLang, coverageRate } = analytics
+
+  const rankingRate = (overview?.totalVideos ?? 0) > 0 ? ((overview?.rankedVideoCount ?? 0) / (overview?.totalVideos ?? 1)) * 100 : 0
+  const growthNorm = Math.max(0, Math.min(100, ((overview?.growth?.d7 ?? 0) + 50) / 100 * 100))
+  const campaignScore = Math.round(rankingRate * 0.4 + (coverageRate || 0) * 0.3 + growthNorm * 0.3)
+
+  const dailyViews = overview?.dailyViews as { date: string; views: number }[] | undefined
+  const todayViews = dailyViews?.[dailyViews.length - 1]?.views ?? 0
+  const yestViews = dailyViews?.[dailyViews.length - 2]?.views ?? 0
+  const d7Views = dailyViews?.[Math.max(0, dailyViews.length - 8)]?.views ?? 0
+  const d30Views = dailyViews?.[0]?.views ?? 0
+  const viewsGain24h = todayViews - yestViews
+  const viewsGain7d = todayViews - d7Views
+  const viewsGain30d = todayViews - d30Views
 
   const displayVideos = rankTab === 'short' ? videos.filter((v: any) => v.is_short) : videos.filter((v: any) => !v.is_short)
   const filteredVideos = displayVideos.filter((v: any) =>
@@ -300,30 +320,126 @@ export default function OverviewTab() {
     >
       {/* Row 1: 6 cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
-        <MetricCard label="Keywords Tracked" value={overview?.totalKeywords ?? 0} icon={Layers} color="#1A73E8" info="Total number of active keywords being monitored in this campaign." />
-        <Link href="/videos" style={{ textDecoration: 'none' }}>
-          <MetricCard label="Total Videos" value={fmt(overview?.totalVideos ?? 0)} icon={Video} color="#8B5CF6" info="All videos discovered across all keywords. Click to browse." />
-        </Link>
-        <MetricCard label="Unique Videos" value={fmt(overview?.uniqueVideos ?? 0)} icon={Video} color="#06B6D4" info="Deduplicated count of unique videos that successfully rank in the top 10." />
-        <MetricCard label="Total Viewership" value={fmtIndian(overview?.totalViewership ?? 0)} icon={Eye} color="#10B981" info="Aggregated view count from all campaign videos." />
-        <MetricCard label="Top Keyword Type" value={topCategory} icon={Layers} color="#6366F1" info="The keyword category with the highest number of tracked keywords." />
-        <div style={{ background: '#fff', borderRadius: 12, padding: '12px 14px', border: '1px solid #F1F5F9', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', transition: 'all 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><TrendingUp size={13} style={{ color: '#94A3B8' }} /><span style={{ fontSize: 9.5, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Views Growth</span></div>
-              <Info size={11} style={{ color: '#CBD5E1', cursor: 'help', flexShrink: 0 }} />
+
+        {/* 1. Campaign Score */}
+        <div style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', border: '1px solid #F1F5F9', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Target size={14} style={{ color: '#8B5CF6' }} /><span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.3px' }}>CAMPAIGN SCORE</span></div>
+            <span title="Composite: ranking (40%) + coverage (30%) + growth (30%)" style={{ cursor: 'help' }}><Info size={12} style={{ color: '#CBD5E1' }} /></span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 8 }}>
+            <span style={{ fontSize: 32, fontWeight: 800, color: campaignScore >= 70 ? '#10B981' : campaignScore >= 40 ? '#F59E0B' : '#EF4444', fontFamily: "'JetBrains Mono', monospace", lineHeight: 1 }}>{campaignScore}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#94A3B8' }}>/100</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#64748B' }}>Rank {Math.round(rankingRate)}%</span>
+            <span style={{ fontSize: 10, color: '#CBD5E1' }}>·</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#64748B' }}>Cov {Math.round(coverageRate || 0)}%</span>
+            <span style={{ fontSize: 10, color: '#CBD5E1' }}>·</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#64748B' }}>Grw {formatGrowth(overview?.growth?.d7)}</span>
+          </div>
+        </div>
+
+        {/* 2. Total Videos + Views + Growth */}
+        <div style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', border: '1px solid #F1F5F9', display: 'flex', flexDirection: 'column', height: '100%', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Video size={14} style={{ color: '#8B5CF6' }} /><span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.3px' }}>TOTAL VIDEOS</span></div>
+            <span title="All videos discovered across all keywords." style={{ cursor: 'help' }}><Info size={12} style={{ color: '#CBD5E1' }} /></span>
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', fontFamily: "'JetBrains Mono', monospace", lineHeight: 1, marginTop: 8 }}>{fmt(overview?.totalVideos ?? 0)}</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#94A3B8', marginTop: 4 }}>{fmtIndian(data?.totalRegionalViews ?? 0)} views</div>
+          <div style={{ marginTop: 'auto', paddingTop: 8 }}>
+            <div style={{ display: 'flex', gap: 0, background: '#F1F5F9', borderRadius: 5, overflow: 'hidden' }}>
+              {(['24h', '7d', '30d'] as const).map(tab => {
+                const isActive = totalVideosTab === tab
+                return <button key={tab} onClick={() => setTotalVideosTab(tab)} style={{ flex: 1, padding: '4px 0', fontSize: 10, fontWeight: 700, border: 'none', cursor: 'pointer', background: isActive ? '#fff' : 'transparent', color: isActive ? '#0F172A' : '#94A3B8', boxShadow: isActive ? '0 1px 2px rgba(0,0,0,0.06)' : 'none', transition: 'all 0.15s' }}>{tab}</button>
+              })}
             </div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', fontFamily: "'JetBrains Mono', monospace", marginTop: 6 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: (totalVideosTab === '24h' ? overview?.growth?.h24 : totalVideosTab === '7d' ? overview?.growth?.d7 : overview?.growth?.d30) >= 0 ? '#10B981' : '#EF4444', marginTop: 4, fontFamily: "'JetBrains Mono', monospace" }}>
+              {formatGrowth(totalVideosTab === '24h' ? overview?.growth?.h24 : totalVideosTab === '7d' ? overview?.growth?.d7 : overview?.growth?.d30)}
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Unique Videos + Views + Growth */}
+        <div style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', border: '1px solid #F1F5F9', display: 'flex', flexDirection: 'column', height: '100%', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Video size={14} style={{ color: '#06B6D4' }} /><span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.3px' }}>UNIQUE VIDEOS</span></div>
+            <span title="Deduplicated videos ranking in top 10." style={{ cursor: 'help' }}><Info size={12} style={{ color: '#CBD5E1' }} /></span>
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', fontFamily: "'JetBrains Mono', monospace", lineHeight: 1, marginTop: 8 }}>{fmt(overview?.uniqueVideos ?? 0)}</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#94A3B8', marginTop: 4 }}>{fmtIndian(overview?.uniqueVideoViewership ?? overview?.totalViewership ?? 0)} views</div>
+          <div style={{ marginTop: 'auto', paddingTop: 8 }}>
+            <div style={{ display: 'flex', gap: 0, background: '#F1F5F9', borderRadius: 5, overflow: 'hidden' }}>
+              {(['24h', '7d', '30d'] as const).map(tab => {
+                const isActive = uniqueVideosTab === tab
+                return <button key={tab} onClick={() => setUniqueVideosTab(tab)} style={{ flex: 1, padding: '4px 0', fontSize: 10, fontWeight: 700, border: 'none', cursor: 'pointer', background: isActive ? '#fff' : 'transparent', color: isActive ? '#0F172A' : '#94A3B8', boxShadow: isActive ? '0 1px 2px rgba(0,0,0,0.06)' : 'none', transition: 'all 0.15s' }}>{tab}</button>
+              })}
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: (uniqueVideosTab === '24h' ? overview?.growth?.h24 : uniqueVideosTab === '7d' ? overview?.growth?.d7 : overview?.growth?.d30) >= 0 ? '#10B981' : '#EF4444', marginTop: 4, fontFamily: "'JetBrains Mono', monospace" }}>
+              {formatGrowth(uniqueVideosTab === '24h' ? overview?.growth?.h24 : uniqueVideosTab === '7d' ? overview?.growth?.d7 : overview?.growth?.d30)}
+            </div>
+          </div>
+        </div>
+
+        {/* 4. Top 5 Brands (client-side data) */}
+        <div onClick={() => setActiveTab('brands')} style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', border: '1px solid #F1F5F9', display: 'flex', flexDirection: 'column', height: '100%', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', cursor: 'pointer', transition: 'all 0.2s' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Star size={14} style={{ color: '#F59E0B' }} /><span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.3px' }}>TOP BRANDS</span></div>
+            <ArrowUpRight size={12} style={{ color: '#1A73E8', flexShrink: 0 }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8, flex: 1 }}>
+            {topViews.slice(0, 5).map((b: any, i: number) => (
+              <div key={b.name} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', width: 12, textAlign: 'right' }}>{i + 1}.</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#0F172A', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</span>
+                <Bar100 value={b.pct} color={b.color} />
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#64748B', minWidth: 36, textAlign: 'right' }}>{b.pct}%</span>
+              </div>
+            ))}
+            {topViews.length === 0 && (
+              <div style={{ fontSize: 11, color: '#94A3B8', fontStyle: 'italic', textAlign: 'center', marginTop: 8 }}>No brand data</div>
+            )}
+          </div>
+        </div>
+
+        {/* 5. Keyword Summary */}
+        <div onClick={() => setActiveTab('keywords')} style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', border: '1px solid #F1F5F9', display: 'flex', flexDirection: 'column', height: '100%', transition: 'all 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', cursor: 'pointer' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Layers size={14} style={{ color: '#6366F1' }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.3px' }}>KEYWORD SUMMARY</span>
+            </div>
+            <ArrowUpRight size={12} style={{ color: '#1A73E8' }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 8 }}>
+            <span style={{ fontSize: 26, fontWeight: 800, color: '#0F172A', fontFamily: "'JetBrains Mono', monospace", lineHeight: 1 }}>{overview?.totalKeywords ?? 0}</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#10B981' }}>{activeKwCount} active</span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
+            {langData.map((l: any) => (
+              <span key={l.name} style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 4, background: `${l.fill}18`, color: l.fill, border: `1px solid ${l.fill}40` }}>
+                {l.name} {l.value}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* 6. Views Growth (data-linked) */}
+        <div style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', border: '1px solid #F1F5F9', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><TrendingUp size={14} style={{ color: '#10B981' }} /><span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.3px' }}>VIEWS GROWTH</span></div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', fontFamily: "'JetBrains Mono', monospace", marginTop: 8 }}>
               {growthTab === '24h' ? formatGrowth(overview?.growth?.h24) : growthTab === '7d' ? formatGrowth(overview?.growth?.d7) : formatGrowth(overview?.growth?.d30)}
             </div>
-            <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600, marginTop: 2 }}>
-              {growthTab === '24h' ? `+${fmt(overview?.growth?.h24_gain ?? 0)} views` : growthTab === '7d' ? `+${fmt(overview?.growth?.d7_gain ?? 0)} views` : `+${fmt(overview?.growth?.d30_gain ?? 0)} views`}
+            <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600, marginTop: 3 }}>
+              {growthTab === '24h' ? `${viewsGain24h >= 0 ? '+' : ''}${fmt(viewsGain24h)} views` : growthTab === '7d' ? `${viewsGain7d >= 0 ? '+' : ''}${fmt(viewsGain7d)} views` : `${viewsGain30d >= 0 ? '+' : ''}${fmt(viewsGain30d)} views`}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 0, background: '#F1F5F9', borderRadius: 5, overflow: 'hidden', marginTop: 8 }}>
             {(['24h', '7d', '30d'] as const).map(tab => (
               <button key={tab} onClick={() => setGrowthTab(tab)} style={{
-                flex: 1, padding: '3px 0', fontSize: 9.5, fontWeight: 700, border: 'none', cursor: 'pointer',
+                flex: 1, padding: '4px 0', fontSize: 10, fontWeight: 700, border: 'none', cursor: 'pointer',
                 background: growthTab === tab ? '#fff' : 'transparent', color: growthTab === tab ? '#0F172A' : '#94A3B8',
                 boxShadow: growthTab === tab ? '0 1px 2px rgba(0,0,0,0.06)' : 'none', transition: 'all 0.15s',
               }}>{tab}</button>

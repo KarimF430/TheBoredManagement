@@ -108,10 +108,10 @@ export default function GrowthTab() {
 
       {sorted.length > 0 ? (
         <div className="grid-3">
-          {sorted.map(b => {
+          {sorted.map((b, i) => {
             const c = brandColor(b.brand_name)
             return (
-              <div key={b.brand_name} className="card-interactive">
+              <div key={`${b.brand_name}_${i}`} className="card-interactive">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div style={{ width: 10, height: 10, borderRadius: 3, background: c }} /><span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-bright)' }}>{b.brand_name}</span></div>
                   <GrowthBadge val={b.growthPercent} />

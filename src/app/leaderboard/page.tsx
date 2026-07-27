@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink, Download, ChevronUp, ChevronDown, Search, AlertCircle, Plus, X, Tag, Brain, Loader2 } from 'lucide-react'
 import { useCampaignStore } from '@/lib/store'
 import { PageSkeleton } from '@/components/PageSkeleton'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 
 interface KeywordRank {
   keyword_text: string
@@ -79,16 +80,18 @@ function KeywordRankBreakdown({ ranks }: { ranks?: KeywordRank[] }) {
 }
 
 const PER_PAGE = 20
-export default function LeaderboardPage() {
+function LeaderboardContent() {
   const { campaigns, activeCampaignId, fetchCampaigns } = useCampaignStore()
+  const searchParams = useSearchParams()
+  const initialKeywordId = searchParams.get('keyword_id') || ''
   const [tab, setTab] = useState<'long' | 'short'>('long')
-  const [sort, setSort] = useState<'views' | 'frequency' | 'rank'>('views')
+  const [sort, setSort] = useState<'views' | 'frequency' | 'rank'>(initialKeywordId ? 'rank' : 'views')
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   
   // Filters
   const [selectedBrand, setSelectedBrand] = useState('')
-  const [selectedKeyword, setSelectedKeyword] = useState('')
+  const [selectedKeyword, setSelectedKeyword] = useState(initialKeywordId)
   const [selectedChannel, setSelectedChannel] = useState('')
   const [selectedOwnership, setSelectedOwnership] = useState<'all' | 'ours' | 'theirs'>('all')
   const [keywords, setKeywords] = useState<any[]>([])
@@ -787,5 +790,13 @@ export default function LeaderboardPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function LeaderboardPage() {
+  return (
+    <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200, color: '#94A3B8' }}>Loading leaderboard...</div>}>
+      <LeaderboardContent />
+    </Suspense>
   )
 }

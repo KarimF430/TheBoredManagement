@@ -65,7 +65,7 @@ async function fetchDashboard(cid: string, isOurs?: string | null) {
     transcriptRow,
   ] = await Promise.all([
     // Active keywords list (~50 rows max)
-    supabase.from('keywords').select('id, text, language, category, type')
+    supabase.from('keywords').select('id, text, language, category, type, status')
       .eq('campaign_id', cid).eq('status', 'active'),
     // Campaign brands list (~5 rows max)
     supabase.from('campaign_brands').select('name').eq('campaign_id', cid),
