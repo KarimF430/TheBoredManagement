@@ -69,7 +69,7 @@ export default function PrivacyPolicyPage() {
           <h1 className="page-title">Privacy <span className="accent">Policy</span></h1>
           <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginTop: 6, lineHeight: 1.6 }}>
             SOV Panel — YouTube Share-of-Voice Analytics Platform by TheBoredMonkey<br />
-            <strong style={{ color: 'var(--text-muted)' }}>The Bored Monkey</strong>
+            <strong style={{ color: 'var(--text-muted)' }}>TheBoredMonkey</strong>
           </p>
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -115,7 +115,7 @@ export default function PrivacyPolicyPage() {
 
         <Section icon={Shield} iconColor="#FF9F1C" title="1. About This Policy">
           <p style={{ marginBottom: 12 }}>
-            This Privacy Policy explains how <strong style={{ color: 'var(--text-primary)' }}>The Bored Monkey</strong> ("we", "our", or "us")
+            This Privacy Policy explains how <strong style={{ color: 'var(--text-primary)' }}>TheBoredMonkey</strong> ("we", "our", or "us")
             collects, uses, stores, and protects information in connection with the <strong style={{ color: 'var(--text-primary)' }}>SOV Panel</strong> YouTube analytics platform.
           </p>
           <p>
@@ -331,7 +331,7 @@ export default function PrivacyPolicyPage() {
             background: 'linear-gradient(135deg, rgba(16,185,129,0.06) 0%, rgba(16,185,129,0.02) 100%)',
             border: '1px solid rgba(16,185,129,0.2)',
           }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 10 }}>The Bored Monkey</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 10 }}>TheBoredMonkey</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: 'var(--text-secondary)' }}>
               <div>📧 Email: <a href="mailto:privacy@theboredmonkey.com" style={{ color: 'var(--orange)', textDecoration: 'none' }}>privacy@theboredmonkey.com</a></div>
               <div>🌐 Website: <a href="https://theboredmonkey.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--orange)', textDecoration: 'none' }}>theboredmonkey.com</a></div>

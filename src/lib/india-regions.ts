@@ -10,7 +10,7 @@ export const languageRegions: LanguageRegion[] = [
   {
     id: 'north',
     name: 'Hinglish Belt',
-    states: 'Uttar Pradesh, Bihar, Madhya Pradesh, Rajasthan, Haryana, Delhi, Gujarat, Maharashtra, Odisha, Northeast Region',
+    states: 'Uttar Pradesh, Bihar, Madhya Pradesh, Rajasthan, Haryana, Delhi, Gujarat, Maharashtra, Odisha, Northeast Region, Assam, Punjab, Jammu and Kashmir',
     langCode: 'hi',
     color: '#1A73E8',
   },

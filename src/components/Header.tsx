@@ -153,7 +153,7 @@ export default function Header() {
         <div>
           <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--text-muted)' }}>Workspace</span>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginTop: -2 }}>
-            The Bored Monkey Analytics
+            TheBoredMonkey Analytics
           </div>
         </div>
       </div>

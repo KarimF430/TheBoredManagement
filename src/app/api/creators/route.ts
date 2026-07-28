@@ -20,12 +20,16 @@ export async function GET(request: Request) {
       : ''
 
     const videosRows = await queryAll<any>(`
-      SELECT 
-        v.id, v.channel_name, v.view_count, v.tags
-      FROM campaign_videos cv
+      SELECT DISTINCT
+        v.id, v.channel_id, v.channel_name, v.view_count, v.tags, v.youtube_id, v.title, v.thumbnail_url, v.published_at
+      FROM (
+        SELECT video_id FROM keyword_videos WHERE campaign_id = $1
+        UNION ALL
+        SELECT video_id FROM keyword_shorts WHERE campaign_id = $1
+      ) cv
       JOIN videos v ON v.id = cv.video_id
-      WHERE cv.campaign_id = $1
-      ${formatFilter}
+      WHERE 1=1
+      ${formatFilter.replace('cv.', '')}
     `, [campaign_id])
 
     if (videosRows.length === 0) {
@@ -36,13 +40,15 @@ export async function GET(request: Request) {
 
     // 2. Fetch keyword appearances & best ranks
     const kwRows = await queryAll<any>(`
-      SELECT video_id, keyword_id, rank, false as is_short
-      FROM keyword_videos
-      WHERE campaign_id = $1 AND video_id = ANY($2)
+      SELECT kv.video_id, k.text as keyword_id, kv.rank, false as is_short
+      FROM keyword_videos kv
+      JOIN keywords k ON k.id = kv.keyword_id
+      WHERE kv.campaign_id = $1 AND kv.video_id = ANY($2)
       UNION ALL
-      SELECT video_id, keyword_id, rank, true as is_short
-      FROM keyword_shorts
-      WHERE campaign_id = $1 AND video_id = ANY($2)
+      SELECT ks.video_id, k.text as keyword_id, ks.rank, true as is_short
+      FROM keyword_shorts ks
+      JOIN keywords k ON k.id = ks.keyword_id
+      WHERE ks.campaign_id = $1 AND ks.video_id = ANY($2)
     `, [campaign_id, videoIds])
 
     // 3. Fetch brand tags
@@ -62,10 +68,16 @@ export async function GET(request: Request) {
         channel_name: v.channel_name,
         view_count: v.view_count || 0,
         is_short: false,
+        youtube_id: v.youtube_id,
+        title: v.title,
+        thumbnail_url: v.thumbnail_url,
+        published_at: v.published_at,
         tags: parsedTags,
         keywords: new Set<string>(),
         brands: new Set<string>(parsedTags),
-        best_rank: 999
+        best_rank: 999,
+        top5_hits: 0,
+        top10_hits: 0
       })
     })
 
@@ -75,6 +87,8 @@ export async function GET(request: Request) {
         v.keywords.add(row.keyword_id)
         if (row.is_short) v.is_short = true
         if (row.rank < v.best_rank) v.best_rank = row.rank
+        if (row.rank <= 5) v.top5_hits++
+        if (row.rank <= 10) v.top10_hits++
       }
     })
 
@@ -83,12 +97,14 @@ export async function GET(request: Request) {
       if (v) v.brands.add(r.brand_name)
     })
 
-    // Aggregate by creator
+    // Aggregate by creator channel_id
     const creatorMap = new Map<string, any>()
     Array.from(videoMap.values()).forEach(v => {
+      const cid = v.channel_id || v.channel_name || 'unknown'
       if (!v.channel_name) return
-      if (!creatorMap.has(v.channel_name)) {
-        creatorMap.set(v.channel_name, {
+      if (!creatorMap.has(cid)) {
+        creatorMap.set(cid, {
+          channel_id: cid,
           name: v.channel_name,
           views: 0,
           count: 0,
@@ -96,16 +112,34 @@ export async function GET(request: Request) {
           bestRank: 99,
           kws: new Set<string>(),
           brandsMap: new Map<string, number>(),
+          top5_hits: 0,
+          top10_hits: 0,
+          videos: []
         })
       }
-      const c = creatorMap.get(v.channel_name)
+      const c = creatorMap.get(cid)
       c.views += (v.view_count || 0)
       c.count++
+      c.top5_hits += v.top5_hits
+      c.top10_hits += v.top10_hits
       if (v.is_short) c.shorts++
       if (v.best_rank < c.bestRank) c.bestRank = v.best_rank
       v.keywords.forEach((k: string) => c.kws.add(k))
       v.brands.forEach((b: string) => {
         c.brandsMap.set(b, (c.brandsMap.get(b) || 0) + (v.view_count || 0))
+      })
+      
+      c.videos.push({
+        id: v.id,
+        youtube_id: v.youtube_id || v.id,
+        title: v.title || v.channel_name + ' Video',
+        view_count: v.view_count,
+        best_rank: v.best_rank,
+        is_short: v.is_short,
+        thumbnail_url: v.thumbnail_url,
+        published_at: v.published_at,
+        top5_hits: v.top5_hits,
+        top10_hits: v.top10_hits
       })
     })
 
@@ -120,7 +154,22 @@ export async function GET(request: Request) {
         .map(([name, views]) => ({ name, views }))
         .sort((a, b) => b.views - a.views)
 
+      // Calculate daily view growth
+      let totalGrowth = 0;
+      let validVideos = 0;
+      const now = new Date();
+      c.videos.forEach((v: any) => {
+        if (v.published_at && v.view_count) {
+          const p = new Date(v.published_at);
+          const days = Math.max(1, (now.getTime() - p.getTime()) / (1000 * 60 * 60 * 24));
+          totalGrowth += (v.view_count / days);
+          validVideos++;
+        }
+      });
+      const avgDailyGrowth = validVideos > 0 ? Math.round(totalGrowth / validVideos) : 0;
+
       return {
+        id: c.channel_id,
         name: c.name,
         views: c.views,
         count: c.count,
@@ -129,7 +178,13 @@ export async function GET(request: Request) {
         kwCount,
         brandCount,
         bestRank: c.bestRank,
+        top5_hits: c.top5_hits,
+        top10_hits: c.top10_hits,
         brandsList,
+        dailyGrowth: avgDailyGrowth,
+        dailyGrowthPct: c.views > 0 ? Number(((avgDailyGrowth / c.views) * 100).toFixed(4)) : 0,
+        kws: Array.from(c.kws),
+        creatorVideos: c.videos.sort((a: any, b: any) => b.view_count - a.view_count)
       }
     }).sort((a, b) => b.views - a.views)
 
