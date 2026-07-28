@@ -53,15 +53,7 @@ const DOT_COLORS: Record<string, string> = {
   gray:   '#94A3B8',
 }
 
-function LogoSmall() {
-  return (
-    <img
-      src="/tbm-logo.png"
-      alt="TheBoredMonkey"
-      style={{ width: '100%', height: 'auto', display: 'block' }}
-    />
-  )
-}
+
 
 export default function Sidebar() {
   const pathname = usePathname()
@@ -103,9 +95,9 @@ export default function Sidebar() {
       boxShadow: '2px 0 20px rgba(0,0,0,0.02)',
     }}>
 
-      {/* ── Logo / Brand ── */}
+      {/* ── Active Project (Top) ── */}
       <div style={{
-        padding: collapsed ? '14px 10px' : '14px 14px 10px',
+        padding: collapsed ? '14px 10px' : '10px 12px',
         borderBottom: '1.5px solid rgba(26,115,232,0.05)',
         display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start',
         minHeight: 52,
@@ -124,33 +116,35 @@ export default function Sidebar() {
             </svg>
           </div>
         ) : (
-          <LogoSmall />
+          <div style={{ width: '100%' }}>
+            {activeCampaign ? (
+              <div style={{
+                padding: '8px 12px',
+                background: 'linear-gradient(135deg, rgba(245,130,32,0.04), rgba(255,159,67,0.02))',
+                border: '1.5px solid rgba(245,130,32,0.1)',
+                borderRadius: 8,
+                cursor: 'default',
+              }}>
+                <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px', color: '#94A3B8', marginBottom: 2 }}>
+                  Active Project
+                </div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#F58220', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {activeCampaign.name}
+                </div>
+                {activeCampaign.category && (
+                  <div style={{ fontSize: 10, color: '#64748B', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {activeCampaign.category}{activeCampaign.sub_category ? ` › ${activeCampaign.sub_category}` : ''}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#94A3B8' }}>
+                No Active Project
+              </div>
+            )}
+          </div>
         )}
       </div>
-
-      {/* ── Active Project Chip ── */}
-      {!collapsed && activeCampaign && (
-        <div style={{
-          margin: '10px 12px',
-          padding: '8px 12px',
-          background: 'linear-gradient(135deg, rgba(245,130,32,0.04), rgba(255,159,67,0.02))',
-          border: '1.5px solid rgba(245,130,32,0.1)',
-          borderRadius: 8,
-          cursor: 'default',
-        }}>
-          <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px', color: '#94A3B8', marginBottom: 2 }}>
-            Active Project
-          </div>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: '#F58220', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {activeCampaign.name}
-          </div>
-          {activeCampaign.category && (
-            <div style={{ fontSize: 10, color: '#64748B', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {activeCampaign.category}{activeCampaign.sub_category ? ` › ${activeCampaign.sub_category}` : ''}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* ── Navigation ── */}
       <nav style={{

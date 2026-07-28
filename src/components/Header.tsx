@@ -152,8 +152,9 @@ export default function Header() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div>
           <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--text-muted)' }}>Workspace</span>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginTop: -2 }}>
-            TheBoredMonkey Analytics
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
+            <img src="/tbm-logo.png" alt="TheBoredMonkey" style={{ height: 22, width: 'auto', display: 'block' }} />
+            <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)' }}>Analytics</span>
           </div>
         </div>
       </div>
