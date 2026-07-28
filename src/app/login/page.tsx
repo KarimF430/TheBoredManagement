@@ -8,7 +8,7 @@ import { motion } from 'framer-motion'
 function Logo({ h }: { h: number }) {
   return (
     <img
-      src="/tbm-logo.jpg"
+      src="/tbm-logo.png"
       alt="TheBoredMonkey"
       style={{ height: h, width: 'auto', display: 'block' }}
     />
