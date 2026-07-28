@@ -56,7 +56,7 @@ const DOT_COLORS: Record<string, string> = {
 function LogoSmall() {
   return (
     <img
-      src="/tbm-logo.svg"
+      src="/tbm-logo.jpg"
       alt="TheBoredMonkey"
       style={{ width: '100%', height: 'auto', display: 'block' }}
     />

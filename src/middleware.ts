@@ -9,6 +9,7 @@ export async function middleware(req: NextRequest) {
   if (
     path.startsWith('/_next') ||
     path.startsWith('/favicon.ico') ||
+    path.startsWith('/tbm-logo') ||
     path.startsWith('/login') ||
     path.startsWith('/api/auth') ||
     path.startsWith('/api/brands/analyze') ||

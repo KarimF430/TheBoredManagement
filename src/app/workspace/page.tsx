@@ -45,7 +45,7 @@ const ROLE_CONFIG: Record<string, { label: string; color: string; bg: string; bo
 function LogoSm() {
   return (
     <img
-      src="/tbm-logo.svg"
+      src="/tbm-logo.jpg"
       alt="TheBoredMonkey"
       style={{ height: 22, width: 'auto', display: 'block' }}
     />
