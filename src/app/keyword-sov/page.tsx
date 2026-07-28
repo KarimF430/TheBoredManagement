@@ -6,6 +6,8 @@ import {
   PieChart, Pie, Cell, Legend
 } from 'recharts'
 import { useCampaignStore } from '@/lib/store'
+import { useFilterStore } from '@/lib/filter-store'
+import SharedFilterBar from '@/components/SharedFilterBar'
 import { useQuery } from '@tanstack/react-query'
 import {
   AlertCircle, Hash, BarChart2, BarChart3, Download,
@@ -70,9 +72,9 @@ function Badge({ fg, bg: bg2, children }: any) {
 /* ── Page ── */
 export default function KeywordSovPage() {
   const { activeCampaignId, fetchCampaigns } = useCampaignStore()
+  const { search, ownership, format } = useFilterStore()
   const [lang, setLang] = useState('all')
   const [type, setType] = useState('all')
-  const [own, setOwn] = useState<'all' | 'ours' | 'theirs'>('all')
   const [vm, setVm] = useState<'chart' | 'heatmap' | 'table'>('chart')
   const [sk, setSk] = useState('total_videos')
   const [sd, setSd] = useState(true)
@@ -82,12 +84,13 @@ export default function KeywordSovPage() {
   const [eCat, setECat] = useState('generic')
   const [eSaving, setESaving] = useState(false)
 
-  const ownP = own !== 'all' ? `&is_ours=${own === 'ours'}` : ''
-
   const q = useQuery({
-    queryKey: ['kw-sov', activeCampaignId, lang, type, own],
+    queryKey: ['kw-sov', activeCampaignId, lang, type, ownership, format],
     queryFn: async () => {
-      const r = await fetch(`/api/keywords/sov?campaign_id=${activeCampaignId}&language=${lang}&type=${type}${ownP}`)
+      let url = `/api/keywords/sov?campaign_id=${activeCampaignId}&language=${lang}&type=${type}`
+      if (ownership !== 'all') url += `&is_ours=${ownership === 'ours' ? 'true' : 'false'}`
+      if (format !== 'all') url += `&format=${format}`
+      const r = await fetch(url)
       if (!r.ok) throw new Error('Failed to fetch')
       return r.json()
     },
@@ -96,6 +99,7 @@ export default function KeywordSovPage() {
 
   const data: any[] = q.data?.data ?? []
   const brands: string[] = q.data?.brandNames ?? []
+  const filtered = search ? data.filter((kw: any) => kw.keyword?.toLowerCase().includes(search.toLowerCase())) : data
 
   useEffect(() => { fetchCampaigns() }, [fetchCampaigns])
 
@@ -155,12 +159,12 @@ export default function KeywordSovPage() {
   }, [data, brands])
 
   const sortedData = useMemo(() =>
-    data.slice().sort((a, b) => {
+    filtered.slice().sort((a, b) => {
       const av = Number(a[sk]??0), bv = Number(b[sk]??0)
       return sd ? bv - av : av - bv
-    }), [data, sk, sd])
+    }), [filtered, sk, sd])
 
-  const ch = Math.max(240, data.length * 38)
+  const ch = Math.max(240, filtered.length * 38)
   const sortCb = (k: string) => () => { sk === k ? setSd(v => !v) : (setSk(k), setSd(true)) }
 
   if (q.isLoading) return <div className="anim-fade-up"><PageSkeleton cols={4} rows={5} /></div>
@@ -209,29 +213,22 @@ export default function KeywordSovPage() {
         </div>
       </div>
 
-      {/* ── Filters ── */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-        <div>
-          <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: $.mute, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 4 }}>Language</label>
-          <select className="input" style={{ width: 150 }} value={lang} onChange={e => setLang(e.target.value)}>
+      {/* Search & Select Filters */}
+      <SharedFilterBar hasActiveFilters={lang !== 'all' || type !== 'all'} onReset={() => { setLang('all'); setType('all') }} style={{ marginBottom: 20 }}>
+        {/* Language Filter */}
+        <div style={{ minWidth: 130 }}>
+          <select className="input" value={lang} onChange={e => setLang(e.target.value)} style={{ cursor: 'pointer', padding: '6px 12px' }}>
             {LANG_OPTS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
           </select>
         </div>
-        <div>
-          <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: $.mute, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 4 }}>Type</label>
-          <select className="input" style={{ width: 150 }} value={type} onChange={e => setType(e.target.value)}>
+
+        {/* Type Filter */}
+        <div style={{ minWidth: 120 }}>
+          <select className="input" value={type} onChange={e => setType(e.target.value)} style={{ cursor: 'pointer', padding: '6px 12px' }}>
             {TYPE_OPTS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
           </select>
         </div>
-        <div>
-          <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: $.mute, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 4 }}>Ownership</label>
-          <select className="input" style={{ width: 140, cursor: 'pointer' }} value={own} onChange={e => setOwn(e.target.value as any)}>
-            <option value="all">All Videos</option>
-            <option value="ours">Our Videos</option>
-            <option value="theirs">Not Our Videos</option>
-          </select>
-        </div>
-      </div>
+      </SharedFilterBar>
 
       {/* ── Empty ── */}
       {!data.length ? (
@@ -451,7 +448,7 @@ export default function KeywordSovPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.map(kw => (
+                  {filtered.map(kw => (
                     <tr key={kw.keyword}>
                       <td style={{ padding: '6px 12px', fontWeight: 600, fontSize: 12, color: $.text, whiteSpace: 'nowrap' }}>
                         <div>{kw.keyword}</div>

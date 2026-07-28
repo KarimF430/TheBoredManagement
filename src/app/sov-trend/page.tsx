@@ -7,8 +7,10 @@ import {
   BarChart, Bar, Cell,
 } from 'recharts'
 import { useCampaignStore } from '@/lib/store'
+import { useFilterStore } from '@/lib/filter-store'
+import SharedFilterBar from '@/components/SharedFilterBar'
 import { useQuery } from '@tanstack/react-query'
-import { AlertCircle, TrendingUp, TrendingDown, RefreshCw, ChevronUp, ChevronDown, Download } from 'lucide-react'
+import { AlertCircle, TrendingUp, TrendingDown, RefreshCw, ChevronUp, ChevronDown, Download, Search } from 'lucide-react'
 import { PageSkeleton } from '@/components/PageSkeleton'
 import Link from 'next/link'
 
@@ -24,15 +26,6 @@ function brandColor(name: string, idx: number): string {
   for (let i = 0; i < name.length; i++) hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0
   return COLORS[Math.abs(hash) % COLORS.length]
 }
-
-const RANGES = [
-  { key: '1', label: 'Daily' },
-  { key: '7', label: '7 Days' },
-  { key: '30', label: '30 Days' },
-  { key: '90', label: '3 Months' },
-  { key: '180', label: '6 Months' },
-  { key: '365', label: '1 Year' },
-]
 
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
@@ -80,18 +73,32 @@ function computeBrandStats(data: any[], brands: string[]) {
 
 export default function SovTrendPage() {
   const { campaigns, activeCampaignId, fetchCampaigns } = useCampaignStore()
-  const [days, setDays] = useState('30')
+  const { search, ownership, format, dateRange, customDateFrom, customDateTo } = useFilterStore()
   const [chartType, setChartType] = useState<'area' | 'line'>('area')
   const [activeBrands, setActiveBrands] = useState<string[]>([])
   const [showAvg, setShowAvg] = useState(false)
-  const [ownershipFilter, setOwnershipFilter] = useState<'all' | 'ours' | 'theirs'>('all')
 
-  const ownershipParam = ownershipFilter && ownershipFilter !== 'all' ? `&is_ours=${ownershipFilter === 'ours'}` : ''
+  const days = (() => {
+    if (dateRange === 'Custom' && customDateFrom && customDateTo) {
+      const from = new Date(customDateFrom)
+      const to = new Date(customDateTo)
+      const diffMs = to.getTime() - from.getTime()
+      return String(Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1))
+    }
+    const map: Record<string, string> = { '24h': '1', '48h': '2', '1W': '7', '1M': '30', 'All': '365' }
+    return map[dateRange] || '30'
+  })()
 
   const trendQuery = useQuery({
-    queryKey: ['sov-trend', activeCampaignId, days, ownershipFilter],
+    queryKey: ['sov-trend', activeCampaignId, days, ownership, format, customDateFrom, customDateTo],
     queryFn: async () => {
-      const res = await fetch(`/api/sov-trend?campaign_id=${activeCampaignId}&days=${days}${ownershipParam}`)
+      let url = `/api/sov-trend?campaign_id=${activeCampaignId}&days=${days}`
+      if (ownership !== 'all') url += `&is_ours=${ownership === 'ours' ? 'true' : 'false'}`
+      if (format !== 'all') url += `&format=${format}`
+      if (dateRange === 'Custom' && customDateFrom && customDateTo) {
+        url += `&date_from=${customDateFrom}&date_to=${customDateTo}`
+      }
+      const res = await fetch(url)
       if (!res.ok) throw new Error('Failed to fetch trend data')
       return res.json()
     },
@@ -102,6 +109,7 @@ export default function SovTrendPage() {
   const brands: string[] = trendQuery.data?.brands ?? []
   const hasScrapeData = trendQuery.data?.has_scrape_data ?? false
   const loading = trendQuery.isLoading
+  const filteredBrands = search ? brands.filter(b => b.toLowerCase().includes(search.toLowerCase())) : brands
 
   useEffect(() => {
     if (brands.length > 0) setActiveBrands(brands)
@@ -163,34 +171,20 @@ export default function SovTrendPage() {
           <h1 className="page-title">Share-of-Voice <span className="accent">Trend</span></h1>
           <p className="page-subtitle">Time-series SOV evolution with brand comparison</p>
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div className="toggle-group">
-            {RANGES.map(r => (
-              <button key={r.key} className={`toggle-btn ${days === r.key ? 'active' : ''}`} onClick={() => setDays(r.key)}>
-                {r.label}
-              </button>
-            ))}
-          </div>
-          <div className="toggle-group">
-            <button className={`toggle-btn ${chartType === 'area' ? 'active' : ''}`} onClick={() => setChartType('area')}>Stacked Area</button>
-            <button className={`toggle-btn ${chartType === 'line' ? 'active' : ''}`} onClick={() => setChartType('line')}>Multi Line</button>
-          </div>
-          <button
-            onClick={() => setShowAvg(v => !v)}
-            className={`toggle-btn ${showAvg ? 'active' : ''}`}
-            style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, fontWeight: 600, border: '1px solid #E2E8F0', cursor: 'pointer', background: showAvg ? '#1A73E8' : '#F8FAFC', color: showAvg ? '#FFF' : '#64748B', fontFamily: 'inherit' }}
-          >
-            7-Day Avg
-          </button>
-          <div style={{ minWidth: 130 }}>
-            <select className="input" value={ownershipFilter} onChange={e => setOwnershipFilter(e.target.value as any)} style={{ cursor: 'pointer', padding: '6px 12px', minWidth: 130 }}>
-              <option value="all">All Videos</option>
-              <option value="ours">Our Videos</option>
-              <option value="theirs">Not Our Videos</option>
-            </select>
-          </div>
-        </div>
       </div>
+
+      <SharedFilterBar hasActiveFilters={showAvg || chartType !== 'area'} onReset={() => { setShowAvg(false); setChartType('area') }} style={{ marginBottom: 20 }}>
+        {/* Chart Type Toggle */}
+        <div className="toggle-group">
+          <button className={`toggle-btn ${chartType === 'area' ? 'active' : ''}`} onClick={() => setChartType('area')}>Stacked Area</button>
+          <button className={`toggle-btn ${chartType === 'line' ? 'active' : ''}`} onClick={() => setChartType('line')}>Multi Line</button>
+        </div>
+
+        {/* 7-Day Avg Toggle */}
+        <button onClick={() => setShowAvg(v => !v)} className={`toggle-btn ${showAvg ? 'active' : ''}`} style={{ padding: '5px 12px', borderRadius: 7, fontSize: 11.5, fontWeight: 600, border: '1px solid #E2E8F0', cursor: 'pointer', background: showAvg ? '#1A73E8' : '#F8FAFC', color: showAvg ? '#FFF' : '#64748B', fontFamily: 'inherit' }}>
+          7-Day Avg
+        </button>
+      </SharedFilterBar>
 
       {!hasScrapeData && (
         <div className="card" style={{ padding: '14px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12, borderLeft: '3px solid #1A73E8' }}>
@@ -344,9 +338,9 @@ export default function SovTrendPage() {
 
       {/* Brand Filter */}
       <div className="card" style={{ padding: '16px 20px' }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', marginBottom: 10 }}>Filter Brands</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', marginBottom: 10 }}>Filter Brands {search ? <span style={{ color: '#94A3B8', fontWeight: 400, fontSize: 11 }}>· {filteredBrands.length} of {brands.length}</span> : <span style={{ color: '#94A3B8', fontWeight: 400, fontSize: 11 }}>· {brands.length} total</span>}</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {brands.map((b, i) => {
+          {filteredBrands.map((b, i) => {
             const active = effectiveActiveBrands.includes(b)
             const color = brandColor(b, i)
             return (

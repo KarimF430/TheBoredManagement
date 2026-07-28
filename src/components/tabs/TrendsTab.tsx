@@ -4,13 +4,9 @@ import { useState, useEffect, useMemo } from 'react'
 import { AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { Loader2, Download } from 'lucide-react'
 import { useCampaignStore } from '@/lib/store'
+import { useFilterStore } from '@/lib/filter-store'
 import { useQuery } from '@tanstack/react-query'
 import { brandColor } from '@/lib/brand-colors'
-
-const RANGES = [
-  { key: '1', label: 'Daily' }, { key: '7', label: '7 Days' }, { key: '30', label: '30 Days' },
-  { key: '90', label: '3 Months' }, { key: '180', label: '6 Months' }, { key: '365', label: '1 Year' },
-]
 
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
@@ -41,18 +37,28 @@ function computeBrandStats(data: any[], brands: string[]) {
 
 export default function TrendsTab() {
   const { activeCampaignId } = useCampaignStore()
-  const [days, setDays] = useState('30')
+  const { search, ownership, dateRange, customDateFrom, customDateTo } = useFilterStore()
   const [chartType, setChartType] = useState<'area' | 'line'>('area')
   const [activeBrands, setActiveBrands] = useState<string[]>([])
   const [showAvg, setShowAvg] = useState(false)
-  const [ownershipFilter, setOwnershipFilter] = useState<'all' | 'ours' | 'theirs'>('all')
   const [metric, setMetric] = useState<'views' | 'frequency'>('views')
 
+  const days = useMemo(() => {
+    if (dateRange === 'Custom' && customDateFrom && customDateTo) {
+      const from = new Date(customDateFrom)
+      const to = new Date(customDateTo)
+      const diffMs = to.getTime() - from.getTime()
+      return String(Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1))
+    }
+    const map: Record<string, string> = { '24h': '1', '48h': '2', '1W': '7', '1M': '30', 'All': '365' }
+    return map[dateRange] || '30'
+  }, [dateRange, customDateFrom, customDateTo])
+
   const trendTabQuery = useQuery({
-    queryKey: ['trends-tab', activeCampaignId, days, ownershipFilter, metric],
+    queryKey: ['trends-tab', activeCampaignId, days, ownership, metric],
     queryFn: async () => {
       const params = new URLSearchParams({ campaign_id: activeCampaignId!, days })
-      if (ownershipFilter !== 'all') params.set('is_ours', ownershipFilter === 'ours' ? 'true' : 'false')
+      if (ownership !== 'all') params.set('is_ours', ownership === 'ours' ? 'true' : 'false')
       if (metric === 'frequency') params.set('metric', 'frequency')
       const res = await fetch(`/api/sov-trend?${params}`)
       if (!res.ok) throw new Error('Failed to fetch trend data')
@@ -63,6 +69,7 @@ export default function TrendsTab() {
 
   const data = trendTabQuery.data?.data ?? []
   const brands = trendTabQuery.data?.brands ?? []
+  const filteredBrands = search ? brands.filter((b: string) => b.toLowerCase().includes(search.toLowerCase())) : brands
 
   useEffect(() => {
     if (trendTabQuery.data?.brands) setActiveBrands(trendTabQuery.data.brands)
@@ -91,31 +98,25 @@ export default function TrendsTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {RANGES.map(r => <button key={r.key} onClick={() => setDays(r.key)} className={`toggle-btn ${days === r.key ? 'on' : ''}`}>{r.label}</button>)}
+      {/* Page-specific Filters */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', border: '1px solid var(--border-2)', borderRadius: 'var(--border-radius-xs)', overflow: 'hidden' }}>
+          <button onClick={() => setMetric('views')} className={`toggle-btn ${metric === 'views' ? 'on' : ''}`}>Views</button>
+          <button onClick={() => setMetric('frequency')} className={`toggle-btn ${metric === 'frequency' ? 'on' : ''}`}>Frequency</button>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <select className="input" value={ownershipFilter} onChange={e => setOwnershipFilter(e.target.value as any)} style={{ fontSize: 11, padding: '5px 8px', minWidth: 110 }}>
-            <option value="all">All Videos</option><option value="ours">Our Videos</option><option value="theirs">Not Ours</option>
-          </select>
-          <div style={{ display: 'flex', border: '1px solid var(--border-2)', borderRadius: 'var(--border-radius-xs)', overflow: 'hidden' }}>
-            <button onClick={() => setMetric('views')} className={`toggle-btn ${metric === 'views' ? 'on' : ''}`}>Views</button>
-            <button onClick={() => setMetric('frequency')} className={`toggle-btn ${metric === 'frequency' ? 'on' : ''}`}>Frequency</button>
-          </div>
-          <div style={{ display: 'flex', border: '1px solid var(--border-2)', borderRadius: 'var(--border-radius-xs)', overflow: 'hidden' }}>
-            <button onClick={() => setChartType('area')} className={`toggle-btn ${chartType === 'area' ? 'on' : ''}`}>Area</button>
-            <button onClick={() => setChartType('line')} className={`toggle-btn ${chartType === 'line' ? 'on' : ''}`}>Line</button>
-          </div>
-          <button onClick={() => setShowAvg(v => !v)} className={`toggle-btn ${showAvg ? 'on' : ''}`}>3d avg</button>
-          <button onClick={handleExport} className="btn btn-ghost btn-sm"><Download size={11} /> CSV</button>
+        <div style={{ display: 'flex', border: '1px solid var(--border-2)', borderRadius: 'var(--border-radius-xs)', overflow: 'hidden' }}>
+          <button onClick={() => setChartType('area')} className={`toggle-btn ${chartType === 'area' ? 'on' : ''}`}>Area</button>
+          <button onClick={() => setChartType('line')} className={`toggle-btn ${chartType === 'line' ? 'on' : ''}`}>Line</button>
         </div>
+        <button onClick={() => setShowAvg(v => !v)} className={`toggle-btn ${showAvg ? 'on' : ''}`}>3d avg</button>
+        <button onClick={handleExport} className="btn btn-ghost btn-sm"><Download size={11} /> CSV</button>
       </div>
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {brands.map((b: string) => { const on = activeBrands.includes(b); const c = brandColor(b)
+        {filteredBrands.map((b: string) => { const on = activeBrands.includes(b); const c = brandColor(b)
           return <button key={b} onClick={() => toggleBrand(b)} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 6, border: `1.5px solid ${on ? c : 'var(--border-2)'}`, background: on ? `${c}10` : '#fff', color: on ? c : 'var(--text-muted)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: on ? c : 'var(--border-2)' }} />{b}</button> })}
+        {search && brands.length > filteredBrands.length && <span style={{ fontSize: 11, color: '#94A3B8', alignSelf: 'center' }}>{filteredBrands.length} of {brands.length}</span>}
       </div>
 
       <div className="chart-container" style={{ minHeight: 340 }}>

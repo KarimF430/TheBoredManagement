@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { useDashboard } from '@/lib/dashboard-context'
+import { useFilterStore } from '@/lib/filter-store'
 import { languageRegions } from '@/lib/india-regions'
 import IndiaMap from '@/components/IndiaMap'
 
@@ -180,10 +181,9 @@ function buildTimeline(totalViews: number, days: number) {
 
 export default function OverviewTab() {
   const { data, overview, videos, keywords, setDrawerType, downloadCSV, setActiveTab } = useDashboard()
-  const [timeRange, setTimeRange] = useState<'7' | '14' | '30'>('14')
+  const { dateRange } = useFilterStore()
   const [rankTab, setRankTab] = useState<'long' | 'short'>('long')
   const [videoSearch, setVideoSearch] = useState('')
-  const [growthTab, setGrowthTab] = useState<'24h' | '7d' | '30d'>('24h')
   const [ovTrendFormat, setOvTrendFormat] = useState<'all' | 'long' | 'short'>('all')
   const [ovTrendDays, setOvTrendDays] = useState<number>(14)
   const [chartTimeRange, setChartTimeRange] = useState<'24h' | '48h' | '1w' | '1m' | 'all' | 'custom'>('all')
@@ -191,8 +191,6 @@ export default function OverviewTab() {
   const [chartCustomTo, setChartCustomTo] = useState('')
   const [chartViewMode, setChartViewMode] = useState<'cumulative' | 'daily_gain'>('cumulative')
   const [hoveredRegion, setHoveredRegion] = useState<any>(null)
-  const [totalVideosTab, setTotalVideosTab] = useState<'24h' | '7d' | '30d'>('24h')
-  const [uniqueVideosTab, setUniqueVideosTab] = useState<'24h' | '7d' | '30d'>('24h')
 
   const distinctLanguages = useMemo(() => {
     const langs = new Set<string>()
@@ -307,6 +305,9 @@ export default function OverviewTab() {
   const viewsGain7d = todayViews - d7Views
   const viewsGain30d = todayViews - d30Views
 
+  const growthValue = dateRange === '24h' ? overview?.growth?.h24 : dateRange === '48h' ? overview?.growth?.h24 : dateRange === '1W' ? overview?.growth?.d7 : overview?.growth?.d30
+  const viewsGain = dateRange === '24h' || dateRange === '48h' ? viewsGain24h : dateRange === '1W' ? viewsGain7d : viewsGain30d
+
   const displayVideos = rankTab === 'short' ? videos.filter((v: any) => v.is_short) : videos.filter((v: any) => !v.is_short)
   const filteredVideos = displayVideos.filter((v: any) =>
     (v.title || '').toLowerCase().includes(videoSearch.toLowerCase()) ||
@@ -349,14 +350,8 @@ export default function OverviewTab() {
           <div style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', fontFamily: "'JetBrains Mono', monospace", lineHeight: 1, marginTop: 8 }}>{fmt(overview?.totalVideos ?? 0)}</div>
           <div style={{ fontSize: 12, fontWeight: 600, color: '#94A3B8', marginTop: 4 }}>{fmtIndian(data?.totalRegionalViews ?? 0)} views</div>
           <div style={{ marginTop: 'auto', paddingTop: 8 }}>
-            <div style={{ display: 'flex', gap: 0, background: '#F1F5F9', borderRadius: 5, overflow: 'hidden' }}>
-              {(['24h', '7d', '30d'] as const).map(tab => {
-                const isActive = totalVideosTab === tab
-                return <button key={tab} onClick={() => setTotalVideosTab(tab)} style={{ flex: 1, padding: '4px 0', fontSize: 10, fontWeight: 700, border: 'none', cursor: 'pointer', background: isActive ? '#fff' : 'transparent', color: isActive ? '#0F172A' : '#94A3B8', boxShadow: isActive ? '0 1px 2px rgba(0,0,0,0.06)' : 'none', transition: 'all 0.15s' }}>{tab}</button>
-              })}
-            </div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: (totalVideosTab === '24h' ? overview?.growth?.h24 : totalVideosTab === '7d' ? overview?.growth?.d7 : overview?.growth?.d30) >= 0 ? '#10B981' : '#EF4444', marginTop: 4, fontFamily: "'JetBrains Mono', monospace" }}>
-              {formatGrowth(totalVideosTab === '24h' ? overview?.growth?.h24 : totalVideosTab === '7d' ? overview?.growth?.d7 : overview?.growth?.d30)}
+            <div style={{ fontSize: 12, fontWeight: 800, color: growthValue >= 0 ? '#10B981' : '#EF4444', fontFamily: "'JetBrains Mono', monospace" }}>
+              {formatGrowth(growthValue)}
             </div>
           </div>
         </div>
@@ -370,14 +365,8 @@ export default function OverviewTab() {
           <div style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', fontFamily: "'JetBrains Mono', monospace", lineHeight: 1, marginTop: 8 }}>{fmt(overview?.uniqueVideos ?? 0)}</div>
           <div style={{ fontSize: 12, fontWeight: 600, color: '#94A3B8', marginTop: 4 }}>{fmtIndian(overview?.uniqueVideoViewership ?? overview?.totalViewership ?? 0)} views</div>
           <div style={{ marginTop: 'auto', paddingTop: 8 }}>
-            <div style={{ display: 'flex', gap: 0, background: '#F1F5F9', borderRadius: 5, overflow: 'hidden' }}>
-              {(['24h', '7d', '30d'] as const).map(tab => {
-                const isActive = uniqueVideosTab === tab
-                return <button key={tab} onClick={() => setUniqueVideosTab(tab)} style={{ flex: 1, padding: '4px 0', fontSize: 10, fontWeight: 700, border: 'none', cursor: 'pointer', background: isActive ? '#fff' : 'transparent', color: isActive ? '#0F172A' : '#94A3B8', boxShadow: isActive ? '0 1px 2px rgba(0,0,0,0.06)' : 'none', transition: 'all 0.15s' }}>{tab}</button>
-              })}
-            </div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: (uniqueVideosTab === '24h' ? overview?.growth?.h24 : uniqueVideosTab === '7d' ? overview?.growth?.d7 : overview?.growth?.d30) >= 0 ? '#10B981' : '#EF4444', marginTop: 4, fontFamily: "'JetBrains Mono', monospace" }}>
-              {formatGrowth(uniqueVideosTab === '24h' ? overview?.growth?.h24 : uniqueVideosTab === '7d' ? overview?.growth?.d7 : overview?.growth?.d30)}
+            <div style={{ fontSize: 12, fontWeight: 800, color: growthValue >= 0 ? '#10B981' : '#EF4444', fontFamily: "'JetBrains Mono', monospace" }}>
+              {formatGrowth(growthValue)}
             </div>
           </div>
         </div>
@@ -430,20 +419,11 @@ export default function OverviewTab() {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><TrendingUp size={14} style={{ color: '#10B981' }} /><span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.3px' }}>VIEWS GROWTH</span></div>
             <div style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', fontFamily: "'JetBrains Mono', monospace", marginTop: 8 }}>
-              {growthTab === '24h' ? formatGrowth(overview?.growth?.h24) : growthTab === '7d' ? formatGrowth(overview?.growth?.d7) : formatGrowth(overview?.growth?.d30)}
+              {formatGrowth(growthValue)}
             </div>
             <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600, marginTop: 3 }}>
-              {growthTab === '24h' ? `${viewsGain24h >= 0 ? '+' : ''}${fmt(viewsGain24h)} views` : growthTab === '7d' ? `${viewsGain7d >= 0 ? '+' : ''}${fmt(viewsGain7d)} views` : `${viewsGain30d >= 0 ? '+' : ''}${fmt(viewsGain30d)} views`}
+              {viewsGain >= 0 ? '+' : ''}{fmt(viewsGain)} views
             </div>
-          </div>
-          <div style={{ display: 'flex', gap: 0, background: '#F1F5F9', borderRadius: 5, overflow: 'hidden', marginTop: 8 }}>
-            {(['24h', '7d', '30d'] as const).map(tab => (
-              <button key={tab} onClick={() => setGrowthTab(tab)} style={{
-                flex: 1, padding: '4px 0', fontSize: 10, fontWeight: 700, border: 'none', cursor: 'pointer',
-                background: growthTab === tab ? '#fff' : 'transparent', color: growthTab === tab ? '#0F172A' : '#94A3B8',
-                boxShadow: growthTab === tab ? '0 1px 2px rgba(0,0,0,0.06)' : 'none', transition: 'all 0.15s',
-              }}>{tab}</button>
-            ))}
           </div>
         </div>
       </div>
@@ -455,7 +435,15 @@ export default function OverviewTab() {
           <MetricCard label="Pending Tagging" value={fmt(overview?.untaggedVideos ?? 0)} icon={Video} color="#EF4444" info="Top-ranked videos not yet assigned a brand. Click to tag them." />
         </Link>
         <MetricCard label="Active Creators" value={fmt(overview?.uniqueChannels ?? 0)} icon={Tv} color="#10B981" info="Unique YouTube channels whose videos appear in search results." />
-        <MetricCard label="Top Creator" value={overview?.mostRankingChannel?.name || '—'} icon={Activity} color="#EC4899" info="The channel with the highest number of keyword appearances." />
+        <div onClick={() => setActiveTab('creators')} style={{ cursor: 'pointer', height: '100%' }}>
+          <MetricCard
+            label="Top Creator"
+            value={channels[0]?.name || overview?.mostRankingChannel?.name || '—'}
+            icon={Activity}
+            color="#EC4899"
+            info="The creator channel with the highest search reach and keyword rankings. Click to open Creators Intelligence Hub."
+          />
+        </div>
         <MetricCard label="Our Videos" value={fmt(overview?.ourVideos?.count || 0)} icon={Video} color="#10B981" info="Videos identified as belonging to your brand or campaign." />
       </div>
 

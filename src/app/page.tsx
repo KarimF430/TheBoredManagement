@@ -11,7 +11,9 @@ import {
 import { AnimatePresence, motion } from 'framer-motion'
 import Link from 'next/link'
 import { useCampaignStore } from '@/lib/store'
+import { useFilterStore } from '@/lib/filter-store'
 import { DashboardCtx } from '@/lib/dashboard-context'
+import SharedFilterBar from '@/components/SharedFilterBar'
 
 const VideosTab = lazy(() => import('@/components/tabs/VideosTab'))
 const KeywordsTab = lazy(() => import('@/components/tabs/KeywordsTab'))
@@ -81,6 +83,31 @@ function Bar100({ value, color }: { value: number; color: string }) {
   )
 }
 
+function formatTimestamp(input: any): string {
+  if (!input) return 'Not updated'
+  let date: Date
+  if (typeof input === 'object' && input !== null) {
+    const val = input.updated_at || input.value
+    if (!val) return 'Not updated'
+    date = new Date(val)
+  } else {
+    date = new Date(input)
+  }
+  if (isNaN(date.getTime())) return 'Not updated'
+
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+
+  let relative = 'Just now'
+  if (diffMins >= 1 && diffMins < 60) relative = `${diffMins}m ago`
+  else if (diffMins >= 60 && diffMins < 1440) relative = `${Math.floor(diffMins / 60)}h ago`
+  else if (diffMins >= 1440) relative = `${Math.floor(diffMins / 1440)}d ago`
+
+  const dateStr = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  return `${dateStr} (${relative})`
+}
+
 function TabLoader({ label }: { label?: string }) {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -97,21 +124,24 @@ function TabLoader({ label }: { label?: string }) {
 
 export default function OverviewPage() {
   const { campaigns, activeCampaignId, fetchCampaigns } = useCampaignStore()
-  const [timeRange, setTimeRange] = useState<'7' | '14' | '30'>('14')
+  const { format, ownership, dateRange, customDateFrom, customDateTo } = useFilterStore()
   const [activeTab, setActiveTab] = useState<'overview' | 'brands' | 'creators' | 'rankings' | 'videos' | 'keywords' | 'trends' | 'growth' | 'alerts' | 'settings'>('overview')
   const [showDemo, setShowDemo] = useState(false)
-  const [ownershipFilter, setOwnershipFilter] = useState<'all' | 'ours' | 'theirs'>('all')
   const [drawerType, setDrawerType] = useState<'views_detail' | 'brand_sov_detail' | 'creator_detail' | 'rank_detail' | null>(null)
+  const [isRefreshingViews, setIsRefreshingViews] = useState(false)
 
   const campaign = campaigns.find(c => c.id === activeCampaignId)
-  const isOursParam = ownershipFilter && ownershipFilter !== 'all' ? `&is_ours=${ownershipFilter}` : ''
+  const isOursParam = ownership && ownership !== 'all' ? `&is_ours=${ownership}` : ''
+  const formatParam = format && format !== 'all' ? `&format=${format}` : ''
+  const timeRangeParam = dateRange && dateRange !== 'All' ? `&time_range=${dateRange}` : ''
+  const customDateParam = dateRange === 'Custom' && customDateFrom && customDateTo ? `&date_from=${customDateFrom}&date_to=${customDateTo}` : ''
 
   const dashboardQuery = useQuery({
-    queryKey: ['dashboard', activeCampaignId, ownershipFilter],
+    queryKey: ['dashboard', activeCampaignId, format, ownership, dateRange, customDateFrom, customDateTo],
     queryFn: async () => {
       const [kpisRes, fullRes] = await Promise.all([
-        fetch(`/api/dashboard/kpis?campaign_id=${activeCampaignId}`),
-        fetch(`/api/dashboard?campaign_id=${activeCampaignId}${isOursParam}`),
+        fetch(`/api/dashboard/kpis?campaign_id=${activeCampaignId}${formatParam}${timeRangeParam}${customDateParam}`),
+        fetch(`/api/dashboard?campaign_id=${activeCampaignId}${formatParam}${isOursParam}${timeRangeParam}${customDateParam}`),
       ])
       const kpis = kpisRes.ok ? await kpisRes.json() : null
       const d = await fullRes.json()
@@ -119,6 +149,23 @@ export default function OverviewPage() {
     },
     enabled: !!activeCampaignId,
   })
+
+  const handleViewsUpdate = async () => {
+    if (!activeCampaignId || isRefreshingViews) return
+    setIsRefreshingViews(true)
+    try {
+      await fetch('/api/views/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaign_id: activeCampaignId }),
+      })
+      await dashboardQuery.refetch()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setIsRefreshingViews(false)
+    }
+  }
 
   const dashboardData = dashboardQuery.data
   const overview = dashboardData?.overview ?? null
@@ -252,7 +299,7 @@ export default function OverviewPage() {
       `}</style>
 
       {/* ── HEADER ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, gap: 12, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, gap: 12, flexWrap: 'wrap' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
             <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.4px' }}>
@@ -260,30 +307,25 @@ export default function OverviewPage() {
             </h1>
             {hasData && <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Live</span>}
           </div>
-          <div style={{ fontSize: 12, color: '#94A3B8', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ fontSize: 12, color: '#94A3B8', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <span>{overview?.totalKeywords ?? 0} keywords</span>
             <span style={{ color: '#E2E8F0' }}>·</span>
             <span>{fmt(overview?.totalVideos)} videos</span>
             <span style={{ color: '#E2E8F0' }}>·</span>
             <span>{fmt(overview?.uniqueChannels)} creators</span>
           </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <select className="select-filter" value={ownershipFilter} onChange={(e) => setOwnershipFilter(e.target.value as any)}>
-            <option value="all">All Videos</option>
-            <option value="ours">Our Videos</option>
-            <option value="theirs">Not Our Videos</option>
-          </select>
-          <div style={{ display: 'flex', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden' }}>
-            {(['7', '14', '30'] as const).map(r => (
-              <button key={r} onClick={() => setTimeRange(r)} style={{ padding: '6px 12px', fontSize: 11.5, fontWeight: 600, background: timeRange === r ? '#1A73E8' : 'transparent', color: timeRange === r ? '#FFF' : '#64748B', border: 'none', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}>{r}d</button>
-            ))}
+          <div style={{ fontSize: 11, color: '#94A3B8', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span>Last updated: {formatTimestamp(overview?.lastUpdatedViews || dashboardData?.lastUpdated)}</span>
+            <span style={{ fontSize: 9, color: '#CBD5E1' }}>•</span>
+            <span>Weekly run: Monday 11 PM</span>
           </div>
-          <button onClick={() => dashboardQuery.refetch()} disabled={dashboardQuery.isRefetching}
-            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: '1px solid #E2E8F0', background: '#FFF', color: '#475569', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-            <RefreshCw size={12} style={{ animation: dashboardQuery.isRefetching ? 'spin 1s linear infinite' : 'none' }} />
-            {dashboardQuery.isRefetching ? 'Refreshing…' : 'Refresh'}
-          </button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <SharedFilterBar
+            showViewsUpdate
+            onViewsUpdate={handleViewsUpdate}
+            isViewsUpdating={isRefreshingViews || dashboardQuery.isRefetching}
+          />
         </div>
       </div>
 

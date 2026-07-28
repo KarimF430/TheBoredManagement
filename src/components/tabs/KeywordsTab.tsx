@@ -15,6 +15,7 @@ type MetricMode = 'views' | 'frequency'
 type SortKey = 'name' | 'videos' | 'views' | 'frequency' | 'last_scraped' | 'status' | 'rank' | 'score' | 'slotValue'
 
 import { useDashboard } from '@/lib/dashboard-context'
+import { useFilterStore } from '@/lib/filter-store'
 
 const C = ['#4C78A8','#54A24B','#E45756','#72B7B2','#EECA3B','#B279A2','#FF9DA6','#9D755D','#BAB0AC','#D67195']
 const TYPE_COLORS: Record<string, string> = { generic: '#1A73E8', branded: '#DC2626', comparison: '#F59E0B' }
@@ -134,7 +135,7 @@ export default function KeywordsTab() {
   const [kwLang, setKwLang] = useState('en')
   const [kwType, setKwType] = useState<'generic' | 'branded' | 'comparison'>('generic')
   const [adding, setAdding] = useState(false)
-  const [search, setSearch] = useState('')
+  const { search } = useFilterStore()
   const [filterType, setFilterType] = useState<string>('all')
   const [filterLang, setFilterLang] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<string>('all')
@@ -318,8 +319,6 @@ export default function KeywordsTab() {
   }
 
   const SortIcon = ({ col }: { col: SortKey }) => <ArrowUpDown size={10} style={{ color: sortKey === col ? '#1A73E8' : '#CBD5E1', marginLeft: 3 }} />
-
-  const activeFilters = [filterType, filterLang, filterStatus, filterRank].filter(v => v !== 'all').length
 
   const getRankBg = (rank: number) => {
     if (rank <= 3) return 'rgba(5,150,105,0.08)'
@@ -576,29 +575,20 @@ export default function KeywordsTab() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: '1 1 240px', maxWidth: 360 }}>
-          <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
-          <input className="input" placeholder="Search keywords..." value={search} onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 32, width: '100%' }} />
-        </div>
-        <select className="input" value={filterType} onChange={e => setFilterType(e.target.value)} style={{ minWidth: 100 }}>
+      {/* Page-specific Filters */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <select className="input" value={filterType} onChange={e => setFilterType(e.target.value)} style={{ cursor: 'pointer', padding: '6px 12px', minWidth: 100 }}>
           <option value="all">All Types</option><option value="generic">Generic</option><option value="branded">Branded</option><option value="comparison">Comparison</option>
         </select>
-        <select className="input" value={filterLang} onChange={e => setFilterLang(e.target.value)} style={{ minWidth: 110 }}>
+        <select className="input" value={filterLang} onChange={e => setFilterLang(e.target.value)} style={{ cursor: 'pointer', padding: '6px 12px', minWidth: 110 }}>
           <option value="all">All Languages</option>{distinctLangs.map(l => <option key={l} value={l}>{LANG_LABELS[l] || l}</option>)}
         </select>
-        <select className="input" value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ minWidth: 100 }}>
+        <select className="input" value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ cursor: 'pointer', padding: '6px 12px', minWidth: 100 }}>
           {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
-        <select className="input" value={filterRank} onChange={e => setFilterRank(e.target.value)} style={{ minWidth: 120 }}>
+        <select className="input" value={filterRank} onChange={e => setFilterRank(e.target.value)} style={{ cursor: 'pointer', padding: '6px 12px', minWidth: 120 }}>
           {RANK_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
-        {activeFilters > 0 && (
-          <button onClick={() => { setFilterType('all'); setFilterLang('all'); setFilterStatus('all'); setFilterRank('all'); setSearch('') }}
-            style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #EF4444', background: '#FEF2F2', color: '#DC2626', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-            <X size={12} /> Reset Filters
-          </button>
-        )}
       </div>
 
       {loading ? (

@@ -9,25 +9,12 @@ export interface LanguageRegion {
 export const languageRegions: LanguageRegion[] = [
   {
     id: 'north',
-    name: 'North (Hindi Belt)',
-    states: 'Uttar Pradesh, Bihar, Madhya Pradesh, Rajasthan, Haryana, Delhi',
+    name: 'Hinglish Belt',
+    states: 'Uttar Pradesh, Bihar, Madhya Pradesh, Rajasthan, Haryana, Delhi, Gujarat, Maharashtra, Odisha, Northeast Region',
     langCode: 'hi',
     color: '#1A73E8',
   },
-  {
-    id: 'west_gujarat',
-    name: 'Gujarat (Gujarati)',
-    states: 'Gujarat',
-    langCode: 'gu',
-    color: '#06B6D4',
-  },
-  {
-    id: 'west_maharashtra',
-    name: 'Maharashtra (Marathi)',
-    states: 'Maharashtra, Goa',
-    langCode: 'mr',
-    color: '#F97316',
-  },
+
   {
     id: 'south_karnataka',
     name: 'Karnataka (Kannada)',
@@ -56,13 +43,7 @@ export const languageRegions: LanguageRegion[] = [
     langCode: 'te',
     color: '#F59E0B',
   },
-  {
-    id: 'east_odisha',
-    name: 'Odisha (Odia)',
-    states: 'Odisha',
-    langCode: 'or',
-    color: '#EC4899',
-  },
+
   {
     id: 'east_bengal',
     name: 'West Bengal (Bengali)',
@@ -70,13 +51,7 @@ export const languageRegions: LanguageRegion[] = [
     langCode: 'bn',
     color: '#14B8A6',
   },
-  {
-    id: 'northeast',
-    name: 'Northeast Region',
-    states: 'Assam, Meghalaya, Tripura, Mizoram, Manipur, Nagaland, Arunachal',
-    langCode: 'as',
-    color: '#6366F1',
-  },
+
 ]
 
 export function getLanguageRegion(langCode: string): LanguageRegion | undefined {

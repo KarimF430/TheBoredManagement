@@ -10,13 +10,16 @@ export async function GET(req: NextRequest) {
     const campaignId = req.nextUrl.searchParams.get('campaign_id')
     const days = parseInt(req.nextUrl.searchParams.get('days') ?? '30')
     const isOurs = req.nextUrl.searchParams.get('is_ours')
+    const format = req.nextUrl.searchParams.get('format') // 'all' | 'long' | 'short'
+    const dateFrom = req.nextUrl.searchParams.get('date_from')
+    const dateTo = req.nextUrl.searchParams.get('date_to')
 
     const { authorized, error } = await authorizeCampaignAccess(req, campaignId)
     if (!authorized) return error
     if (!campaignId) return NextResponse.json({ data: [], brands: [], has_scrape_data: false })
 
-    const key = `${cacheKey.sovTrend(campaignId, 'all', String(days))}:${isOurs || 'all'}`
-    const data = await getCached(key, () => fetchSovTrend(campaignId, days, isOurs), CACHE_TTL.sov_trend)
+    const key = `${cacheKey.sovTrend(campaignId, 'all', String(days))}:${isOurs || 'all'}:${format || 'all'}:${dateFrom || ''}:${dateTo || ''}`
+    const data = await getCached(key, () => fetchSovTrend(campaignId, days, isOurs, format, dateFrom, dateTo), CACHE_TTL.sov_trend)
     return NextResponse.json(data)
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unknown error'
@@ -25,7 +28,14 @@ export async function GET(req: NextRequest) {
   }
 }
 
-async function fetchSovTrend(campaignId: string, days: number, isOurs?: string | null) {
+async function fetchSovTrend(
+  campaignId: string,
+  days: number,
+  isOurs?: string | null,
+  format?: string | null,
+  dateFrom?: string | null,
+  dateTo?: string | null
+) {
   // Parallel: get brand names from campaign_brands AND brand_tags simultaneously
   const [cbRes, btRes] = await Promise.all([
     supabase.from('campaign_brands').select('name').eq('campaign_id', campaignId),
@@ -41,7 +51,16 @@ async function fetchSovTrend(campaignId: string, days: number, isOurs?: string |
     return { data: [], brands: [], has_scrape_data: false }
   }
 
-  const brandTags = btRes.data || []
+  let brandTags = btRes.data || []
+
+  // Filter by format if specified
+  if (brandTags.length > 0 && (format === 'long' || format === 'short')) {
+    const table = format === 'long' ? 'keyword_videos' : 'keyword_shorts'
+    const { data: kvRows } = await supabase.from(table).select('video_id').eq('campaign_id', campaignId)
+    const validVideoIds = new Set((kvRows || []).map((r: any) => r.video_id))
+    brandTags = brandTags.filter((bt: any) => validVideoIds.has(bt.video_id))
+  }
+
   if (brandTags.length === 0) {
     return { data: [], brands: brandNames, has_scrape_data: false }
   }
@@ -76,15 +95,40 @@ async function fetchSovTrend(campaignId: string, days: number, isOurs?: string |
     filteredVideoIds = allVideoIds.filter(id => vidsSet.has(id))
   }
 
-  // Fetch snapshot data
-  const startDate = new Date(Date.now() - (days - 1) * 86400000).toISOString().split('T')[0]
+  // Build time-series date list
+  const dates: string[] = []
+  if (dateFrom && dateTo) {
+    const start = new Date(dateFrom)
+    const end = new Date(dateTo)
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      dates.push(d.toISOString().split('T')[0])
+    }
+  } else {
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000)
+      dates.push(d.toISOString().split('T')[0])
+    }
+  }
 
-  const { data: snapshots } = await supabase
+  if (dates.length === 0) {
+    return { data: [], brands: brandNames, has_scrape_data: false }
+  }
+
+  // Fetch snapshot data
+  const startDate = dates[0]
+  const endDate = dates[dates.length - 1]
+
+  let query = supabase
     .from('view_snapshots')
     .select('video_id, view_count, snapshot_date')
     .eq('campaign_id', campaignId)
     .gte('snapshot_date', startDate)
-    .in('video_id', filteredVideoIds.length > 0 ? filteredVideoIds : ['__none__'])
+
+  if (dateFrom && dateTo) {
+    query = query.lte('snapshot_date', endDate)
+  }
+
+  const { data: snapshots } = await query.in('video_id', filteredVideoIds.length > 0 ? filteredVideoIds : ['__none__'])
 
   const hasSnapshots = (snapshots || []).length > 0
 
@@ -101,13 +145,6 @@ async function fetchSovTrend(campaignId: string, days: number, isOurs?: string |
         brandMap.set(brandName, (brandMap.get(brandName) || 0) + (snap.view_count || 0))
       }
     }
-  }
-
-  // Build time-series
-  const dates: string[] = []
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 86400000)
-    dates.push(d.toISOString().split('T')[0])
   }
 
   const trendData = dates

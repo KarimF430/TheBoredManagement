@@ -4,8 +4,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { useCampaignStore } from '@/lib/store'
+import { useFilterStore } from '@/lib/filter-store'
+import SharedFilterBar from '@/components/SharedFilterBar'
 import { PageSkeleton } from '@/components/PageSkeleton'
-import { Loader2, Eye, Hash, TrendingUp, Award, ChevronRight } from 'lucide-react'
+import { Loader2, Eye, Hash, TrendingUp, Award, ChevronRight, Search } from 'lucide-react'
 import Link from 'next/link'
 
 const COLORS = [
@@ -44,15 +46,16 @@ function CustomTooltip({ active, payload }: any) {
 
 export default function BrandIntelligencePage() {
   const { campaigns, activeCampaignId, fetchCampaigns } = useCampaignStore()
+  const { search, ownership, format } = useFilterStore()
   const [sortBy, setSortBy] = useState<'views' | 'freq'>('views')
-  const [ownershipFilter, setOwnershipFilter] = useState<'all' | 'ours' | 'theirs'>('all')
-
-  const isOursParam = ownershipFilter === 'ours' ? '&is_ours=true' : ownershipFilter === 'theirs' ? '&is_ours=false' : ''
 
   const brandsQuery = useQuery({
-    queryKey: ['brands', activeCampaignId, ownershipFilter],
+    queryKey: ['brands', activeCampaignId, ownership, format],
     queryFn: async () => {
-      const res = await fetch(`/api/brands?campaign_id=${activeCampaignId}${isOursParam}`)
+      let url = `/api/brands?campaign_id=${activeCampaignId}`
+      if (ownership !== 'all') url += `&is_ours=${ownership === 'ours' ? 'true' : 'false'}`
+      if (format !== 'all') url += `&format=${format}`
+      const res = await fetch(url)
       return res.json()
     },
     enabled: !!activeCampaignId,
@@ -60,10 +63,11 @@ export default function BrandIntelligencePage() {
 
   const brands = brandsQuery.data?.data ?? []
   const hasData = brandsQuery.data?.has_scrape_data ?? false
+  const filteredBrandsList = search ? brands.filter((b: any) => b.name?.toLowerCase().includes(search.toLowerCase())) : brands
 
   useEffect(() => { fetchCampaigns() }, [fetchCampaigns])
 
-  const sortedBrands = [...brands].sort((a, b) =>
+  const sortedBrands = [...filteredBrandsList].sort((a, b) =>
     sortBy === 'views' ? (b.total_views || 0) - (a.total_views || 0) : (b.total_frequency || 0) - (a.total_frequency || 0)
   )
 
@@ -83,28 +87,18 @@ export default function BrandIntelligencePage() {
           <h1 className="page-title">Brand <span className="accent">Intelligence</span></h1>
           <p className="page-subtitle">Deep analytics: Share-of-Voice, frequency rankings, and competitive positioning</p>
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <div className="toggle-group">
-            <button className={`toggle-btn ${sortBy === 'views' ? 'active' : ''}`} onClick={() => setSortBy('views')}>By Views</button>
-            <button className={`toggle-btn ${sortBy === 'freq' ? 'active' : ''}`} onClick={() => setSortBy('freq')}>By Frequency</button>
-          </div>
-          <Link href="/control" className="btn btn-blue btn-sm">
-            <Award size={13} /> Manage Brands
-          </Link>
-          <div style={{ minWidth: 130 }}>
-            <select
-              className="input"
-              style={{ cursor: 'pointer', padding: '6px 12px', minWidth: 130 }}
-              value={ownershipFilter}
-              onChange={(e) => setOwnershipFilter(e.target.value as 'all' | 'ours' | 'theirs')}
-            >
-              <option value="all">All Videos</option>
-              <option value="ours">Our Videos</option>
-              <option value="theirs">Not Our Videos</option>
-            </select>
-          </div>
-        </div>
+        <Link href="/control" className="btn btn-blue btn-sm">
+          <Award size={13} /> Manage Brands
+        </Link>
       </div>
+
+      <SharedFilterBar style={{ marginBottom: 20 }}>
+        {/* Sort Toggle */}
+        <div className="toggle-group">
+          <button className={`toggle-btn ${sortBy === 'views' ? 'active' : ''}`} onClick={() => setSortBy('views')}>By Views</button>
+          <button className={`toggle-btn ${sortBy === 'freq' ? 'active' : ''}`} onClick={() => setSortBy('freq')}>By Frequency</button>
+        </div>
+      </SharedFilterBar>
 
       {brandsQuery.isLoading ? (
         <PageSkeleton cols={4} rows={5} />

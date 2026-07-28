@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import { TrendingUp, TrendingDown, Minus, Download, Loader2 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts'
 import { useCampaignStore } from '@/lib/store'
+import { useFilterStore } from '@/lib/filter-store'
 import { useQuery } from '@tanstack/react-query'
 import { brandColor } from '@/lib/brand-colors'
 
@@ -35,16 +36,20 @@ type SortKey = 'growth' | 'name' | 'current'
 
 export default function GrowthTab() {
   const { activeCampaignId } = useCampaignStore()
+  const { ownership, dateRange } = useFilterStore()
   const [metric, setMetric] = useState<'views' | 'frequency'>('views')
-  const [period, setPeriod] = useState<'24h' | '7d' | '30d'>('7d')
-  const [ownershipFilter, setOwnershipFilter] = useState<'all' | 'ours' | 'theirs'>('all')
   const [sortBy, setSortBy] = useState<SortKey>('growth')
 
+  const period = useMemo(() => {
+    const map: Record<string, string> = { '24h': '24h', '48h': '7d', '1W': '7d', '1M': '30d', 'All': '30d' }
+    return map[dateRange] || '7d'
+  }, [dateRange])
+
   const growthTabQuery = useQuery({
-    queryKey: ['growth-tab', activeCampaignId, metric, period, ownershipFilter],
+    queryKey: ['growth-tab', activeCampaignId, metric, period, ownership],
     queryFn: async () => {
       const params = new URLSearchParams({ campaign_id: activeCampaignId!, metric, period })
-      if (ownershipFilter !== 'all') params.set('is_ours', ownershipFilter === 'ours' ? 'true' : 'false')
+      if (ownership !== 'all') params.set('is_ours', ownership === 'ours' ? 'true' : 'false')
       const res = await fetch(`/api/brands/growth?${params}`)
       const d = await res.json()
       return (d.data ?? []) as any[]
@@ -70,23 +75,16 @@ export default function GrowthTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {(['24h', '7d', '30d'] as const).map(p => <button key={p} onClick={() => setPeriod(p)} className={`toggle-btn ${period === p ? 'on' : ''}`}>{p === '24h' ? '24 Hours' : p === '7d' ? '7 Days' : '30 Days'}</button>)}
+      {/* Page-specific Filters */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', border: '1px solid var(--border-2)', borderRadius: 'var(--border-radius-xs)', overflow: 'hidden' }}>
+          <button onClick={() => setMetric('views')} className={`toggle-btn ${metric === 'views' ? 'on' : ''}`}>Views</button>
+          <button onClick={() => setMetric('frequency')} className={`toggle-btn ${metric === 'frequency' ? 'on' : ''}`}>Frequency</button>
         </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <select className="input" value={ownershipFilter} onChange={e => setOwnershipFilter(e.target.value as any)} style={{ fontSize: 11, padding: '5px 8px', minWidth: 110 }}>
-            <option value="all">All Videos</option><option value="ours">Our Videos</option><option value="theirs">Not Ours</option>
-          </select>
-          <div style={{ display: 'flex', border: '1px solid var(--border-2)', borderRadius: 'var(--border-radius-xs)', overflow: 'hidden' }}>
-            <button onClick={() => setMetric('views')} className={`toggle-btn ${metric === 'views' ? 'on' : ''}`}>Views</button>
-            <button onClick={() => setMetric('frequency')} className={`toggle-btn ${metric === 'frequency' ? 'on' : ''}`}>Frequency</button>
-          </div>
-          <select className="input" value={sortBy} onChange={e => setSortBy(e.target.value as SortKey)} style={{ fontSize: 11, padding: '5px 8px', minWidth: 100 }}>
-            <option value="growth">Sort: Growth</option><option value="name">Sort: Name</option><option value="current">Sort: Value</option>
-          </select>
-          <button onClick={handleExport} className="btn btn-ghost btn-sm"><Download size={11} /> CSV</button>
-        </div>
+        <select className="input" value={sortBy} onChange={e => setSortBy(e.target.value as SortKey)} style={{ fontSize: 11, padding: '5px 8px', minWidth: 100 }}>
+          <option value="growth">Sort: Growth</option><option value="name">Sort: Name</option><option value="current">Sort: Value</option>
+        </select>
+        <button onClick={handleExport} className="btn btn-ghost btn-sm"><Download size={11} /> CSV</button>
       </div>
 
       {chartData.length > 0 && (

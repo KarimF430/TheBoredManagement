@@ -9,12 +9,13 @@ export async function GET(req: NextRequest) {
   const language = req.nextUrl.searchParams.get('language') ?? 'all'
   const type = req.nextUrl.searchParams.get('type') ?? 'all'
   const isOurs = req.nextUrl.searchParams.get('is_ours')
+  const format = req.nextUrl.searchParams.get('format') // 'all' | 'long' | 'short'
 
   if (!campaignId) return NextResponse.json({ error: 'campaign_id required' }, { status: 400 })
 
   try {
-    const key = `${cacheKey.keywordsSov(campaignId, language, type)}:${isOurs || 'all'}`
-    const data = await getCached(key, () => fetchKeywordSov(campaignId!, language, type, isOurs), CACHE_TTL.keywords_sov)
+    const key = `${cacheKey.keywordsSov(campaignId, language, type)}:${isOurs || 'all'}:${format || 'all'}`
+    const data = await getCached(key, () => fetchKeywordSov(campaignId!, language, type, isOurs, format), CACHE_TTL.keywords_sov)
     return NextResponse.json(data)
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
@@ -23,7 +24,13 @@ export async function GET(req: NextRequest) {
   }
 }
 
-async function fetchKeywordSov(campaignId: string, language: string, type: string, isOurs?: string | null) {
+async function fetchKeywordSov(
+  campaignId: string,
+  language: string,
+  type: string,
+  isOurs?: string | null,
+  format?: string | null
+) {
   const [cbRes, btRes, kwQuery] = await Promise.all([
     supabase.from('campaign_brands').select('name').eq('campaign_id', campaignId),
     supabase.from('brand_tags').select('brand_name').eq('campaign_id', campaignId),
@@ -48,8 +55,12 @@ async function fetchKeywordSov(campaignId: string, language: string, type: strin
   const kwIds = keywords.map((k: any) => k.id)
 
   const [kvRes, ksRes] = await Promise.all([
-    supabase.from('keyword_videos').select('keyword_id, video_id').in('keyword_id', kwIds),
-    supabase.from('keyword_shorts').select('keyword_id, video_id').in('keyword_id', kwIds),
+    format === 'short'
+      ? Promise.resolve({ data: [] })
+      : supabase.from('keyword_videos').select('keyword_id, video_id').in('keyword_id', kwIds),
+    format === 'long'
+      ? Promise.resolve({ data: [] })
+      : supabase.from('keyword_shorts').select('keyword_id, video_id').in('keyword_id', kwIds),
   ])
 
   const kwVideoMap = new Map<string, Set<string>>()

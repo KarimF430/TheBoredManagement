@@ -6,8 +6,9 @@ import {
   ScatterChart, Scatter, ZAxis, ReferenceLine, Label
 } from 'recharts'
 import { motion } from 'framer-motion'
-import { Award, Star, Info, TrendingUp, Zap, BarChart3, ChevronDown, ChevronUp, Target, Eye, Hash, Filter } from 'lucide-react'
+import { Award, Star, Info, TrendingUp, Zap, BarChart3, ChevronDown, ChevronUp, Target, Eye, Hash } from 'lucide-react'
 import { useDashboard } from '@/lib/dashboard-context'
+import { useFilterStore } from '@/lib/filter-store'
 
 const C = [
   '#4C78A8', '#54A24B', '#E45756', '#72B7B2', '#EECA3B',
@@ -79,8 +80,8 @@ const CHART_TOP = 10
 
 export default function BrandsTab() {
   const { videos, distinctLanguages } = useDashboard()
+  const { format } = useFilterStore()
   const [brandSOVLang, setBrandSOVLang] = useState<string>('all')
-  const [brandSOVFormat, setBrandSOVFormat] = useState<'all' | 'long' | 'short'>('all')
   const [sortBy, setSortBy] = useState<'views' | 'freq'>('views')
   const [showAllBrands, setShowAllBrands] = useState(false)
 
@@ -99,8 +100,8 @@ export default function BrandsTab() {
 
   const analytics = useMemo(() => {
     let filteredBrandVideos = videos
-    if (brandSOVFormat !== 'all') {
-      filteredBrandVideos = brandSOVFormat === 'long'
+    if (format !== 'all') {
+      filteredBrandVideos = format === 'long'
         ? videos.filter((v: any) => !v.is_short)
         : videos.filter((v: any) => v.is_short)
     }
@@ -184,7 +185,7 @@ export default function BrandsTab() {
     const weakBrands = brandPositioning.filter(b => !b.aboveMedianView && !b.aboveMedianFreq)
 
     return { topViews, topFreq, totalViewsFiltered, totalFreq, totalVideos, avgSOV, topBrandSOV, brandPositioning, brandEfficiency, avgEfficiency, medianViewSOV, medianFreqSOV, mostEfficient, widestReach, viewLeader, starBrands, volumeBrands, nicheBrands, weakBrands }
-  }, [videos, brandSOVLang, brandSOVFormat, videoLanguagesMap])
+  }, [videos, brandSOVLang, format, videoLanguagesMap])
 
   const { topViews, topFreq, totalVideos, avgSOV, topBrandSOV, brandPositioning, brandEfficiency, avgEfficiency, medianViewSOV, medianFreqSOV, mostEfficient, widestReach, viewLeader, starBrands, volumeBrands, nicheBrands, weakBrands } = analytics
   const sortedBrands = sortBy === 'views' ? topViews : topFreq
@@ -227,15 +228,8 @@ export default function BrandsTab() {
         ))}
       </div>
 
-      {/* Filters */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <Filter size={14} style={{ color: '#94A3B8' }} />
-        <select value={brandSOVFormat} onChange={(e) => setBrandSOVFormat(e.target.value as any)}
-          style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 11, fontWeight: 600, color: '#475569', background: '#fff', cursor: 'pointer' }}>
-          <option value="all">All formats</option>
-          <option value="long">Long-form</option>
-          <option value="short">Shorts</option>
-        </select>
+      {/* Page-specific Filters */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <select value={brandSOVLang} onChange={(e) => setBrandSOVLang(e.target.value)}
           style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 11, fontWeight: 600, color: '#475569', background: '#fff', cursor: 'pointer' }}>
           <option value="all">All languages</option>

@@ -9,13 +9,14 @@ export async function GET(req: NextRequest) {
   try {
     const campaignId = req.nextUrl.searchParams.get('campaign_id')
     const isOurs = req.nextUrl.searchParams.get('is_ours')
+    const format = req.nextUrl.searchParams.get('format') // 'all' | 'long' | 'short'
 
     const { authorized, error } = await authorizeCampaignAccess(req, campaignId)
     if (!authorized) return error
     if (!campaignId) return NextResponse.json({ data: [], has_scrape_data: false })
 
-    const key = `${cacheKey.brands(campaignId)}:${isOurs || 'all'}`
-    const data = await getCached(key, () => fetchBrands(campaignId, isOurs), CACHE_TTL.brands_overview)
+    const key = `${cacheKey.brands(campaignId)}:${isOurs || 'all'}:${format || 'all'}`
+    const data = await getCached(key, () => fetchBrands(campaignId, isOurs, format), CACHE_TTL.brands_overview)
     return NextResponse.json(data)
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unknown error'
@@ -24,9 +25,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-async function fetchBrands(campaignId: string, isOurs?: string | null) {
+async function fetchBrands(campaignId: string, isOurs?: string | null, format?: string | null) {
   // Get brand names from brand_tags (the source of truth)
-  const { data: btRows } = await supabase.from('brand_tags').select('brand_name, video_id').eq('campaign_id', campaignId)
+  let { data: btRows } = await supabase.from('brand_tags').select('brand_name, video_id').eq('campaign_id', campaignId)
 
   if (!btRows || btRows.length === 0) {
     // Fallback to campaign_brands
@@ -43,6 +44,18 @@ async function fetchBrands(campaignId: string, isOurs?: string | null) {
     }
   }
 
+  // Filter by format if specified
+  if (format === 'long' || format === 'short') {
+    const table = format === 'long' ? 'keyword_videos' : 'keyword_shorts'
+    const { data: kvRows } = await supabase.from(table).select('video_id').eq('campaign_id', campaignId)
+    const validVideoIds = new Set((kvRows || []).map((r: any) => r.video_id))
+    btRows = btRows.filter((bt: any) => validVideoIds.has(bt.video_id))
+  }
+
+  if (btRows.length === 0) {
+    return { data: [], has_scrape_data: true }
+  }
+
   // Build brand → video aggregation
   const brandAgg = new Map<string, { videoIds: Set<string>; views: number }>()
   for (const bt of btRows) {
@@ -53,6 +66,7 @@ async function fetchBrands(campaignId: string, isOurs?: string | null) {
   // Fetch all video views in parallel batches
   const allVideoIds = [...new Set(btRows.map((bt: any) => bt.video_id))]
   const videoViews = new Map<string, number>()
+  const videoIsOurs = new Map<string, boolean>()
   const BATCH = 500
   const videoBatchPromises = []
   for (let i = 0; i < allVideoIds.length; i += BATCH) {
@@ -62,21 +76,24 @@ async function fetchBrands(campaignId: string, isOurs?: string | null) {
   }
   const videoBatchResults = await Promise.all(videoBatchPromises)
   for (const result of videoBatchResults) {
-    for (const v of (result.data || []) as any[]) videoViews.set(v.id, v.view_count || 0)
+    for (const v of (result.data || []) as any[]) {
+      videoViews.set(v.id, v.view_count || 0)
+      videoIsOurs.set(v.id, v.is_ours || false)
+    }
   }
 
   // Sum views per brand (with is_ours filter)
   for (const [, agg] of brandAgg) {
     for (const vid of agg.videoIds) {
-      const vData = videoBatchResults.flatMap(r => r.data || []).find((v: any) => v.id === vid) as any
-      if (isOurs === 'true' && !vData?.is_ours) continue
-      if (isOurs === 'false' && vData?.is_ours) continue
+      if (isOurs === 'true' && !videoIsOurs.get(vid)) continue
+      if (isOurs === 'false' && videoIsOurs.get(vid)) continue
       agg.views += videoViews.get(vid) || 0
     }
   }
 
   // Get keyword video counts for frequency SOV
-  const { data: kvRows } = await supabase.from('keyword_videos').select('video_id').eq('campaign_id', campaignId)
+  const kvTable = format === 'short' ? 'keyword_shorts' : 'keyword_videos'
+  const { data: kvRows } = await supabase.from(kvTable).select('video_id').eq('campaign_id', campaignId)
   const kvVideoIds = new Set((kvRows || []).map((r: any) => r.video_id))
 
   // Build enriched brand list

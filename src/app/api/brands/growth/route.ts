@@ -10,10 +10,14 @@ export async function GET(req: NextRequest) {
     const metric = req.nextUrl.searchParams.get('metric') ?? 'views'
     const period = req.nextUrl.searchParams.get('period') ?? '7d'
     const isOurs = req.nextUrl.searchParams.get('is_ours')
+    const format = req.nextUrl.searchParams.get('format') // 'all' | 'long' | 'short'
+    const dateFrom = req.nextUrl.searchParams.get('date_from')
+    const dateTo = req.nextUrl.searchParams.get('date_to')
+
     if (!campaignId) return NextResponse.json({ data: [], period, has_scrape_data: false })
 
-    const key = `${cacheKey.brandGrowth(campaignId, metric, period)}:${isOurs || 'all'}`
-    const data = await getCached(key, () => fetchGrowth(campaignId!, metric, period, isOurs), CACHE_TTL.brand_growth)
+    const key = `${cacheKey.brandGrowth(campaignId, metric, period)}:${isOurs || 'all'}:${format || 'all'}:${dateFrom || ''}:${dateTo || ''}`
+    const data = await getCached(key, () => fetchGrowth(campaignId!, metric, period, isOurs, format, dateFrom, dateTo), CACHE_TTL.brand_growth)
     return NextResponse.json(data)
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unknown error'
@@ -22,16 +26,41 @@ export async function GET(req: NextRequest) {
   }
 }
 
-async function fetchGrowth(campaignId: string, metric: string, period: string, isOurs?: string | null) {
-  const periodDays = period === '24h' ? 1 : period === '30d' ? 30 : 7
-  const periodStart = new Date(Date.now() - periodDays * 86400000).toISOString().split('T')[0]
-  const prevStart = new Date(Date.now() - periodDays * 2 * 86400000).toISOString().split('T')[0]
+async function fetchGrowth(
+  campaignId: string,
+  metric: string,
+  period: string,
+  isOurs?: string | null,
+  format?: string | null,
+  dateFrom?: string | null,
+  dateTo?: string | null
+) {
+  let periodDays = period === '24h' ? 1 : period === '30d' ? 30 : 7
+  let periodStart = new Date(Date.now() - periodDays * 86400000).toISOString().split('T')[0]
+  let prevStart = new Date(Date.now() - periodDays * 2 * 86400000).toISOString().split('T')[0]
+
+  if (dateFrom && dateTo) {
+    const from = new Date(dateFrom)
+    const to = new Date(dateTo)
+    const diffMs = to.getTime() - from.getTime()
+    periodDays = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1)
+    periodStart = dateFrom
+    prevStart = new Date(from.getTime() - periodDays * 86400000).toISOString().split('T')[0]
+  }
 
   // Fetch brand_tags directly (count:'exact',head:true returns null on some tables)
-  const { data: brandTags } = await supabase
+  let { data: brandTags } = await supabase
     .from('brand_tags')
     .select('brand_name, video_id')
     .eq('campaign_id', campaignId)
+
+  // Filter by format if specified
+  if (brandTags && brandTags.length > 0 && (format === 'long' || format === 'short')) {
+    const table = format === 'long' ? 'keyword_videos' : 'keyword_shorts'
+    const { data: kvRows } = await supabase.from(table).select('video_id').eq('campaign_id', campaignId)
+    const validVideoIds = new Set((kvRows || []).map((r: any) => r.video_id))
+    brandTags = brandTags.filter((bt: any) => validVideoIds.has(bt.video_id))
+  }
 
   if (!brandTags || brandTags.length === 0) {
     // Fallback to campaign_brands

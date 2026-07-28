@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { TrendingUp, TrendingDown, Minus, Download, AlertCircle, RefreshCw, Zap } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine, Legend } from 'recharts'
 import { useCampaignStore } from '@/lib/store'
+import { useFilterStore } from '@/lib/filter-store'
+import SharedFilterBar from '@/components/SharedFilterBar'
 import { useQuery } from '@tanstack/react-query'
 import { PageSkeleton } from '@/components/PageSkeleton'
 import Link from 'next/link'
@@ -55,15 +57,24 @@ function MiniSparkBar({ data, color }: { data: number[]; color: string }) {
 
 export default function BrandGrowthPage() {
   const { campaigns, activeCampaignId, fetchCampaigns } = useCampaignStore()
+  const { search, ownership, format, dateRange, customDateFrom, customDateTo } = useFilterStore()
   const [metric, setMetric] = useState<'views' | 'frequency'>('views')
-  const [period, setPeriod] = useState<'24h' | '7d' | '30d'>('7d')
-  const [ownershipFilter, setOwnershipFilter] = useState<'all' | 'ours' | 'theirs'>('all')
 
-  const ownershipParam = ownershipFilter && ownershipFilter !== 'all' ? `&is_ours=${ownershipFilter === 'ours'}` : ''
+  const period = (() => {
+    const map: Record<string, string> = { '24h': '24h', '48h': '7d', '1W': '7d', '1M': '30d', 'All': '30d' }
+    return map[dateRange] || '30d'
+  })()
+
   const growthQuery = useQuery({
-    queryKey: ['brand-growth', activeCampaignId, metric, period, ownershipFilter],
+    queryKey: ['brand-growth', activeCampaignId, metric, period, ownership, format, customDateFrom, customDateTo],
     queryFn: async () => {
-      const res = await fetch(`/api/brands/growth?campaign_id=${activeCampaignId}&metric=${metric}&period=${period}${ownershipParam}`)
+      let url = `/api/brands/growth?campaign_id=${activeCampaignId}&metric=${metric}&period=${period}`
+      if (ownership !== 'all') url += `&is_ours=${ownership === 'ours' ? 'true' : 'false'}`
+      if (format !== 'all') url += `&format=${format}`
+      if (dateRange === 'Custom' && customDateFrom && customDateTo) {
+        url += `&date_from=${customDateFrom}&date_to=${customDateTo}`
+      }
+      const res = await fetch(url)
       if (!res.ok) throw new Error('Failed to fetch growth data')
       return res.json()
     },
@@ -72,6 +83,7 @@ export default function BrandGrowthPage() {
   const data = growthQuery.data?.data ?? []
   const hasScrapeData = growthQuery.data?.has_scrape_data ?? false
   const loading = growthQuery.isLoading
+  const filtered = search ? data.filter((b: any) => b.brand_name?.toLowerCase().includes(search.toLowerCase())) : data
 
   useEffect(() => { fetchCampaigns() }, [fetchCampaigns])
 
@@ -105,7 +117,7 @@ export default function BrandGrowthPage() {
     </div>
   )
 
-  const sorted = [...data].sort((a, b) => b.growthPercent - a.growthPercent)
+  const sorted = [...filtered].sort((a, b) => b.growthPercent - a.growthPercent)
   const topGainer = sorted[0]
   const topLoser = sorted[sorted.length - 1]
 
@@ -121,35 +133,18 @@ export default function BrandGrowthPage() {
           <h1 className="page-title">Brand <span className="accent">Growth</span></h1>
           <p className="page-subtitle">Velocity tracking and period comparison</p>
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ minWidth: 130 }}>
-            <select
-              className="input"
-              value={ownershipFilter}
-              onChange={e => setOwnershipFilter(e.target.value as 'all' | 'ours' | 'theirs')}
-              style={{ cursor: 'pointer', padding: '6px 12px', minWidth: 130 }}
-            >
-              <option value="all">All Videos</option>
-              <option value="ours">Our Videos</option>
-              <option value="theirs">Not Our Videos</option>
-            </select>
-          </div>
-          <div className="toggle-group">
-            {(['24h', '7d', '30d'] as const).map(p => (
-              <button key={p} className={`toggle-btn ${period === p ? 'active' : ''}`} onClick={() => setPeriod(p)}>
-                {p === '24h' ? '24h' : p === '7d' ? '7 Days' : '30 Days'}
-              </button>
-            ))}
-          </div>
-          <div className="toggle-group">
-            <button className={`toggle-btn ${metric === 'views' ? 'active' : ''}`} onClick={() => setMetric('views')}>By Views</button>
-            <button className={`toggle-btn ${metric === 'frequency' ? 'active' : ''}`} onClick={() => setMetric('frequency')}>By Frequency</button>
-          </div>
-          <button className="btn btn-ghost btn-sm" onClick={handleExport} disabled={data.length === 0}>
-            <Download size={13} /> Export
-          </button>
-        </div>
+        <button className="btn btn-ghost btn-sm" onClick={handleExport} disabled={data.length === 0}>
+          <Download size={13} /> Export
+        </button>
       </div>
+
+      <SharedFilterBar style={{ marginBottom: 20 }}>
+        {/* Metric Toggle */}
+        <div className="toggle-group">
+          <button className={`toggle-btn ${metric === 'views' ? 'active' : ''}`} onClick={() => setMetric('views')}>By Views</button>
+          <button className={`toggle-btn ${metric === 'frequency' ? 'active' : ''}`} onClick={() => setMetric('frequency')}>By Frequency</button>
+        </div>
+      </SharedFilterBar>
 
       {data.length === 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 300, gap: 12, background: '#fff', borderRadius: 14, border: '1px solid #F1F5F9' }}>

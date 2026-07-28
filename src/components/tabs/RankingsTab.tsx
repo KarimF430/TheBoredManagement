@@ -7,9 +7,10 @@ import {
 } from 'recharts'
 import { motion } from 'framer-motion'
 import {
-  Target, Award, Hash, BarChart2, TrendingUp, Info, Download
+  Target, Award, Hash, BarChart2, TrendingUp, Info, Download, Search
 } from 'lucide-react'
 import { useDashboard } from '@/lib/dashboard-context'
+import { useFilterStore } from '@/lib/filter-store'
 
 const C = [
   '#4C78A8', '#54A24B', '#E45756', '#72B7B2', '#EECA3B',
@@ -86,11 +87,18 @@ function pct(a: number, b: number) {
 // ── Main Component ────────────────────────────────────────────────
 export default function RankingsTab() {
   const { videos, keywords, overview, isDemo, setDrawerType, downloadCSV, distinctBrands } = useDashboard()
-  const [rankRangeFilter, setRankRangeFilter] = useState<'all' | 'top3' | 'top5' | 'top10'>('all')
+  const { search, format } = useFilterStore()
   const [rankBrandFilter, setRankBrandFilter] = useState<string>('all')
+  const [rankRangeFilter, setRankRangeFilter] = useState<'all' | 'top3' | 'top5' | 'top10'>('all')
 
   const analytics = useMemo(() => {
     let filteredRankVideos = videos
+    if (format !== 'all') {
+      filteredRankVideos = filteredRankVideos.filter((v: any) => format === 'short' ? v.is_short : !v.is_short)
+    }
+    if (search) {
+      filteredRankVideos = filteredRankVideos.filter((v: any) => v.title?.toLowerCase().includes(search.toLowerCase()))
+    }
     if (rankBrandFilter !== 'all') {
       filteredRankVideos = filteredRankVideos.filter((v: any) => (v.tags || v.brands || []).includes(rankBrandFilter))
     }
@@ -135,7 +143,7 @@ export default function RankingsTab() {
     ]
 
     return { rankBuckets, filteredRankVideos, scatterData, rankTypeCompare, longForm, shorts }
-  }, [videos, rankBrandFilter, rankRangeFilter])
+  }, [videos, rankBrandFilter, rankRangeFilter, search, format])
 
   const { rankBuckets, filteredRankVideos, scatterData, rankTypeCompare } = analytics
 
@@ -144,6 +152,20 @@ export default function RankingsTab() {
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}
       style={{ display: 'flex', flexDirection: 'column', gap: 20 }}
     >
+      {/* Page-specific Filters */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <select className="input" value={rankBrandFilter} onChange={(e) => setRankBrandFilter(e.target.value)} style={{ cursor: 'pointer', padding: '6px 12px', minWidth: 150 }}>
+          <option value="all">All Brands</option>
+          {distinctBrands.map(b => <option key={b} value={b}>{b}</option>)}
+        </select>
+        <select className="input" value={rankRangeFilter} onChange={(e) => setRankRangeFilter(e.target.value as any)} style={{ cursor: 'pointer', padding: '6px 12px', minWidth: 130 }}>
+          <option value="all">All Ranks</option>
+          <option value="top3">Top 3 Only</option>
+          <option value="top5">Top 5 Only</option>
+          <option value="top10">Top 10 Only</option>
+        </select>
+      </div>
+
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
         {[
@@ -179,21 +201,9 @@ export default function RankingsTab() {
           sub="Number of videos in search rank categories"
           height={220}
           right={
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <select className="select-filter" value={rankBrandFilter} onChange={(e) => setRankBrandFilter(e.target.value)}>
-                <option value="all">All brands</option>
-                {distinctBrands.map(b => <option key={b} value={b}>{b}</option>)}
-              </select>
-              <select className="select-filter" value={rankRangeFilter} onChange={(e) => setRankRangeFilter(e.target.value as any)}>
-                <option value="all">All ranks</option>
-                <option value="top3">Top 3 only</option>
-                <option value="top5">Top 5 only</option>
-                <option value="top10">Top 10 only</option>
-              </select>
-              <button onClick={() => setDrawerType('rank_detail')} style={{ background: '#F1F5F9', border: 'none', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', color: '#1E293B' }}>
-                View more
-              </button>
-            </div>
+            <button onClick={() => setDrawerType('rank_detail')} style={{ background: '#F1F5F9', border: 'none', padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', color: '#1E293B' }}>
+              View more
+            </button>
           }
         >
           <ResponsiveContainer width="100%" height="100%">

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink, Download, ChevronUp, ChevronDown, Search, AlertCircle, Plus, X, Tag, Brain, Loader2 } from 'lucide-react'
 import { useCampaignStore } from '@/lib/store'
-import { PageSkeleton } from '@/components/PageSkeleton'
+import { useFilterStore } from '@/lib/filter-store'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 
@@ -84,16 +84,14 @@ function LeaderboardContent() {
   const { campaigns, activeCampaignId, fetchCampaigns } = useCampaignStore()
   const searchParams = useSearchParams()
   const initialKeywordId = searchParams.get('keyword_id') || ''
-  const [tab, setTab] = useState<'long' | 'short'>('long')
   const [sort, setSort] = useState<'views' | 'frequency' | 'rank'>(initialKeywordId ? 'rank' : 'views')
   const [page, setPage] = useState(1)
-  const [search, setSearch] = useState('')
-  
+
   // Filters
   const [selectedBrand, setSelectedBrand] = useState('')
   const [selectedKeyword, setSelectedKeyword] = useState(initialKeywordId)
   const [selectedChannel, setSelectedChannel] = useState('')
-  const [selectedOwnership, setSelectedOwnership] = useState<'all' | 'ours' | 'theirs'>('all')
+  const { search, ownership, format, setSearch, setOwnership, setFormat } = useFilterStore()
   const [keywords, setKeywords] = useState<any[]>([])
 
   // Tag editing state
@@ -142,14 +140,14 @@ function LeaderboardContent() {
 
   // Filter-dependent data: refetch when filters change
   const leaderboardQuery = useQuery<unknown, Error, { data: VideoRow[]; total: number; channels: string[] }>({
-    queryKey: ['leaderboard', activeCampaignId, tab, sort, page, selectedBrand, selectedKeyword, search, selectedChannel, selectedOwnership],
+    queryKey: ['leaderboard', activeCampaignId, format, sort, page, selectedBrand, selectedKeyword, search, selectedChannel, ownership],
     queryFn: async () => {
-      let url = `/api/videos/leaderboard?campaign_id=${activeCampaignId}&tab=${tab}&sort=${sort}&page=${page}&limit=${PER_PAGE}`
+      let url = `/api/videos/leaderboard?campaign_id=${activeCampaignId}&tab=${format}&sort=${sort}&page=${page}&limit=${PER_PAGE}`
       if (selectedBrand) url += `&brand_name=${encodeURIComponent(selectedBrand)}`
       if (selectedKeyword) url += `&keyword_id=${encodeURIComponent(selectedKeyword)}`
       if (selectedChannel) url += `&channel_name=${encodeURIComponent(selectedChannel)}`
       if (search.trim()) url += `&q=${encodeURIComponent(search.trim())}`
-      if (selectedOwnership !== 'all') url += `&is_ours=${selectedOwnership === 'ours' ? 'true' : 'false'}`
+      if (ownership !== 'all') url += `&is_ours=${ownership === 'ours' ? 'true' : 'false'}`
       const res = await fetch(url)
       return res.json()
     },
@@ -243,13 +241,13 @@ function LeaderboardContent() {
     )
     const blob = new Blob([headers + '\n' + rows.join('\n')], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = `top_${tab}_videos.csv`; a.click()
+    const a = document.createElement('a'); a.href = url; a.download = `top_${format}_videos.csv`; a.click()
   }
 
   if (leaderboardQuery.isLoading) {
     return (
-      <div className="anim-fade-up">
-        <PageSkeleton cols={4} rows={10} />
+      <div className="anim-fade-up" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200, color: '#94A3B8' }}>
+        Loading leaderboard...
       </div>
     )
   }
@@ -266,11 +264,14 @@ function LeaderboardContent() {
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <div className="toggle-group">
-            <button className={`toggle-btn ${tab === 'long' ? 'active' : ''}`} onClick={() => { setTab('long'); setPage(1) }}>
-              Long-Form
+            <button className={`toggle-btn ${format === 'all' ? 'active' : ''}`} onClick={() => { setFormat('all'); setPage(1) }}>
+              All
             </button>
-            <button className={`toggle-btn ${tab === 'short' ? 'active' : ''}`} onClick={() => { setTab('short'); setPage(1) }}>
-              Shorts
+            <button className={`toggle-btn ${format === 'long' ? 'active' : ''}`} onClick={() => { setFormat('long'); setPage(1) }}>
+              Long Format
+            </button>
+            <button className={`toggle-btn ${format === 'short' ? 'active' : ''}`} onClick={() => { setFormat('short'); setPage(1) }}>
+              Short Format
             </button>
           </div>
           <div className="toggle-group">
@@ -304,98 +305,29 @@ function LeaderboardContent() {
         </div>
       </div>
 
-      {/* Search & Select Filters */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: '1 1 240px', maxWidth: 360 }}>
-          <Search size={13} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-          <input
-            className="input"
-            style={{ paddingLeft: 34 }}
-            placeholder="Search within page results..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
-
-        {/* Brand Dropdown Filter */}
+      {/* Page-specific filters: Brand, Keyword, Channel */}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', padding: '0 24px', marginBottom: 16 }}>
         <div style={{ minWidth: 150 }}>
-          <select
-            className="input"
-            value={selectedBrand}
-            onChange={e => { setSelectedBrand(e.target.value); setPage(1) }}
-            style={{ cursor: 'pointer', padding: '6px 12px' }}
-          >
+          <select className="input" value={selectedBrand} onChange={e => { setSelectedBrand(e.target.value); setPage(1) }} style={{ cursor: 'pointer', padding: '6px 12px' }}>
             <option value="">All Brands</option>
-            {campaignBrands.map(b => (
-              <option key={b} value={b}>{b}</option>
-            ))}
+            {campaignBrands.map(b => (<option key={b} value={b}>{b}</option>))}
           </select>
         </div>
-
-        {/* Keyword Dropdown Filter */}
         <div style={{ minWidth: 180 }}>
-          <select
-            className="input"
-            value={selectedKeyword}
-            onChange={e => {
-              const val = e.target.value
-              setSelectedKeyword(val)
-              setSort(val ? 'rank' : 'views')
-              setPage(1)
-            }}
-            style={{ cursor: 'pointer', padding: '6px 12px' }}
-          >
+          <select className="input" value={selectedKeyword} onChange={e => { const val = e.target.value; setSelectedKeyword(val); setSort(val ? 'rank' : 'views'); setPage(1) }} style={{ cursor: 'pointer', padding: '6px 12px' }}>
             <option value="">All Keywords</option>
-            {keywords.map(kw => (
-              <option key={kw.id} value={kw.id}>{kw.text} ({kw.language})</option>
-            ))}
+            {keywords.map(kw => (<option key={kw.id} value={kw.id}>{kw.text} ({kw.language})</option>))}
           </select>
         </div>
-
-        {/* Channel Dropdown Filter */}
         <div style={{ minWidth: 180 }}>
-          <select
-            className="input"
-            value={selectedChannel}
-            onChange={e => { setSelectedChannel(e.target.value); setPage(1) }}
-            style={{ cursor: 'pointer', padding: '6px 12px' }}
-          >
+          <select className="input" value={selectedChannel} onChange={e => { setSelectedChannel(e.target.value); setPage(1) }} style={{ cursor: 'pointer', padding: '6px 12px' }}>
             <option value="">All Channels</option>
-            {channels.map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
+            {channels.map(c => (<option key={c} value={c}>{c}</option>))}
           </select>
         </div>
-
-        {/* Ownership Filter */}
-        <div style={{ minWidth: 140 }}>
-          <select
-            className="input"
-            value={selectedOwnership}
-            onChange={e => { setSelectedOwnership(e.target.value as any); setPage(1) }}
-            style={{ cursor: 'pointer', padding: '6px 12px' }}
-          >
-            <option value="all">All Videos</option>
-            <option value="ours">Our Videos</option>
-            <option value="theirs">Not Our Videos</option>
-          </select>
-        </div>
-
-        {/* Reset Filters */}
-        {(selectedBrand || selectedKeyword || selectedChannel || selectedOwnership !== 'all' || search) && (
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={() => {
-              setSelectedBrand('')
-              setSelectedKeyword('')
-              setSelectedChannel('')
-              setSelectedOwnership('all')
-              setSearch('')
-              setPage(1)
-            }}
-            style={{ color: '#EF4444' }}
-          >
-            Reset Filters
+        {(selectedBrand || selectedKeyword || selectedChannel) && (
+          <button className="btn btn-ghost btn-sm" onClick={() => { setSelectedBrand(''); setSelectedKeyword(''); setSelectedChannel(''); setPage(1) }}>
+            <X size={12} /> Reset
           </button>
         )}
       </div>

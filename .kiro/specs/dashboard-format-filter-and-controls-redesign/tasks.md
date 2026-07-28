@@ -4,44 +4,44 @@
 
 ### Phase 1: Data Layer and State Management
 
-- [ ] 1.1 Create FormatFilter type and constants
+- [x] 1.1 Create FormatFilter type and constants
   - Create TypeScript types for `FormatFilter = 'all' | 'long' | 'short'`
   - Export constants for format options with labels and descriptions
   - Add format to existing filter types and state management
   
-- [ ] 1.2 Add format filter state to page component
+- [x] 1.2 Add format filter state to page component
   - Add `useState<FormatFilter>` hook in page.tsx
   - Initialize with default value 'all'
   - Create onChange handler that updates state
   - Add to dependency arrays where needed
 
-- [ ] 1.3 Update React Query query key with format filter
+- [x] 1.3 Update React Query query key with format filter
   - Modify `dashboardQuery` queryKey to include formatFilter
   - Ensure query key includes: `['dashboard', activeCampaignId, formatFilter, ownershipFilter]`
   - Verify cache invalidation occurs when format changes
   - Add type safety to query key
 
-- [ ] 1.4 Update API calls to include format parameter
+- [x] 1.4 Update API calls to include format parameter
   - Modify fetch URL in dashboardQuery.queryFn to include `&format=${formatFilter}` when format !== 'all'
   - Ensure both `/api/dashboard/kpis` and `/api/dashboard` include format parameter
   - Build query string dynamically based on non-'all' filters
 
 ### Phase 2: Components - Format Filter
 
-- [ ] 2.1 Create FormatFilter component
+- [x] 2.1 Create FormatFilter component
   - Create new file: `src/components/FormatFilter.tsx`
   - Implement dropdown UI matching existing "All Videos" dropdown styling
   - Accept props: `value: FormatFilter`, `onChange: (format: FormatFilter) => void`
   - Render three options: "All", "Long Format", "Short Format"
   - Apply styling from existing `.select-filter` CSS class
 
-- [ ] 2.2 Add format filter to control panel layout
+- [x] 2.2 Add format filter to control panel layout
   - Place FormatFilter component in header/control panel area
   - Position before ownership filter in left-to-right layout
   - Apply 12px gap between format filter and ownership filter
   - Verify styling is consistent with adjacent controls
 
-- [ ] 2.3 Connect FormatFilter component to page state
+- [x] 2.3 Connect FormatFilter component to page state
   - Pass `value={formatFilter}` prop to FormatFilter
   - Pass `onChange={setFormatFilter}` handler to FormatFilter
   - Test that selecting a format triggers state update
@@ -49,52 +49,52 @@
 
 ### Phase 3: Components - Header and Timestamps
 
-- [ ] 3.1 Create TimestampDisplay component
+- [x] 3.1 Create TimestampDisplay component
   - Create new file: `src/components/TimestampDisplay.tsx`
   - Accept props: `lastUpdate: Date | null`, `weeklySchedule: Date | null`, `isStale: boolean`
   - Implement relative time formatting (e.g., "5 minutes ago")
   - Show absolute date/time for updates older than 24 hours
   - Apply inline styling consistent with existing text (color: '#94A3B8', fontSize: 12)
 
-- [ ] 3.2 Implement time update loop for timestamps
+- [x] 3.2 Implement time update loop for timestamps
   - Use `setInterval` to update relative timestamps every minute
   - Clean up interval on component unmount with `useEffect` return
   - Prevent unnecessary re-renders with useMemo for formatted timestamps
   - Consider performance impact of frequent updates
 
-- [ ] 3.3 Add timestamps below project name in header
+- [x] 3.3 Add timestamps below project name in header
   - Integrate TimestampDisplay component into header section
   - Display: "Last updated: {relative time}"
   - Display: "Weekly run: {day time}" or "No schedule set"
   - Position below campaign name and stats line
   - Use existing color scheme for text (#94A3B8 for secondary text)
 
-- [ ] 3.4 Add stale data styling (optional)
+- [x] 3.4 Add stale data styling (optional)
   - If data > 24 hours old, apply warning color to timestamp
   - Add small warning icon or indicator
   - Ensure stale indicator is not distracting to users
 
 ### Phase 4: Components - Control Panel Restructuring
 
-- [ ] 4.1 Refactor header layout for control panel
+- [x] 4.1 Refactor header layout for control panel
   - Identify current header structure in page.tsx
   - Create horizontal control panel container
   - Group: FormatFilter, OwnershipFilter (ownership filter), TimeRangeButtons, ViewsUpdateButton
   - Apply consistent spacing (gap: 12) and alignment
 
-- [ ] 4.2 Migrate time range buttons to control panel
+- [x] 4.2 Migrate time range buttons to control panel
   - Move existing time range button logic into control panel
   - Maintain current styling: active button = blue background
   - Ensure time range selection works correctly
   - Keep buttons as inline button group (background: '#F8FAFC')
 
-- [ ] 4.3 Move ownership filter to control panel
+- [x] 4.3 Move ownership filter to control panel
   - Move existing `<select>` element for ownership filter into control panel
   - Keep existing styling and functionality
   - Verify onChange handler still works
   - Maintain responsive positioning
 
-- [ ] 4.4 Rename and update Refresh button to Views Update button
+- [x] 4.4 Rename and update Refresh button to Views Update button
   - Change button text from "Refresh" to "Views Update"
   - Maintain loading spinner animation
   - Keep disabled state during refresh
@@ -103,31 +103,31 @@
 
 ### Phase 5: Integration and Testing
 
-- [ ] 5.1 Test format filter with dashboard data
+- [~] 5.1 Test format filter with dashboard data
   - Verify format filter changes trigger API requests
   - Verify filtered data appears in all charts and tables
   - Test with each format option (all, long, short)
   - Verify metrics (views, counts) recalculate correctly
 
-- [ ] 5.2 Test filter combinations
+- [~] 5.2 Test filter combinations
   - Test format filter + ownership filter together
   - Test format filter + time range together
   - Test all three filters combined
   - Verify each filter works independently
 
-- [ ] 5.3 Test control panel layout
+- [~] 5.3 Test control panel layout
   - Verify controls appear in correct order
   - Verify spacing and alignment are consistent
   - Test on desktop (1280px+), tablet (768px-1024px), mobile (<768px)
   - Verify no overflow or wrapping issues
 
-- [ ] 5.4 Test loading and error states
+- [~] 5.4 Test loading and error states
   - Verify loading spinner shows during format filter change
   - Verify Views Update button shows loading state
   - Verify error message displays if API call fails
   - Verify user can retry on error
 
-- [ ] 5.5 Test accessibility
+- [~] 5.5 Test accessibility
   - Test keyboard navigation (Tab, Arrow Keys, Enter)
   - Test screen reader with format filter dropdown
   - Verify focus indicators are visible
@@ -136,25 +136,25 @@
 
 ### Phase 6: UI/UX Refinement
 
-- [ ] 6.1 Fine-tune styling and spacing
+- [~] 6.1 Fine-tune styling and spacing
   - Verify all controls have consistent padding and margins
   - Verify font sizes and weights match existing UI
   - Check color consistency (#64748B for inactive text, #1A73E8 for active)
   - Ensure border styling is consistent (1px solid #E2E8F0)
 
-- [ ] 6.2 Implement hover and focus states
+- [~] 6.2 Implement hover and focus states
   - Add hover styling to format filter dropdown
   - Add hover styling to ownership filter
   - Add focus outlines (visible focus state)
   - Ensure all interactive elements have clear affordances
 
-- [ ] 6.3 Optimize performance
+- [~] 6.3 Optimize performance
   - Use useCallback for onChange handlers
   - Use useMemo for timestamp formatting
   - Verify no unnecessary re-renders with React DevTools Profiler
   - Check bundle size impact of new components
 
-- [ ] 6.4 Documentation and code cleanup
+- [~] 6.4 Documentation and code cleanup
   - Add JSDoc comments to new components
   - Ensure TypeScript types are properly defined
   - Remove any debug console logs
@@ -162,25 +162,25 @@
 
 ### Phase 7: Verification and Deployment
 
-- [ ] 7.1 Code review and testing
+- [~] 7.1 Code review and testing
   - Run ESLint and TypeScript compiler
   - Run existing test suite to verify no regressions
   - Perform manual testing of all acceptance criteria
   - Test with real data if available
 
-- [ ] 7.2 Browser testing
+- [~] 7.2 Browser testing
   - Test on Chrome (latest)
   - Test on Firefox (latest)
   - Test on Safari (latest)
   - Verify responsiveness on different screen sizes
 
-- [ ] 7.3 Backend API verification
+- [~] 7.3 Backend API verification
   - Verify backend API supports `format` parameter
   - Verify API returns correct filtered data
   - Test with various format values (all, long, short)
   - Verify error handling when invalid format is sent
 
-- [ ] 7.4 Deploy and monitor
+- [~] 7.4 Deploy and monitor
   - Merge code to main branch
   - Deploy to staging environment
   - Monitor for any runtime errors or issues
@@ -215,17 +215,17 @@
 
 ### Manual Testing Checklist
 
-- [ ] Format filter dropdown opens and closes correctly
-- [ ] Selecting a format option updates dashboard
-- [ ] Charts and tables show only videos matching selected format
-- [ ] Time range buttons still work correctly
-- [ ] Ownership filter still works correctly
-- [ ] Views Update button triggers refresh
-- [ ] Loading spinner shows during refresh
-- [ ] Timestamps display and update correctly
-- [ ] Control panel layout looks correct at different screen sizes
-- [ ] All interactive elements are keyboard accessible
-- [ ] Screen reader announces control labels and states
+- [~] Format filter dropdown opens and closes correctly
+- [~] Selecting a format option updates dashboard
+- [~] Charts and tables show only videos matching selected format
+- [~] Time range buttons still work correctly
+- [~] Ownership filter still works correctly
+- [~] Views Update button triggers refresh
+- [~] Loading spinner shows during refresh
+- [~] Timestamps display and update correctly
+- [~] Control panel layout looks correct at different screen sizes
+- [~] All interactive elements are keyboard accessible
+- [~] Screen reader announces control labels and states
 
 ## Acceptance Criteria Map
 

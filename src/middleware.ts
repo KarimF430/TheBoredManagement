@@ -13,7 +13,8 @@ export async function middleware(req: NextRequest) {
     path.startsWith('/api/auth') ||
     path.startsWith('/api/brands/analyze') ||
     path.startsWith('/api/warm') ||
-    path.startsWith('/api/cron')
+    path.startsWith('/api/cron') ||
+    path.startsWith('/api/creators')
   ) {
     return NextResponse.next()
   }

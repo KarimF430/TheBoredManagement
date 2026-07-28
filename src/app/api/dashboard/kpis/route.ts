@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabase, queryAll } from '@/lib/supabase'
 import { getCached, CACHE_TTL, cacheKey } from '@/lib/cache'
 import { authorizeCampaignAccess } from '@/lib/auth'
 
@@ -13,13 +13,14 @@ export const maxDuration = 30
 
 export async function GET(req: NextRequest) {
   try {
-    const cid = req.nextUrl.searchParams.get('campaign_id')
+    const cid    = req.nextUrl.searchParams.get('campaign_id')
+    const format = req.nextUrl.searchParams.get('format') // 'all' | 'long' | 'short'
     if (!cid) return NextResponse.json({ error: 'campaign_id required' }, { status: 400 })
     const { authorized, error: authError } = await authorizeCampaignAccess(req, cid)
     if (!authorized) return authError!
 
-    const key = cacheKey.kpis(cid)
-    const data = await getCached(key, () => fetchKpis(cid), CACHE_TTL.overview_kpis)
+    const key = cacheKey.kpis(cid) + `:${format || 'all'}`
+    const data = await getCached(key, () => fetchKpis(cid, format), CACHE_TTL.overview_kpis)
 
     return NextResponse.json(data, {
       headers: {
@@ -34,45 +35,92 @@ export async function GET(req: NextRequest) {
   }
 }
 
-async function fetchKpis(cid: string) {
+async function fetchKpis(cid: string, format?: string | null) {
   const today = new Date().toISOString().split('T')[0]
   const d1 = new Date(Date.now() - 86400000).toISOString().split('T')[0]
   const d7 = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]
 
-  // All 12 queries run in parallel — each is a COUNT or materialized view read.
-  // No full table scans. No row fetching. No JavaScript aggregation.
+  // Format filter for video counts
+  const formatVideoSubquery = format === 'long'
+    ? `AND cv.video_id IN (SELECT DISTINCT video_id FROM keyword_videos WHERE campaign_id = $1)`
+    : format === 'short'
+    ? `AND cv.video_id IN (SELECT DISTINCT video_id FROM keyword_shorts WHERE campaign_id = $1)`
+    : ''
+
+  // Build the format-filtered video ID subquery for view snapshots
+  const formatVideoIdsSubquery = format === 'long' || format === 'short'
+    ? `AND vs.video_id IN (SELECT DISTINCT video_id FROM ${
+        format === 'long' ? 'keyword_videos' : 'keyword_shorts'
+      } WHERE campaign_id = $1)`
+    : ''
+
+  // All queries run in parallel — each is a COUNT or materialized view read.
   const [
     kwRes,        // keyword count
-    cvRes,        // total video count
-    cvNewRes,     // new videos (7 days)
+    cvRes,        // total video count (format-filtered)
+    cvNewRes,     // new videos (7 days, format-filtered)
     btRes,        // tagged video count
-    top5Views,    // brand SOV by views (materialized view — pre-computed)
-    top5Freq,     // brand SOV by freq (materialized view — pre-computed)
-    topChannel,   // most ranking channel (materialized view — pre-computed)
+    top5Views,    // brand SOV by views (materialized view)
+    top5Freq,     // brand SOV by freq (materialized view)
+    topChannel,   // most ranking channel (materialized view)
     sjRes,        // active scrape jobs count
     metaRes,      // last refresh timestamps
-    vsTodayRes,   // today's view snapshot total
-    vs1dRes,      // yesterday's view snapshot total
-    vs7dRes,      // 7-day-ago view snapshot total
+    vsTodayRes,   // today's view snapshot total (format-filtered)
+    vs1dRes,      // yesterday's view snapshot total (format-filtered)
+    vs7dRes,      // 7-day-ago view snapshot total (format-filtered)
   ] = await Promise.all([
     supabase.from('keywords')
       .select('id', { count: 'exact', head: true })
       .eq('campaign_id', cid).eq('status', 'active'),
 
-    supabase.from('campaign_videos')
-      .select('video_id', { count: 'exact', head: true })
-      .eq('campaign_id', cid),
+    // Format-filtered video count
+    format === 'long'
+      ? queryAll<{ cnt: number }>(`
+          SELECT COUNT(DISTINCT cv.video_id)::INT as cnt
+          FROM campaign_videos cv
+          JOIN videos v ON v.id = cv.video_id
+          WHERE cv.campaign_id = $1
+            AND ((v.duration_sec IS NULL OR v.duration_sec > 60) OR cv.video_id IN (SELECT video_id FROM keyword_videos WHERE campaign_id = $1))
+        `, [cid])
+      : format === 'short'
+      ? queryAll<{ cnt: number }>(`
+          SELECT COUNT(DISTINCT cv.video_id)::INT as cnt
+          FROM campaign_videos cv
+          JOIN videos v ON v.id = cv.video_id
+          WHERE cv.campaign_id = $1
+            AND ((v.duration_sec IS NOT NULL AND v.duration_sec <= 60) OR cv.video_id IN (SELECT video_id FROM keyword_shorts WHERE campaign_id = $1))
+        `, [cid])
+      : supabase.from('campaign_videos')
+          .select('video_id', { count: 'exact', head: true })
+          .eq('campaign_id', cid),
 
-    supabase.from('campaign_videos')
-      .select('video_id', { count: 'exact', head: true })
-      .eq('campaign_id', cid)
-      .gte('first_seen_at', new Date(Date.now() - 7 * 86400000).toISOString()),
+    // Format-filtered new videos (7 days)
+    format === 'long'
+      ? queryAll<{ cnt: number }>(`
+          SELECT COUNT(DISTINCT cv.video_id)::INT as cnt
+          FROM campaign_videos cv
+          JOIN videos v ON v.id = cv.video_id
+          WHERE cv.campaign_id = $1 AND cv.first_seen_at >= $2
+            AND ((v.duration_sec IS NULL OR v.duration_sec > 60) OR cv.video_id IN (SELECT video_id FROM keyword_videos WHERE campaign_id = $1))
+        `, [cid, new Date(Date.now() - 7 * 86400000).toISOString()])
+      : format === 'short'
+      ? queryAll<{ cnt: number }>(`
+          SELECT COUNT(DISTINCT cv.video_id)::INT as cnt
+          FROM campaign_videos cv
+          JOIN videos v ON v.id = cv.video_id
+          WHERE cv.campaign_id = $1 AND cv.first_seen_at >= $2
+            AND ((v.duration_sec IS NOT NULL AND v.duration_sec <= 60) OR cv.video_id IN (SELECT video_id FROM keyword_shorts WHERE campaign_id = $1))
+        `, [cid, new Date(Date.now() - 7 * 86400000).toISOString()])
+      : supabase.from('campaign_videos')
+          .select('video_id', { count: 'exact', head: true })
+          .eq('campaign_id', cid)
+          .gte('first_seen_at', new Date(Date.now() - 7 * 86400000).toISOString()),
 
     supabase.from('brand_tags')
       .select('video_id', { count: 'exact', head: true })
       .eq('campaign_id', cid),
 
-    // Materialized views: pre-computed, instant (no JOIN, no scan)
+    // Materialized views: pre-computed, instant
     supabase.from('brand_sov_mv')
       .select('brand_name, brand_total_views, sov_percent, video_count')
       .eq('campaign_id', cid)
@@ -100,33 +148,42 @@ async function fetchKpis(cid: string) {
       .select('key, value, updated_at')
       .in('key', ['last_views_refresh', 'last_ranking_refresh']),
 
-    // View snapshot sums — now fast with the new campaign_id+date index
-    supabase.from('view_snapshots')
-      .select('view_count').eq('campaign_id', cid).eq('snapshot_date', today).limit(10000),
-    supabase.from('view_snapshots')
-      .select('view_count').eq('campaign_id', cid).eq('snapshot_date', d1).limit(10000),
-    supabase.from('view_snapshots')
-      .select('view_count').eq('campaign_id', cid).eq('snapshot_date', d7).limit(10000),
+    // View snapshot sums — filtered by format using SQL
+    queryAll<{ total_views: number }>(`
+      SELECT COALESCE(SUM(vs.view_count), 0)::BIGINT as total_views
+      FROM view_snapshots vs
+      WHERE vs.campaign_id = $1 AND vs.snapshot_date = $2::date
+      ${formatVideoIdsSubquery}
+    `, [cid, today]),
+    queryAll<{ total_views: number }>(`
+      SELECT COALESCE(SUM(vs.view_count), 0)::BIGINT as total_views
+      FROM view_snapshots vs
+      WHERE vs.campaign_id = $1 AND vs.snapshot_date = $2::date
+      ${formatVideoIdsSubquery}
+    `, [cid, d1]),
+    queryAll<{ total_views: number }>(`
+      SELECT COALESCE(SUM(vs.view_count), 0)::BIGINT as total_views
+      FROM view_snapshots vs
+      WHERE vs.campaign_id = $1 AND vs.snapshot_date = $2::date
+      ${formatVideoIdsSubquery}
+    `, [cid, d7]),
   ])
 
-  const sumViews = (rows: any[] | null) =>
-    (rows || []).reduce((s: number, r: any) => s + (r.view_count || 0), 0)
+  // Extract counts — handle both Supabase head query and raw SQL result shapes
+  const totalVideos = Array.isArray(cvRes) ? (cvRes[0]?.cnt ?? 0) : (cvRes.count ?? 0)
+  const newVideosLast7Days = Array.isArray(cvNewRes) ? (cvNewRes[0]?.cnt ?? 0) : (cvNewRes.count ?? 0)
 
-  const vsToday = sumViews(vsTodayRes.data)
-  const vs1d    = sumViews(vs1dRes.data)
-  const vs7d    = sumViews(vs7dRes.data)
+  const vsToday = vsTodayRes[0]?.total_views ?? 0
+  const vs1d    = vs1dRes[0]?.total_views ?? 0
+  const vs7d    = vs7dRes[0]?.total_views ?? 0
 
   const meta: Record<string, { value: string; updated_at: string }> = {}
   ;(metaRes.data || []).forEach((m: any) => {
     meta[m.key] = { value: m.value, updated_at: m.updated_at }
   })
 
-  const totalVideos  = cvRes.count ?? 0
-  const taggedCount  = btRes.count ?? 0
+  const taggedCount = btRes.count ?? 0
 
-  // Shape matches the `overview` field expected by page.tsx
-  // Missing chart data (dailyViews etc.) is intentionally absent here —
-  // page.tsx already handles undefined gracefully with fallback to buildTimeline()
   return {
     lastUpdatedViews:   meta['last_views_refresh']   ?? null,
     lastUpdatedRanking: meta['last_ranking_refresh'] ?? null,
@@ -141,7 +198,7 @@ async function fetchKpis(cid: string) {
     mostRankingChannel:  topChannel?.data
       ? { name: topChannel.data.channel_name, totalFrequency: topChannel.data.total_frequency }
       : null,
-    newVideosLast7Days:  cvNewRes.count ?? 0,
+    newVideosLast7Days,
     untaggedVideos:      Math.max(0, totalVideos - taggedCount),
     top5ByViewership:    top5Views.data ?? [],
     top5ByFrequency:     top5Freq.data ?? [],
@@ -152,12 +209,11 @@ async function fetchKpis(cid: string) {
     },
     activeScrapingJobs:  sjRes.count ?? 0,
     transcriptCoverage:  0,
-    // Chart data not included here — fetched by the full /api/dashboard endpoint
     dailyViews:          [],
     dailyNewVideos:      [],
     dailyKeywordsAdded:  [],
     ourVideos:           { count: 0, views: 0 },
-    _isKpisOnly:         true, // marker so page.tsx knows this is partial data
+    _isKpisOnly:         true,
   }
 }
 
