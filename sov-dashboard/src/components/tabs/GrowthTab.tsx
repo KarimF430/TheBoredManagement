@@ -9,6 +9,7 @@ import { motion } from 'framer-motion'
 import { TrendingUp, TrendingDown, Minus, Download, Loader2, Zap, Target, BarChart2, Activity, Info, Award } from 'lucide-react'
 import { useDashboard } from '@/lib/dashboard-context'
 import { useFilterStore } from '@/lib/filter-store'
+import { useCampaignStore } from '@/lib/store'
 import { useQuery } from '@tanstack/react-query'
 import { brandColor } from '@/lib/brand-colors'
 
@@ -102,6 +103,7 @@ type SortKey = 'growth' | 'name' | 'current'
 export default function GrowthTab() {
   const { downloadCSV } = useDashboard()
   const { ownership, dateRange } = useFilterStore()
+  const { activeCampaignId } = useCampaignStore()
   const [metric, setMetric] = useState<'views' | 'frequency'>('views')
   const [sortBy, setSortBy] = useState<SortKey>('growth')
 

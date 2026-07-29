@@ -9,6 +9,7 @@ import { motion } from 'framer-motion'
 import { Loader2, Download, TrendingUp, Calendar, Activity, Flame, Crown, Info, BarChart2 } from 'lucide-react'
 import { useDashboard } from '@/lib/dashboard-context'
 import { useFilterStore } from '@/lib/filter-store'
+import { useCampaignStore } from '@/lib/store'
 import { useQuery } from '@tanstack/react-query'
 import { brandColor } from '@/lib/brand-colors'
 
@@ -125,6 +126,7 @@ function MomentumBadge({ value }: { value: number }) {
 export default function TrendsTab() {
   const { downloadCSV } = useDashboard()
   const { search, ownership, dateRange, customDateFrom, customDateTo } = useFilterStore()
+  const { activeCampaignId } = useCampaignStore()
   const [chartType, setChartType] = useState<'area' | 'line'>('area')
   const [activeBrands, setActiveBrands] = useState<string[]>([])
   const [showAvg, setShowAvg] = useState(false)
@@ -142,15 +144,17 @@ export default function TrendsTab() {
   }, [dateRange, customDateFrom, customDateTo])
 
   const trendTabQuery = useQuery({
-    queryKey: ['trends-tab', days, ownership, metric],
+    queryKey: ['trends-tab', activeCampaignId, days, ownership, metric],
     queryFn: async () => {
-      const params = new URLSearchParams({ days })
+      if (!activeCampaignId) return { data: [], brands: [] }
+      const params = new URLSearchParams({ campaign_id: activeCampaignId, days })
       if (ownership !== 'all') params.set('is_ours', ownership === 'ours' ? 'true' : 'false')
       if (metric === 'frequency') params.set('metric', 'frequency')
       const res = await fetch(`/api/sov-trend?${params}`)
       if (!res.ok) throw new Error('Failed to fetch trend data')
       return res.json()
     },
+    enabled: !!activeCampaignId,
   })
 
   const data = trendTabQuery.data?.data ?? []
