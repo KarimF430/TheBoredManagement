@@ -213,67 +213,43 @@ export default function CreatorsTab() {
         <MetricCard label="Shorts Specialists" value={channels.filter((c: any) => c.shortsRatio > 60).length} icon={Zap} color="#EC4899" sub=">60% Shorts ratio" info="Channels where over 60% of indexed content are Shorts." />
       </div>
 
-      {/* Charts Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-        <Card
-          title="Creator Reach vs Efficiency"
-          sub="Bubble size indicates total views. Displays top 50 creators."
-          height={260}
-          info="Locate creators with both high keyword frequency and high average views."
-        >
-          {scatterData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <ScatterChart margin={{ top: 10, right: 20, bottom: 10, left: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-                <XAxis type="number" dataKey="x" name="Keyword Freq" tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-                <YAxis type="number" dataKey="y" name="Avg Views" tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} tickFormatter={fmt} />
-                <ZAxis type="number" dataKey="z" range={[20, 400]} name="Total Views" />
-                <RechartsTooltip
-                  cursor={{ strokeDasharray: '3 3' }}
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const d = payload[0].payload
-                      return (
-                        <div style={{ background: '#0F172A', padding: '8px 12px', borderRadius: 8, color: '#FFF', fontSize: 11 }}>
-                          <div style={{ fontWeight: 700, marginBottom: 4 }}>{d.name}</div>
-                          <div>Total Views: {fmt(d.z)}</div>
-                          <div>Avg Views: {fmt(d.y)}</div>
-                          <div>Keywords: {d.x}</div>
-                        </div>
-                      )
-                    }
-                    return null
-                  }}
-                />
-                <Scatter data={scatterData}>
-                  {scatterData.map((entry: any, index: number) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} fillOpacity={0.7} />
-                  ))}
-                </Scatter>
-              </ScatterChart>
-            </ResponsiveContainer>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94A3B8', fontSize: 12 }}>Insufficient data for scatter plot</div>
-          )}
-        </Card>
-
-        <Card title="Creator-Brand View Share Matrix" sub="Which brands drive viewership for top creator channels" height={260}>
-          {brandAlignmentData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={brandAlignmentData} layout="vertical" margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" horizontal={false} />
-                <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: '#475569', fontWeight: 600 }} axisLine={false} tickLine={false} width={90} />
-                <RechartsTooltip contentStyle={{ background: '#0F172A', border: 'none', borderRadius: 8, fontSize: 11 }} itemStyle={{ color: '#FFF' }} />
-                {allBrands.slice(0, 5).map((b, i) => (
-                  <Bar key={b} dataKey={b} stackId="a" fill={C[i % C.length]} radius={i === 0 ? [2, 0, 0, 2] : [0, 2, 2, 0]} barSize={16} />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94A3B8', fontSize: 12 }}>No brand alignment data available</div>
-          )}
-        </Card>
+      {/* Top 10 Creators Intelligence */}
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: '#0F172A', marginBottom: 16 }}>Top 10 Creators Intelligence</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16 }}>
+          {filteredChannels.slice(0, 10).map((c: any, i: number) => (
+            <div key={c.id} style={{ background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)', borderRadius: 16, border: '1px solid #E2E8F0', padding: 20, boxShadow: '0 2px 4px rgba(0,0,0,0.02)', position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: -14, right: -10, fontSize: 64, fontWeight: 900, color: '#F1F5F9', zIndex: 0 }}>#{i + 1}</div>
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#0F172A', marginBottom: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>Total Views</div>
+                    <div style={{ fontSize: 18, fontWeight: 900, color: '#1A73E8', fontFamily: "'JetBrains Mono',monospace" }}>{fmt(c.views)}</div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>Keywords</div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: '#334155' }}>{c.kwCount}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>Brands</div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: '#334155' }}>{c.brandCount}</div>
+                    </div>
+                  </div>
+                  {c.brandCount > 0 && (
+                    <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {c.brandsList.slice(0, 3).map((b: any) => (
+                        <span key={b.name} style={{ fontSize: 9, fontWeight: 700, background: '#EFF6FF', color: '#1D4ED8', padding: '2px 6px', borderRadius: 6 }}>{b.name}</span>
+                      ))}
+                      {c.brandCount > 3 && <span style={{ fontSize: 9, fontWeight: 700, background: '#F1F5F9', color: '#64748B', padding: '2px 6px', borderRadius: 6 }}>+{c.brandCount - 3}</span>}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Creator Leaderboard Table */}
@@ -385,44 +361,44 @@ export default function CreatorsTab() {
                       <tr style={{ background: '#F8FAFC' }}>
                         <td colSpan={9} style={{ padding: 0 }}>
                           <div style={{ padding: '20px', borderBottom: '1px solid #E2E8F0', background: '#F8FAFC' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 24 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 16 }}>
                               {/* Left Col: Channel Summary */}
-                              <div style={{ background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)', borderRadius: 16, border: '1px solid #E2E8F0', padding: 24, boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)' }}>
-                                <h4 style={{ fontSize: 15, fontWeight: 800, color: '#0F172A', marginTop: 0, marginBottom: 20 }}>Performance Summary</h4>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
-                                  <div style={{ background: '#FFF', padding: 12, borderRadius: 12, border: '1px solid #F1F5F9', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
-                                    <div style={{ fontSize: 10, color: '#64748B', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Top 5 Hits</div>
-                                    <div style={{ fontSize: 24, fontWeight: 800, color: '#059669', fontFamily: "'JetBrains Mono',monospace" }}>{c.top5_hits}</div>
+                              <div style={{ background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)', borderRadius: 12, border: '1px solid #E2E8F0', padding: 16, boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.05)' }}>
+                                <h4 style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', marginTop: 0, marginBottom: 16 }}>Performance Summary</h4>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                                  <div style={{ background: '#FFF', padding: 10, borderRadius: 10, border: '1px solid #F1F5F9', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                                    <div style={{ fontSize: 9, color: '#64748B', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>Top 5 Hits</div>
+                                    <div style={{ fontSize: 20, fontWeight: 800, color: '#059669', fontFamily: "'JetBrains Mono',monospace" }}>{c.top5_hits}</div>
                                   </div>
-                                  <div style={{ background: '#FFF', padding: 12, borderRadius: 12, border: '1px solid #F1F5F9', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
-                                    <div style={{ fontSize: 10, color: '#64748B', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Top 10 Hits</div>
-                                    <div style={{ fontSize: 24, fontWeight: 800, color: '#1A73E8', fontFamily: "'JetBrains Mono',monospace" }}>{c.top10_hits}</div>
+                                  <div style={{ background: '#FFF', padding: 10, borderRadius: 10, border: '1px solid #F1F5F9', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                                    <div style={{ fontSize: 9, color: '#64748B', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>Top 10 Hits</div>
+                                    <div style={{ fontSize: 20, fontWeight: 800, color: '#1A73E8', fontFamily: "'JetBrains Mono',monospace" }}>{c.top10_hits}</div>
                                   </div>
-                                  <div style={{ background: '#FFF', padding: 12, borderRadius: 12, border: '1px solid #F1F5F9', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
-                                    <div style={{ fontSize: 10, color: '#64748B', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Avg Views</div>
-                                    <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A', fontFamily: "'JetBrains Mono',monospace" }}>{fmt(c.avgViews)}</div>
+                                  <div style={{ background: '#FFF', padding: 10, borderRadius: 10, border: '1px solid #F1F5F9', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                                    <div style={{ fontSize: 9, color: '#64748B', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>Avg Views</div>
+                                    <div style={{ fontSize: 16, fontWeight: 800, color: '#0F172A', fontFamily: "'JetBrains Mono',monospace" }}>{fmt(c.avgViews)}</div>
                                   </div>
-                                  <div style={{ background: '#FFF', padding: 12, borderRadius: 12, border: '1px solid #F1F5F9', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
-                                    <div style={{ fontSize: 10, color: '#64748B', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Daily Growth</div>
-                                    <div style={{ fontSize: 18, fontWeight: 800, color: c.dailyGrowthPct > 5 ? '#10B981' : '#3B82F6', fontFamily: "'JetBrains Mono',monospace" }}>{c.dailyGrowthPct > 0 ? '+' : ''}{c.dailyGrowthPct}%</div>
+                                  <div style={{ background: '#FFF', padding: 10, borderRadius: 10, border: '1px solid #F1F5F9', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                                    <div style={{ fontSize: 9, color: '#64748B', fontWeight: 700, textTransform: 'uppercase', marginBottom: 2 }}>Daily Growth</div>
+                                    <div style={{ fontSize: 16, fontWeight: 800, color: c.dailyGrowthPct > 5 ? '#10B981' : '#3B82F6', fontFamily: "'JetBrains Mono',monospace" }}>{c.dailyGrowthPct > 0 ? '+' : ''}{c.dailyGrowthPct}%</div>
                                   </div>
                                 </div>
-                                <h4 style={{ fontSize: 12, fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: 12 }}>Top Keywords Covered</h4>
+                                <h4 style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: 8 }}>Top Keywords Covered</h4>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                                   {(c.kws || []).slice(0, 12).map((kw: any) => (
-                                    <span key={kw} style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 8, background: '#F8FAFC', color: '#334155', border: '1px solid #E2E8F0' }}>{kw}</span>
+                                    <span key={kw} style={{ fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 6, background: '#F8FAFC', color: '#334155', border: '1px solid #E2E8F0' }}>{kw}</span>
                                   ))}
-                                  {(c.kws || []).length > 12 && <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 8, background: '#F1F5F9', color: '#94A3B8' }}>+{c.kws.length - 12} more</span>}
+                                  {(c.kws || []).length > 12 && <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: '#F1F5F9', color: '#94A3B8' }}>+{c.kws.length - 12} more</span>}
                                 </div>
                               </div>
 
                               {/* Right Col: Video List */}
-                              <div style={{ background: '#FFF', borderRadius: 16, border: '1px solid #E2E8F0', padding: 24, boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                                  <h4 style={{ fontSize: 15, fontWeight: 800, color: '#0F172A', margin: 0 }}>Indexed Videos</h4>
-                                  <span style={{ fontSize: 13, fontWeight: 600, color: '#64748B', background: '#F1F5F9', padding: '4px 10px', borderRadius: 20 }}>{c.count} total</span>
+                              <div style={{ background: '#FFF', borderRadius: 12, border: '1px solid #E2E8F0', padding: 16, boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.05)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                  <h4 style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', margin: 0 }}>Indexed Videos</h4>
+                                  <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B', background: '#F1F5F9', padding: '3px 8px', borderRadius: 12 }}>{c.count} total</span>
                                 </div>
-                                <div style={{ display: 'inline-flex', gap: 4, marginBottom: 20, overflowX: 'auto', background: '#F8FAFC', padding: 4, borderRadius: 10, border: '1px solid #E2E8F0' }}>
+                                <div style={{ display: 'inline-flex', gap: 4, marginBottom: 16, overflowX: 'auto', background: '#F8FAFC', padding: 4, borderRadius: 8, border: '1px solid #E2E8F0' }}>
                                   {[
                                     { id: 'all', label: 'All' },
                                     { id: 'top5', label: 'Top 5s' },
@@ -442,14 +418,14 @@ export default function CreatorsTab() {
                                           }
                                         }}
                                         style={{
-                                          padding: '8px 16px',
-                                          fontSize: 12,
+                                          padding: '6px 14px',
+                                          fontSize: 11,
                                           fontWeight: 700,
-                                          borderRadius: 8,
+                                          borderRadius: 6,
                                           border: 'none',
                                           background: isActive ? '#FFF' : 'transparent',
                                           color: isActive ? '#0F172A' : '#64748B',
-                                          boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                                          boxShadow: isActive ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
                                           cursor: 'pointer',
                                           whiteSpace: 'nowrap',
                                           transition: 'all 0.2s ease'
@@ -460,7 +436,7 @@ export default function CreatorsTab() {
                                     );
                                   })}
                                 </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 380, overflowY: 'auto', paddingRight: 6 }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 340, overflowY: 'auto', paddingRight: 6 }}>
                                   {(() => {
                                     let filtered = [...(c.creatorVideos || [])];
                                     
@@ -488,34 +464,40 @@ export default function CreatorsTab() {
                                       }
                                     }
                                     
-                                    // Sort by rank ascending (best first), then by views descending
-                                    filtered = filtered.sort((a: any, b: any) => {
-                                      const rankA = a.best_rank || 999;
-                                      const rankB = b.best_rank || 999;
-                                      if (rankA !== rankB) return rankA - rankB;
-                                      return (b.view_count || 0) - (a.view_count || 0);
-                                    });
+                                    // Sorting logic
+                                    if (videoFilters.includes('top5')) {
+                                      filtered = filtered.sort((a: any, b: any) => (b.top5_hits || 0) - (a.top5_hits || 0));
+                                    } else if (videoFilters.includes('top10')) {
+                                      filtered = filtered.sort((a: any, b: any) => (b.top10_hits || 0) - (a.top10_hits || 0));
+                                    } else {
+                                      filtered = filtered.sort((a: any, b: any) => {
+                                        const rankA = a.best_rank || 999;
+                                        const rankB = b.best_rank || 999;
+                                        if (rankA !== rankB) return rankA - rankB;
+                                        return (b.view_count || 0) - (a.view_count || 0);
+                                      });
+                                    }
                                     
                                     if (filtered.length === 0) {
-                                      return <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '40px 0', background: '#F8FAFC', borderRadius: 12, border: '1px dashed #CBD5E1' }}>No videos match these filters.</div>
+                                      return <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '30px 0', background: '#F8FAFC', borderRadius: 8, border: '1px dashed #CBD5E1' }}>No videos match these filters.</div>
                                     }
                                     
                                     return filtered.map((v: any) => (
                                       <a key={v.id} href={`https://www.youtube.com/watch?v=${v.youtube_id}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
-                                        <div style={{ display: 'flex', gap: 16, alignItems: 'center', background: '#FFF', border: '1px solid #F1F5F9', padding: '12px 16px', borderRadius: 12, transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.01)' }} onMouseEnter={e => { e.currentTarget.style.borderColor = '#CBD5E1'; e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.05)' }} onMouseLeave={e => { e.currentTarget.style.borderColor = '#F1F5F9'; e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.01)' }}>
-                                          <div style={{ width: 56, height: 56, borderRadius: 28, overflow: 'hidden', flexShrink: 0, background: '#F1F5F9', border: '1px solid #E2E8F0' }}>
+                                        <div style={{ display: 'flex', gap: 12, alignItems: 'center', background: '#FFF', border: '1px solid #F1F5F9', padding: '10px 14px', borderRadius: 10, transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.01)' }} onMouseEnter={e => { e.currentTarget.style.borderColor = '#CBD5E1'; e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)' }} onMouseLeave={e => { e.currentTarget.style.borderColor = '#F1F5F9'; e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.01)' }}>
+                                          <div style={{ width: 48, height: 48, borderRadius: 24, overflow: 'hidden', flexShrink: 0, background: '#F1F5F9', border: '1px solid #E2E8F0' }}>
                                             {v.thumbnail_url && <img src={v.thumbnail_url} alt={v.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
                                           </div>
                                           <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                            <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                                               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title}</span>
                                               <ExternalLink size={12} style={{ color: '#94A3B8', flexShrink: 0 }} />
                                             </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 11, color: '#64748B' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 11, color: '#64748B' }}>
                                               <span style={{ fontWeight: 800, color: '#334155' }}>{fmtIndian(v.view_count)} views</span>
-                                              {v.top5_hits > 0 && <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#059669', fontWeight: 800, background: '#ECFDF5', padding: '2px 8px', borderRadius: 6 }}><Star size={10} /> {v.top5_hits} Top 5s</span>}
-                                              {v.top10_hits > 0 && <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#1A73E8', fontWeight: 800, background: '#EFF6FF', padding: '2px 8px', borderRadius: 6 }}><Star size={10} /> {v.top10_hits} Top 10s</span>}
-                                              <span style={{ color: v.is_short ? '#EC4899' : '#1A73E8', fontWeight: 700, background: v.is_short ? '#FDF2F8' : '#EFF6FF', padding: '2px 8px', borderRadius: 6 }}>{v.is_short ? 'Short' : 'Video'}</span>
+                                              {v.top5_hits > 0 && <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#059669', fontWeight: 800, background: '#ECFDF5', padding: '2px 6px', borderRadius: 4 }}><Star size={10} /> {v.top5_hits} Top 5s</span>}
+                                              {v.top10_hits > 0 && <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#1A73E8', fontWeight: 800, background: '#EFF6FF', padding: '2px 6px', borderRadius: 4 }}><Star size={10} /> {v.top10_hits} Top 10s</span>}
+                                              <span style={{ color: v.is_short ? '#EC4899' : '#1A73E8', fontWeight: 700, background: v.is_short ? '#FDF2F8' : '#EFF6FF', padding: '2px 6px', borderRadius: 4 }}>{v.is_short ? 'Short' : 'Video'}</span>
                                             </div>
                                           </div>
                                           <div style={{ flexShrink: 0, paddingLeft: 10 }}><Rank n={v.best_rank || 99} /></div>
