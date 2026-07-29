@@ -57,10 +57,10 @@ async function fetchKeywordSov(
   const [kvRes, ksRes] = await Promise.all([
     format === 'short'
       ? Promise.resolve({ data: [] })
-      : supabase.from('keyword_videos').select('keyword_id, video_id').in('keyword_id', kwIds),
+      : supabase.from('keyword_videos').select('keyword_id, video_id').in('keyword_id', kwIds).eq('campaign_id', campaignId),
     format === 'long'
       ? Promise.resolve({ data: [] })
-      : supabase.from('keyword_shorts').select('keyword_id, video_id').in('keyword_id', kwIds),
+      : supabase.from('keyword_shorts').select('keyword_id, video_id').in('keyword_id', kwIds).eq('campaign_id', campaignId),
   ])
 
   if ((kvRes as any).error) console.error('keyword_videos fetch error:', (kvRes as any).error.message)
