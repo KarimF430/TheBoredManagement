@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/warm",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron?job=daily_views",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron?job=sheets_sync",
+      "schedule": "0 9 * * *"
+    }
+  ]
+}
