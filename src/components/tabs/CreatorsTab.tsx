@@ -410,7 +410,7 @@ export default function CreatorsTab() {
                                   <h4 style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', margin: 0 }}>Indexed Videos</h4>
                                   <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B' }}>{c.count} total</span>
                                 </div>
-                                <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto', paddingBottom: 4 }}>
+                                <div style={{ display: 'inline-flex', gap: 4, marginBottom: 16, overflowX: 'auto', background: '#F8FAFC', padding: 4, borderRadius: 8, border: '1px solid #E2E8F0' }}>
                                   {[
                                     { id: 'all', label: 'All' },
                                     { id: 'top5', label: 'Top 5s' },
@@ -422,15 +422,17 @@ export default function CreatorsTab() {
                                       key={f.id}
                                       onClick={() => setVideoFilter(f.id as any)}
                                       style={{
-                                        padding: '4px 10px',
+                                        padding: '6px 14px',
                                         fontSize: 11,
                                         fontWeight: 700,
                                         borderRadius: 6,
-                                        border: `1px solid ${videoFilter === f.id ? '#1A73E8' : '#E2E8F0'}`,
-                                        background: videoFilter === f.id ? '#EFF6FF' : '#FFF',
-                                        color: videoFilter === f.id ? '#1A73E8' : '#64748B',
+                                        border: 'none',
+                                        background: videoFilter === f.id ? '#FFF' : 'transparent',
+                                        color: videoFilter === f.id ? '#0F172A' : '#64748B',
+                                        boxShadow: videoFilter === f.id ? '0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1)' : 'none',
                                         cursor: 'pointer',
-                                        whiteSpace: 'nowrap'
+                                        whiteSpace: 'nowrap',
+                                        transition: 'all 0.2s ease'
                                       }}
                                     >
                                       {f.label}
@@ -439,11 +441,19 @@ export default function CreatorsTab() {
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 340, overflowY: 'auto', paddingRight: 6 }}>
                                   {(() => {
-                                    let filtered = c.creatorVideos || [];
+                                    let filtered = [...(c.creatorVideos || [])];
                                     if (videoFilter === 'top5') filtered = filtered.filter((v: any) => v.top5_hits > 0);
                                     if (videoFilter === 'top10') filtered = filtered.filter((v: any) => v.top10_hits > 0);
                                     if (videoFilter === 'shorts') filtered = filtered.filter((v: any) => v.is_short);
                                     if (videoFilter === 'long') filtered = filtered.filter((v: any) => !v.is_short);
+                                    
+                                    // Sort by rank ascending (best first), then by views descending
+                                    filtered = filtered.sort((a: any, b: any) => {
+                                      const rankA = a.best_rank || 999;
+                                      const rankB = b.best_rank || 999;
+                                      if (rankA !== rankB) return rankA - rankB;
+                                      return (b.view_count || 0) - (a.view_count || 0);
+                                    });
                                     
                                     if (filtered.length === 0) {
                                       return <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '20px 0' }}>No videos match this filter.</div>
