@@ -85,9 +85,10 @@ export default function CreatorsTab() {
   const { activeCampaignId } = useCampaignStore()
 
   const [creatorMinVideos, setCreatorMinVideos] = useState<number>(1)
-  const [sortConfig, setSortConfig] = useState<{key: string, direction: 'asc'|'desc'}>({ key: 'views', direction: 'desc' })
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'views', direction: 'desc' })
   const [search, setSearch] = useState('')
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
+  const [videoFilter, setVideoFilter] = useState<'all' | 'top5' | 'top10' | 'shorts' | 'long'>('all')
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
 
@@ -122,7 +123,7 @@ export default function CreatorsTab() {
     }
 
     const topCreators50 = channels.slice(0, 50)
-    
+
     const scatterData = topCreators50.map((c: any, i: number) => ({
       name: c.name,
       x: c.kwCount,
@@ -136,9 +137,9 @@ export default function CreatorsTab() {
     top8Creators.forEach((c: any) => (c.brandsList || []).forEach((b: any) => allBrandsSet.add(b.name)))
     const brandAlignmentData = top8Creators.map((c: any) => {
       const row: any = { name: c.name.length > 11 ? c.name.slice(0, 11) + '...' : c.name }
-      ;(c.brandsList || []).forEach((b: any) => {
-        row[b.name] = c.views > 0 ? Math.round((b.views / c.views) * 100) : 0
-      })
+        ; (c.brandsList || []).forEach((b: any) => {
+          row[b.name] = c.views > 0 ? Math.round((b.views / c.views) * 100) : 0
+        })
       return row
     })
 
@@ -165,21 +166,21 @@ export default function CreatorsTab() {
             Evaluate influencer performance across YouTube search terms to select optimal brand partners.
           </div>
         </div>
-        
+
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#FFF', padding: '4px 12px', borderRadius: 8, border: '1px solid #E2E8F0' }}>
             <Search size={14} color="#64748B" />
-            <input 
-              placeholder="Search creators..." 
-              value={search} 
+            <input
+              placeholder="Search creators..."
+              value={search}
               onChange={e => setSearch(e.target.value)}
               style={{ border: 'none', outline: 'none', fontSize: 12, width: 140 }}
             />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>Format:</span>
-            <select 
-              value={format} onChange={(e) => setFormat(e.target.value as 'all'|'long'|'short')} 
+            <select
+              value={format} onChange={(e) => setFormat(e.target.value as 'all' | 'long' | 'short')}
               style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #E2E8F0', fontSize: 12, fontWeight: 600, background: '#FFF', outline: 'none' }}
             >
               <option value="all">All</option>
@@ -190,8 +191,8 @@ export default function CreatorsTab() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>Min Videos:</span>
-            <select 
-              value={creatorMinVideos} onChange={(e) => setCreatorMinVideos(Number(e.target.value))} 
+            <select
+              value={creatorMinVideos} onChange={(e) => setCreatorMinVideos(Number(e.target.value))}
               style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #E2E8F0', fontSize: 12, fontWeight: 600, background: '#FFF', outline: 'none' }}
             >
               <option value={1}>1+ Videos</option>
@@ -227,7 +228,7 @@ export default function CreatorsTab() {
                 <XAxis type="number" dataKey="x" name="Keyword Freq" tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
                 <YAxis type="number" dataKey="y" name="Avg Views" tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} tickFormatter={fmt} />
                 <ZAxis type="number" dataKey="z" range={[20, 400]} name="Total Views" />
-                <RechartsTooltip 
+                <RechartsTooltip
                   cursor={{ strokeDasharray: '3 3' }}
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
@@ -283,7 +284,7 @@ export default function CreatorsTab() {
             <div style={{ fontSize: 11.5, color: '#64748B', marginTop: 2 }}>Ranked by overall daily view growth and keyword search dominance.</div>
           </div>
         </div>
-        
+
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
@@ -299,12 +300,12 @@ export default function CreatorsTab() {
                   { label: 'Channel Authority', key: 'authority' },
                   { label: 'Action', key: '' }
                 ].map(h => (
-                  <th 
-                    key={h.label} 
+                  <th
+                    key={h.label}
                     onClick={() => h.key ? setSortConfig(p => ({ key: h.key, direction: p.key === h.key && p.direction === 'desc' ? 'asc' : 'desc' })) : null}
                     style={{ padding: '12px 14px', textAlign: h.label === '#' || h.label === 'Best Rank' || h.label === 'Action' ? 'center' : 'left', fontSize: 10.5, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', background: '#F8FAFC', cursor: h.key ? 'pointer' : 'default', transition: 'background 0.2s' }}
-                    onMouseEnter={(e) => { if(h.key) e.currentTarget.style.background = '#F1F5F9' }}
-                    onMouseLeave={(e) => { if(h.key) e.currentTarget.style.background = '#F8FAFC' }}
+                    onMouseEnter={(e) => { if (h.key) e.currentTarget.style.background = '#F1F5F9' }}
+                    onMouseLeave={(e) => { if (h.key) e.currentTarget.style.background = '#F8FAFC' }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: h.label === '#' || h.label === 'Best Rank' || h.label === 'Action' ? 'center' : 'flex-start', gap: 4 }}>
                       {h.label}
@@ -327,8 +328,8 @@ export default function CreatorsTab() {
                 const authorityScore = (c.top5_hits * 2) + c.top10_hits
                 const authBadge = authorityScore > 50 ? { label: `Elite (${authorityScore})`, color: '#6D28D9', bg: '#F3E8FF' }
                   : authorityScore > 20 ? { label: `Strong (${authorityScore})`, color: '#1A73E8', bg: '#EFF6FF' }
-                  : authorityScore > 5 ? { label: `Good (${authorityScore})`, color: '#059669', bg: '#ECFDF5' }
-                  : { label: `Emerging (${authorityScore})`, color: '#64748B', bg: '#F8FAFC' }
+                    : authorityScore > 5 ? { label: `Good (${authorityScore})`, color: '#059669', bg: '#ECFDF5' }
+                      : { label: `Emerging (${authorityScore})`, color: '#64748B', bg: '#F8FAFC' }
 
                 const isExpanded = expandedRowId === c.id
 
@@ -337,8 +338,8 @@ export default function CreatorsTab() {
                     <tr
                       style={{ borderBottom: '1px solid #F1F5F9', cursor: 'pointer', background: isExpanded ? '#F8FAFC' : 'transparent' }}
                       onClick={() => setExpandedRowId(isExpanded ? null : c.id)}
-                      onMouseEnter={(e) => { if(!isExpanded) e.currentTarget.style.background = '#F8FAFC' }}
-                      onMouseLeave={(e) => { if(!isExpanded) e.currentTarget.style.background = 'transparent' }}
+                      onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.background = '#F8FAFC' }}
+                      onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.background = 'transparent' }}
                     >
                       <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 800, fontSize: 12, color: C[i % C.length] }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
@@ -402,36 +403,75 @@ export default function CreatorsTab() {
                                   {(c.kws || []).length > 12 && <span style={{ fontSize: 10.5, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: '#F8FAFC', color: '#94A3B8' }}>+{c.kws.length - 12} more</span>}
                                 </div>
                               </div>
-                              
+
                               {/* Right Col: Video List */}
                               <div style={{ background: '#FFF', borderRadius: 12, border: '1px solid #E2E8F0', padding: 20, boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                                   <h4 style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', margin: 0 }}>Indexed Videos</h4>
                                   <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B' }}>{c.count} total</span>
                                 </div>
+                                <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto', paddingBottom: 4 }}>
+                                  {[
+                                    { id: 'all', label: 'All' },
+                                    { id: 'top5', label: 'Top 5s' },
+                                    { id: 'top10', label: 'Top 10s' },
+                                    { id: 'shorts', label: 'Shorts' },
+                                    { id: 'long', label: 'Long Form' }
+                                  ].map(f => (
+                                    <button
+                                      key={f.id}
+                                      onClick={() => setVideoFilter(f.id as any)}
+                                      style={{
+                                        padding: '4px 10px',
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                        borderRadius: 6,
+                                        border: `1px solid ${videoFilter === f.id ? '#1A73E8' : '#E2E8F0'}`,
+                                        background: videoFilter === f.id ? '#EFF6FF' : '#FFF',
+                                        color: videoFilter === f.id ? '#1A73E8' : '#64748B',
+                                        cursor: 'pointer',
+                                        whiteSpace: 'nowrap'
+                                      }}
+                                    >
+                                      {f.label}
+                                    </button>
+                                  ))}
+                                </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 340, overflowY: 'auto', paddingRight: 6 }}>
-                                  {(c.creatorVideos || []).length > 0 ? (c.creatorVideos || []).map((v: any) => (
-                                    <a key={v.id} href={`https://www.youtube.com/watch?v=${v.youtube_id}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
-                                      <div style={{ display: 'flex', gap: 14, alignItems: 'center', background: '#FFF', border: '1px solid #F1F5F9', padding: '10px 14px', borderRadius: 10, transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = '#CBD5E1'; e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.04)' }} onMouseLeave={e => { e.currentTarget.style.borderColor = '#F1F5F9'; e.currentTarget.style.boxShadow = 'none' }}>
-                                        <div style={{ width: 48, height: 48, borderRadius: 24, overflow: 'hidden', flexShrink: 0, background: '#F1F5F9', border: '1px solid #E2E8F0' }}>
-                                          {v.thumbnail_url && <img src={v.thumbnail_url} alt={v.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
-                                        </div>
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                          <div style={{ fontSize: 13, fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title}</span>
-                                            <ExternalLink size={12} style={{ color: '#94A3B8', flexShrink: 0 }} />
+                                  {(() => {
+                                    let filtered = c.creatorVideos || [];
+                                    if (videoFilter === 'top5') filtered = filtered.filter((v: any) => v.top5_hits > 0);
+                                    if (videoFilter === 'top10') filtered = filtered.filter((v: any) => v.top10_hits > 0);
+                                    if (videoFilter === 'shorts') filtered = filtered.filter((v: any) => v.is_short);
+                                    if (videoFilter === 'long') filtered = filtered.filter((v: any) => !v.is_short);
+                                    
+                                    if (filtered.length === 0) {
+                                      return <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '20px 0' }}>No videos match this filter.</div>
+                                    }
+                                    
+                                    return filtered.map((v: any) => (
+                                      <a key={v.id} href={`https://www.youtube.com/watch?v=${v.youtube_id}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+                                        <div style={{ display: 'flex', gap: 14, alignItems: 'center', background: '#FFF', border: '1px solid #F1F5F9', padding: '10px 14px', borderRadius: 10, transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = '#CBD5E1'; e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.04)' }} onMouseLeave={e => { e.currentTarget.style.borderColor = '#F1F5F9'; e.currentTarget.style.boxShadow = 'none' }}>
+                                          <div style={{ width: 48, height: 48, borderRadius: 24, overflow: 'hidden', flexShrink: 0, background: '#F1F5F9', border: '1px solid #E2E8F0' }}>
+                                            {v.thumbnail_url && <img src={v.thumbnail_url} alt={v.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
                                           </div>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 11, color: '#64748B' }}>
-                                            <span style={{ fontWeight: 700, color: '#334155' }}>{fmtIndian(v.view_count)} views</span>
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#059669', fontWeight: 700, background: '#ECFDF5', padding: '2px 6px', borderRadius: 4 }}><Star size={10} /> {v.top5_hits} Top 5s</span>
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#1A73E8', fontWeight: 700, background: '#EFF6FF', padding: '2px 6px', borderRadius: 4 }}><Star size={10} /> {v.top10_hits} Top 10s</span>
-                                            <span style={{ color: v.is_short ? '#EC4899' : '#1A73E8', fontWeight: 600 }}>{v.is_short ? 'Short' : 'Video'}</span>
+                                          <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontSize: 13, fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title}</span>
+                                              <ExternalLink size={12} style={{ color: '#94A3B8', flexShrink: 0 }} />
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 11, color: '#64748B' }}>
+                                              <span style={{ fontWeight: 700, color: '#334155' }}>{fmtIndian(v.view_count)} views</span>
+                                              <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#059669', fontWeight: 700, background: '#ECFDF5', padding: '2px 6px', borderRadius: 4 }}><Star size={10} /> {v.top5_hits} Top 5s</span>
+                                              <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#1A73E8', fontWeight: 700, background: '#EFF6FF', padding: '2px 6px', borderRadius: 4 }}><Star size={10} /> {v.top10_hits} Top 10s</span>
+                                              <span style={{ color: v.is_short ? '#EC4899' : '#1A73E8', fontWeight: 600 }}>{v.is_short ? 'Short' : 'Video'}</span>
+                                            </div>
                                           </div>
+                                          <div style={{ flexShrink: 0, paddingLeft: 10 }}><Rank n={v.best_rank || 99} /></div>
                                         </div>
-                                        <div style={{ flexShrink: 0, paddingLeft: 10 }}><Rank n={v.best_rank || 99} /></div>
-                                      </div>
-                                    </a>
-                                  )) : <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '20px 0' }}>No videos found.</div>}
+                                      </a>
+                                    ))
+                                  })()}
                                 </div>
                               </div>
                             </div>
