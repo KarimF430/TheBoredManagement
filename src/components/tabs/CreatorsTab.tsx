@@ -88,7 +88,7 @@ export default function CreatorsTab() {
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'views', direction: 'desc' })
   const [search, setSearch] = useState('')
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
-  const [videoFilter, setVideoFilter] = useState<'all' | 'top5' | 'top10' | 'shorts' | 'long'>('all')
+  const [videoFilters, setVideoFilters] = useState<string[]>([])
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
 
@@ -385,67 +385,108 @@ export default function CreatorsTab() {
                       <tr style={{ background: '#F8FAFC' }}>
                         <td colSpan={9} style={{ padding: 0 }}>
                           <div style={{ padding: '20px', borderBottom: '1px solid #E2E8F0', background: '#F8FAFC' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 20 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 24 }}>
                               {/* Left Col: Channel Summary */}
-                              <div style={{ background: '#FFF', borderRadius: 12, border: '1px solid #E2E8F0', padding: 20, boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                                <h4 style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', marginTop: 0, marginBottom: 16 }}>Performance Summary</h4>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
-                                  <div><div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase' }}>Top 5 Hits</div><div style={{ fontSize: 20, fontWeight: 800, color: '#059669', fontFamily: "'JetBrains Mono',monospace" }}>{c.top5_hits}</div></div>
-                                  <div><div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase' }}>Top 10 Hits</div><div style={{ fontSize: 20, fontWeight: 800, color: '#1A73E8', fontFamily: "'JetBrains Mono',monospace" }}>{c.top10_hits}</div></div>
-                                  <div><div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase' }}>Avg Views</div><div style={{ fontSize: 16, fontWeight: 800, color: '#0F172A', fontFamily: "'JetBrains Mono',monospace" }}>{fmt(c.avgViews)}</div></div>
-                                  <div><div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase' }}>Daily Growth</div><div style={{ fontSize: 16, fontWeight: 800, color: c.dailyGrowthPct > 5 ? '#10B981' : '#3B82F6', fontFamily: "'JetBrains Mono',monospace" }}>{c.dailyGrowthPct > 0 ? '+' : ''}{c.dailyGrowthPct}%</div></div>
+                              <div style={{ background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)', borderRadius: 16, border: '1px solid #E2E8F0', padding: 24, boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)' }}>
+                                <h4 style={{ fontSize: 15, fontWeight: 800, color: '#0F172A', marginTop: 0, marginBottom: 20 }}>Performance Summary</h4>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
+                                  <div style={{ background: '#FFF', padding: 12, borderRadius: 12, border: '1px solid #F1F5F9', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                                    <div style={{ fontSize: 10, color: '#64748B', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Top 5 Hits</div>
+                                    <div style={{ fontSize: 24, fontWeight: 800, color: '#059669', fontFamily: "'JetBrains Mono',monospace" }}>{c.top5_hits}</div>
+                                  </div>
+                                  <div style={{ background: '#FFF', padding: 12, borderRadius: 12, border: '1px solid #F1F5F9', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                                    <div style={{ fontSize: 10, color: '#64748B', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Top 10 Hits</div>
+                                    <div style={{ fontSize: 24, fontWeight: 800, color: '#1A73E8', fontFamily: "'JetBrains Mono',monospace" }}>{c.top10_hits}</div>
+                                  </div>
+                                  <div style={{ background: '#FFF', padding: 12, borderRadius: 12, border: '1px solid #F1F5F9', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                                    <div style={{ fontSize: 10, color: '#64748B', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Avg Views</div>
+                                    <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A', fontFamily: "'JetBrains Mono',monospace" }}>{fmt(c.avgViews)}</div>
+                                  </div>
+                                  <div style={{ background: '#FFF', padding: 12, borderRadius: 12, border: '1px solid #F1F5F9', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                                    <div style={{ fontSize: 10, color: '#64748B', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Daily Growth</div>
+                                    <div style={{ fontSize: 18, fontWeight: 800, color: c.dailyGrowthPct > 5 ? '#10B981' : '#3B82F6', fontFamily: "'JetBrains Mono',monospace" }}>{c.dailyGrowthPct > 0 ? '+' : ''}{c.dailyGrowthPct}%</div>
+                                  </div>
                                 </div>
-                                <h4 style={{ fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', marginBottom: 10 }}>Top Keywords Covered</h4>
+                                <h4 style={{ fontSize: 12, fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: 12 }}>Top Keywords Covered</h4>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                                   {(c.kws || []).slice(0, 12).map((kw: any) => (
-                                    <span key={kw} style={{ fontSize: 10.5, fontWeight: 600, padding: '3px 8px', borderRadius: 6, background: '#F1F5F9', color: '#475569', border: '1px solid #E2E8F0' }}>{kw}</span>
+                                    <span key={kw} style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 8, background: '#F8FAFC', color: '#334155', border: '1px solid #E2E8F0' }}>{kw}</span>
                                   ))}
-                                  {(c.kws || []).length > 12 && <span style={{ fontSize: 10.5, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: '#F8FAFC', color: '#94A3B8' }}>+{c.kws.length - 12} more</span>}
+                                  {(c.kws || []).length > 12 && <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 8, background: '#F1F5F9', color: '#94A3B8' }}>+{c.kws.length - 12} more</span>}
                                 </div>
                               </div>
 
                               {/* Right Col: Video List */}
-                              <div style={{ background: '#FFF', borderRadius: 12, border: '1px solid #E2E8F0', padding: 20, boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                                  <h4 style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', margin: 0 }}>Indexed Videos</h4>
-                                  <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B' }}>{c.count} total</span>
+                              <div style={{ background: '#FFF', borderRadius: 16, border: '1px solid #E2E8F0', padding: 24, boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                                  <h4 style={{ fontSize: 15, fontWeight: 800, color: '#0F172A', margin: 0 }}>Indexed Videos</h4>
+                                  <span style={{ fontSize: 13, fontWeight: 600, color: '#64748B', background: '#F1F5F9', padding: '4px 10px', borderRadius: 20 }}>{c.count} total</span>
                                 </div>
-                                <div style={{ display: 'inline-flex', gap: 4, marginBottom: 16, overflowX: 'auto', background: '#F8FAFC', padding: 4, borderRadius: 8, border: '1px solid #E2E8F0' }}>
+                                <div style={{ display: 'inline-flex', gap: 4, marginBottom: 20, overflowX: 'auto', background: '#F8FAFC', padding: 4, borderRadius: 10, border: '1px solid #E2E8F0' }}>
                                   {[
                                     { id: 'all', label: 'All' },
                                     { id: 'top5', label: 'Top 5s' },
                                     { id: 'top10', label: 'Top 10s' },
                                     { id: 'shorts', label: 'Shorts' },
                                     { id: 'long', label: 'Long Form' }
-                                  ].map(f => (
-                                    <button
-                                      key={f.id}
-                                      onClick={() => setVideoFilter(f.id as any)}
-                                      style={{
-                                        padding: '6px 14px',
-                                        fontSize: 11,
-                                        fontWeight: 700,
-                                        borderRadius: 6,
-                                        border: 'none',
-                                        background: videoFilter === f.id ? '#FFF' : 'transparent',
-                                        color: videoFilter === f.id ? '#0F172A' : '#64748B',
-                                        boxShadow: videoFilter === f.id ? '0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1)' : 'none',
-                                        cursor: 'pointer',
-                                        whiteSpace: 'nowrap',
-                                        transition: 'all 0.2s ease'
-                                      }}
-                                    >
-                                      {f.label}
-                                    </button>
-                                  ))}
+                                  ].map(f => {
+                                    const isActive = f.id === 'all' ? videoFilters.length === 0 : videoFilters.includes(f.id);
+                                    return (
+                                      <button
+                                        key={f.id}
+                                        onClick={() => {
+                                          if (f.id === 'all') setVideoFilters([]);
+                                          else {
+                                            if (videoFilters.includes(f.id)) setVideoFilters(videoFilters.filter(x => x !== f.id));
+                                            else setVideoFilters([...videoFilters, f.id]);
+                                          }
+                                        }}
+                                        style={{
+                                          padding: '8px 16px',
+                                          fontSize: 12,
+                                          fontWeight: 700,
+                                          borderRadius: 8,
+                                          border: 'none',
+                                          background: isActive ? '#FFF' : 'transparent',
+                                          color: isActive ? '#0F172A' : '#64748B',
+                                          boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                                          cursor: 'pointer',
+                                          whiteSpace: 'nowrap',
+                                          transition: 'all 0.2s ease'
+                                        }}
+                                      >
+                                        {f.label}
+                                      </button>
+                                    );
+                                  })}
                                 </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 340, overflowY: 'auto', paddingRight: 6 }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 380, overflowY: 'auto', paddingRight: 6 }}>
                                   {(() => {
                                     let filtered = [...(c.creatorVideos || [])];
-                                    if (videoFilter === 'top5') filtered = filtered.filter((v: any) => v.top5_hits > 0);
-                                    if (videoFilter === 'top10') filtered = filtered.filter((v: any) => v.top10_hits > 0);
-                                    if (videoFilter === 'shorts') filtered = filtered.filter((v: any) => v.is_short);
-                                    if (videoFilter === 'long') filtered = filtered.filter((v: any) => !v.is_short);
+                                    
+                                    if (videoFilters.length > 0) {
+                                      const hasShorts = videoFilters.includes('shorts');
+                                      const hasLong = videoFilters.includes('long');
+                                      if (hasShorts || hasLong) {
+                                        filtered = filtered.filter(v => {
+                                          if (hasShorts && hasLong) return true;
+                                          if (hasShorts) return v.is_short;
+                                          if (hasLong) return !v.is_short;
+                                          return true;
+                                        });
+                                      }
+
+                                      const hasTop5 = videoFilters.includes('top5');
+                                      const hasTop10 = videoFilters.includes('top10');
+                                      if (hasTop5 || hasTop10) {
+                                        filtered = filtered.filter(v => {
+                                          if (hasTop5 && hasTop10) return v.top5_hits > 0 || v.top10_hits > 0;
+                                          if (hasTop5) return v.top5_hits > 0;
+                                          if (hasTop10) return v.top10_hits > 0;
+                                          return true;
+                                        });
+                                      }
+                                    }
                                     
                                     // Sort by rank ascending (best first), then by views descending
                                     filtered = filtered.sort((a: any, b: any) => {
@@ -456,25 +497,25 @@ export default function CreatorsTab() {
                                     });
                                     
                                     if (filtered.length === 0) {
-                                      return <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '20px 0' }}>No videos match this filter.</div>
+                                      return <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '40px 0', background: '#F8FAFC', borderRadius: 12, border: '1px dashed #CBD5E1' }}>No videos match these filters.</div>
                                     }
                                     
                                     return filtered.map((v: any) => (
                                       <a key={v.id} href={`https://www.youtube.com/watch?v=${v.youtube_id}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
-                                        <div style={{ display: 'flex', gap: 14, alignItems: 'center', background: '#FFF', border: '1px solid #F1F5F9', padding: '10px 14px', borderRadius: 10, transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = '#CBD5E1'; e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.04)' }} onMouseLeave={e => { e.currentTarget.style.borderColor = '#F1F5F9'; e.currentTarget.style.boxShadow = 'none' }}>
-                                          <div style={{ width: 48, height: 48, borderRadius: 24, overflow: 'hidden', flexShrink: 0, background: '#F1F5F9', border: '1px solid #E2E8F0' }}>
+                                        <div style={{ display: 'flex', gap: 16, alignItems: 'center', background: '#FFF', border: '1px solid #F1F5F9', padding: '12px 16px', borderRadius: 12, transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.01)' }} onMouseEnter={e => { e.currentTarget.style.borderColor = '#CBD5E1'; e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.05)' }} onMouseLeave={e => { e.currentTarget.style.borderColor = '#F1F5F9'; e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.01)' }}>
+                                          <div style={{ width: 56, height: 56, borderRadius: 28, overflow: 'hidden', flexShrink: 0, background: '#F1F5F9', border: '1px solid #E2E8F0' }}>
                                             {v.thumbnail_url && <img src={v.thumbnail_url} alt={v.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
                                           </div>
                                           <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ fontSize: 13, fontWeight: 700, color: '#1E293B', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                            <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                                               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title}</span>
                                               <ExternalLink size={12} style={{ color: '#94A3B8', flexShrink: 0 }} />
                                             </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 11, color: '#64748B' }}>
-                                              <span style={{ fontWeight: 700, color: '#334155' }}>{fmtIndian(v.view_count)} views</span>
-                                              <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#059669', fontWeight: 700, background: '#ECFDF5', padding: '2px 6px', borderRadius: 4 }}><Star size={10} /> {v.top5_hits} Top 5s</span>
-                                              <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#1A73E8', fontWeight: 700, background: '#EFF6FF', padding: '2px 6px', borderRadius: 4 }}><Star size={10} /> {v.top10_hits} Top 10s</span>
-                                              <span style={{ color: v.is_short ? '#EC4899' : '#1A73E8', fontWeight: 600 }}>{v.is_short ? 'Short' : 'Video'}</span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 11, color: '#64748B' }}>
+                                              <span style={{ fontWeight: 800, color: '#334155' }}>{fmtIndian(v.view_count)} views</span>
+                                              {v.top5_hits > 0 && <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#059669', fontWeight: 800, background: '#ECFDF5', padding: '2px 8px', borderRadius: 6 }}><Star size={10} /> {v.top5_hits} Top 5s</span>}
+                                              {v.top10_hits > 0 && <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#1A73E8', fontWeight: 800, background: '#EFF6FF', padding: '2px 8px', borderRadius: 6 }}><Star size={10} /> {v.top10_hits} Top 10s</span>}
+                                              <span style={{ color: v.is_short ? '#EC4899' : '#1A73E8', fontWeight: 700, background: v.is_short ? '#FDF2F8' : '#EFF6FF', padding: '2px 8px', borderRadius: 6 }}>{v.is_short ? 'Short' : 'Video'}</span>
                                             </div>
                                           </div>
                                           <div style={{ flexShrink: 0, paddingLeft: 10 }}><Rank n={v.best_rank || 99} /></div>
