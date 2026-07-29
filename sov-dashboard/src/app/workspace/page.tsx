@@ -491,70 +491,7 @@ export default function WorkspacePage() {
         </motion.div>
 
         {/* ════════════════════════════════════════════════════════════════
-            2. QUICK ACTIONS GRID
-        ════════════════════════════════════════════════════════════════ */}
-        <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          style={{ marginBottom: 32 }}
-        >
-          <h2 style={{
-            fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 16px',
-            display: 'flex', alignItems: 'center', gap: 8,
-          }}>
-            <Zap size={16} color="#F58220" /> Quick Actions
-          </h2>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-            gap: 12,
-          }}>
-            {quickActions.map((action, i) => (
-              <motion.div
-                key={action.title}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.25 + i * 0.05 }}
-              >
-                <Link href={action.href} style={{ textDecoration: 'none' }}>
-                  <div
-                    className="card-interactive"
-                    style={{
-                      padding: '18px 16px',
-                      display: 'flex', flexDirection: 'column', gap: 10,
-                      cursor: 'pointer', height: '100%',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{
-                        width: 40, height: 40, borderRadius: 10,
-                        background: `${action.color}0D`,
-                        color: action.color,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        border: `1.5px solid ${action.color}15`,
-                      }}>
-                        {action.icon}
-                      </div>
-                      <ArrowRight size={14} color="var(--text-muted)" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-bright)', marginBottom: 2 }}>
-                        {action.title}
-                      </div>
-                      <div style={{ fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 500 }}>
-                        {action.description}
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* ════════════════════════════════════════════════════════════════
-            3. PROJECTS SECTION
+            2. PROJECTS SECTION
         ════════════════════════════════════════════════════════════════ */}
         <motion.div
           initial={{ opacity: 0, y: 15 }}

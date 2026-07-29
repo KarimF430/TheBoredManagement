@@ -113,14 +113,16 @@ export default function GrowthTab() {
   }, [dateRange])
 
   const growthTabQuery = useQuery({
-    queryKey: ['growth-tab', metric, period, ownership],
+    queryKey: ['growth-tab', activeCampaignId, metric, period, ownership],
     queryFn: async () => {
-      const params = new URLSearchParams({ metric, period })
+      if (!activeCampaignId) return []
+      const params = new URLSearchParams({ campaign_id: activeCampaignId, metric, period })
       if (ownership !== 'all') params.set('is_ours', ownership === 'ours' ? 'true' : 'false')
       const res = await fetch(`/api/brands/growth?${params}`)
       const d = await res.json()
       return (d.data ?? []) as any[]
     },
+    enabled: !!activeCampaignId,
   })
 
   const data = growthTabQuery.data ?? []

@@ -19,34 +19,34 @@ function AnimatedBackground() {
   return (
     <div style={{
       position: 'fixed', inset: 0, overflow: 'hidden', zIndex: 0,
-      background: '#F4F7FC',
+      background: '#0A0A0F',
     }}>
-      {/* Base mesh */}
+      {/* Dark mesh gradients */}
       <div style={{
         position: 'absolute', inset: 0,
         background: `
-          radial-gradient(at 20% 20%, rgba(245,130,32,0.06) 0px, transparent 50%),
-          radial-gradient(at 80% 10%, rgba(26,115,232,0.07) 0px, transparent 50%),
+          radial-gradient(at 20% 20%, rgba(245,130,32,0.08) 0px, transparent 50%),
+          radial-gradient(at 80% 10%, rgba(26,115,232,0.06) 0px, transparent 50%),
           radial-gradient(at 50% 80%, rgba(124,58,237,0.05) 0px, transparent 50%),
           radial-gradient(at 90% 60%, rgba(0,200,83,0.04) 0px, transparent 50%),
-          radial-gradient(at 10% 90%, rgba(245,130,32,0.04) 0px, transparent 50%)
+          radial-gradient(at 10% 90%, rgba(245,130,32,0.03) 0px, transparent 50%)
         `,
       }} />
 
       {/* Animated floating orbs */}
       <div className="login-orb" style={{
         position: 'absolute', top: '10%', left: '15%', width: 300, height: 300,
-        borderRadius: '50%', background: 'radial-gradient(circle, rgba(245,130,32,0.08) 0%, transparent 70%)',
+        borderRadius: '50%', background: 'radial-gradient(circle, rgba(245,130,32,0.10) 0%, transparent 70%)',
         animation: 'loginDrift 20s ease-in-out infinite',
       }} />
       <div className="login-orb" style={{
         position: 'absolute', bottom: '15%', right: '20%', width: 250, height: 250,
-        borderRadius: '50%', background: 'radial-gradient(circle, rgba(26,115,232,0.06) 0%, transparent 70%)',
+        borderRadius: '50%', background: 'radial-gradient(circle, rgba(26,115,232,0.08) 0%, transparent 70%)',
         animation: 'loginDrift2 25s ease-in-out infinite',
       }} />
       <div className="login-orb" style={{
         position: 'absolute', top: '50%', left: '60%', width: 200, height: 200,
-        borderRadius: '50%', background: 'radial-gradient(circle, rgba(124,58,237,0.05) 0%, transparent 70%)',
+        borderRadius: '50%', background: 'radial-gradient(circle, rgba(124,58,237,0.06) 0%, transparent 70%)',
         animation: 'loginDrift3 18s ease-in-out infinite',
       }} />
 
@@ -54,27 +54,27 @@ function AnimatedBackground() {
       <div style={{
         position: 'absolute', inset: 0,
         backgroundImage: `
-          linear-gradient(rgba(26,115,232,0.03) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(26,115,232,0.03) 1px, transparent 1px)
+          linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)
         `,
         backgroundSize: '60px 60px',
       }} />
 
-      {/* Transparent brand logo watermarks */}
+      {/* Brand watermarks — white with very low opacity */}
       {[
-        { text: 'atomberg', top: '6%', left: '3%', rotate: '-12deg', w: 200, color: '#1A1A2E', delay: '0s', dur: '22s' },
-        { text: 'boAt', top: '18%', left: '72%', rotate: '8deg', w: 140, color: '#1A1A2E', delay: '2s', dur: '25s', underline: '#E53935' },
-        { text: 'wakefit', top: '28%', left: '8%', rotate: '-5deg', w: 160, color: '#1A1A2E', delay: '4s', dur: '20s', underline: '#F58220' },
-        { text: 'Belong', top: '68%', left: '65%', rotate: '12deg', w: 150, color: '#1A1A2E', delay: '1s', dur: '28s' },
-        { text: 'Shoonya', top: '42%', left: '78%', rotate: '-8deg', w: 170, color: '#1A1A2E', delay: '3s', dur: '24s' },
-        { text: 'GoPlanet', top: '78%', left: '5%', rotate: '6deg', w: 180, color: '#1A1A2E', delay: '5s', dur: '26s' },
-        { text: 'Lotte', top: '5%', left: '55%', rotate: '-3deg', w: 130, color: '#1A1A2E', delay: '2.5s', dur: '21s', underline: '#E53935' },
-        { text: 'Noise', top: '55%', left: '3%', rotate: '10deg', w: 130, color: '#1A1A2E', delay: '1.5s', dur: '23s', underline: '#F58220' },
-        { text: 'One', top: '85%', left: '40%', rotate: '-10deg', w: 100, color: '#1A1A2E', delay: '6s', dur: '27s' },
-        { text: 'Setu', top: '35%', left: '40%', rotate: '4deg', w: 110, color: '#1A1A2E', delay: '3.5s', dur: '19s' },
-        { text: 'PhonePe', top: '12%', left: '28%', rotate: '-6deg', w: 180, color: '#1A1A2E', delay: '4.5s', dur: '30s', underline: '#5F259F' },
-        { text: 'Zepto', top: '62%', left: '82%', rotate: '7deg', w: 130, color: '#8B5CF6', delay: '2s', dur: '22s' },
-        { text: 'AJIO', top: '88%', left: '72%', rotate: '-4deg', w: 110, color: '#E53935', delay: '7s', dur: '25s' },
+        { text: 'atomberg', top: '6%', left: '3%', rotate: '-12deg', w: 200, delay: '0s', dur: '22s' },
+        { text: 'boAt', top: '18%', left: '72%', rotate: '8deg', w: 140, delay: '2s', dur: '25s', underline: '#E53935' },
+        { text: 'wakefit', top: '28%', left: '8%', rotate: '-5deg', w: 160, delay: '4s', dur: '20s', underline: '#F58220' },
+        { text: 'Belong', top: '68%', left: '65%', rotate: '12deg', w: 150, delay: '1s', dur: '28s' },
+        { text: 'Shoonya', top: '42%', left: '78%', rotate: '-8deg', w: 170, delay: '3s', dur: '24s' },
+        { text: 'GoPlanet', top: '78%', left: '5%', rotate: '6deg', w: 180, delay: '5s', dur: '26s' },
+        { text: 'Lotte', top: '5%', left: '55%', rotate: '-3deg', w: 130, delay: '2.5s', dur: '21s', underline: '#E53935' },
+        { text: 'Noise', top: '55%', left: '3%', rotate: '10deg', w: 130, delay: '1.5s', dur: '23s', underline: '#F58220' },
+        { text: 'One', top: '85%', left: '40%', rotate: '-10deg', w: 100, delay: '6s', dur: '27s' },
+        { text: 'Setu', top: '35%', left: '40%', rotate: '4deg', w: 110, delay: '3.5s', dur: '19s' },
+        { text: 'PhonePe', top: '12%', left: '28%', rotate: '-6deg', w: 180, delay: '4.5s', dur: '30s', underline: '#5F259F' },
+        { text: 'Zepto', top: '62%', left: '82%', rotate: '7deg', w: 130, delay: '2s', dur: '22s' },
+        { text: 'AJIO', top: '88%', left: '72%', rotate: '-4deg', w: 110, delay: '7s', dur: '25s' },
       ].map((w, i) => (
         <div
           key={i}
@@ -84,18 +84,18 @@ function AnimatedBackground() {
             top: w.top,
             left: w.left,
             transform: `rotate(${w.rotate})`,
-            opacity: 0.1,
+            opacity: 0.06,
             pointerEvents: 'auto',
             userSelect: 'none',
             transition: 'opacity 0.5s ease, transform 0.5s ease',
             animation: `watermarkFloat ${w.dur} ease-in-out ${w.delay} infinite`,
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.opacity = '0.3'
+            e.currentTarget.style.opacity = '0.18'
             e.currentTarget.style.transform = `rotate(${w.rotate}) scale(1.08)`
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.opacity = '0.1'
+            e.currentTarget.style.opacity = '0.06'
             e.currentTarget.style.transform = `rotate(${w.rotate}) scale(1)`
           }}
         >
@@ -103,7 +103,7 @@ function AnimatedBackground() {
             fontSize: Math.round(w.w / 4),
             fontWeight: 900,
             fontFamily: 'Arial Black, Arial, Helvetica, sans-serif',
-            color: w.color,
+            color: '#FFFFFF',
             letterSpacing: '-1px',
             lineHeight: 1,
             whiteSpace: 'nowrap',
@@ -117,7 +117,7 @@ function AnimatedBackground() {
               borderRadius: 2,
               background: w.underline,
               marginTop: 2,
-              opacity: 0.7,
+              opacity: 0.5,
             }} />
           )}
         </div>

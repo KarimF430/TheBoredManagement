@@ -51,7 +51,7 @@ function FloatingBrands() {
             top: b.top,
             left: b.left,
             transform: `rotate(${b.rotate})`,
-            opacity: 0.1,
+            opacity: 0.06,
             animation: `watermarkFloat ${b.dur}s ease-in-out ${b.delay}s infinite`,
           }}
         >
@@ -85,8 +85,13 @@ function FloatingBrands() {
 function Logo({ h }: { h: number }) {
   return (
     <div style={{
-      filter: 'drop-shadow(0 0 20px rgba(255,255,255,0.15))',
-      display: 'inline-block',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '16px 28px',
+      borderRadius: 16,
+      background: 'rgba(255,255,255,0.95)',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
     }}>
       <img
         src="/tbm-logo.png"
@@ -171,7 +176,7 @@ export default function LoginPage() {
           alignItems: 'center',
           padding: '60px 48px',
           overflow: 'hidden',
-          background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 40%, #334155 100%)',
+          background: 'linear-gradient(135deg, #1E293B 0%, #0F172A 50%, #1E293B 100%)',
         }}
         className="login-left-panel"
       >
@@ -240,17 +245,6 @@ export default function LoginPage() {
           <motion.div variants={itemVariants} style={{ marginBottom: 28 }}>
             <Logo h={64} />
           </motion.div>
-
-          <motion.h1 variants={itemVariants} style={{
-            fontSize: 36,
-            fontWeight: 800,
-            color: '#FFFFFF',
-            margin: '0 0 8px',
-            letterSpacing: '-0.5px',
-            lineHeight: 1.15,
-          }}>
-            TheBoredMonkey
-          </motion.h1>
 
           <motion.p variants={itemVariants} style={{
             fontSize: 16,

@@ -344,8 +344,6 @@ export default function OverviewPage() {
           { id: 'keywords', label: 'Keywords', icon: Search },
           { id: 'trends', label: 'Trends', icon: TrendingUp },
           { id: 'growth', label: 'Growth', icon: Activity },
-          { id: 'alerts', label: 'Alerts', icon: Bell },
-          { id: 'settings', label: 'Settings', icon: Settings },
         ].map(({ id, label, icon: Icon }) => (
           <button key={id} data-tab={id} className={`tab-pill ${activeTab === id ? 'on' : ''}`} onClick={() => setActiveTab(id as any)}
             style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -392,8 +390,6 @@ export default function OverviewPage() {
             {activeTab === 'keywords' && <Suspense fallback={<TabLoader label="Loading keywords…" />}><KeywordsTab /></Suspense>}
             {activeTab === 'trends' && <Suspense fallback={<TabLoader label="Loading trends…" />}><TrendsTab /></Suspense>}
             {activeTab === 'growth' && <Suspense fallback={<TabLoader label="Loading growth…" />}><GrowthTab /></Suspense>}
-            {activeTab === 'alerts' && <Suspense fallback={<TabLoader label="Loading alerts…" />}><AlertsTab /></Suspense>}
-            {activeTab === 'settings' && <Suspense fallback={<TabLoader label="Loading settings…" />}><SettingsTab /></Suspense>}
           </motion.div>
         </AnimatePresence>
       </div>

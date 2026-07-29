@@ -47,59 +47,75 @@ export default function TutorialOverlay() {
     if (!step?.target) { setTargetRect(null); return }
     const el = document.querySelector(step.target) as HTMLElement | null
     if (!el) { setTargetRect(null); return }
-    const r = el.getBoundingClientRect()
-    const pad = 6
-    setTargetRect({ top: r.top - pad, left: r.left - pad, width: r.width + pad * 2, height: r.height + pad * 2 })
     el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
+    // Wait for scroll to settle, then measure
+    const measure = () => {
+      const r = el.getBoundingClientRect()
+      const pad = 6
+      setTargetRect({ top: r.top - pad, left: r.left - pad, width: r.width + pad * 2, height: r.height + pad * 2 })
+    }
+    setTimeout(measure, 100)
+    setTimeout(measure, 300)
   }, [step])
 
   useEffect(() => {
     if (!isActive) return
     updateHighlight()
-    window.addEventListener('resize', updateHighlight)
-    return () => window.removeEventListener('resize', updateHighlight)
+    const onScroll = () => updateHighlight()
+    window.addEventListener('resize', onScroll)
+    window.addEventListener('scroll', onScroll, true)
+    return () => {
+      window.removeEventListener('resize', onScroll)
+      window.removeEventListener('scroll', onScroll, true)
+    }
   }, [isActive, updateHighlight])
 
   // Position card relative to target
   useEffect(() => {
     const card = cardRef.current
     if (!card) return
-    const cw = Math.min(card.offsetWidth || 340, 380)
-    const ch = card.offsetHeight || 140
-    const gap = 12
-    const vw = window.innerWidth
-    const vh = window.innerHeight
-    const placement = step?.placement || 'bottom'
+    const recalc = () => {
+      const cw = Math.min(card.offsetWidth || 340, 380)
+      const ch = card.offsetHeight || 140
+      const gap = 12
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+      const placement = step?.placement || 'bottom'
 
-    let top = 0, left = 0, arrow = 'top'
+      let top = 0, left = 0, arrow = 'top'
 
-    if (!targetRect) {
-      setCardPos({ top: vh / 2 - ch / 2, left: vw / 2 - cw / 2, arrow: 'top' })
-      return
+      if (!targetRect) {
+        setCardPos({ top: vh / 2 - ch / 2, left: vw / 2 - cw / 2, arrow: 'top' })
+        return
+      }
+
+      if (placement === 'bottom') {
+        top = targetRect.top + targetRect.height + gap
+        left = targetRect.left + targetRect.width / 2 - cw / 2
+        arrow = 'top'
+      } else if (placement === 'top') {
+        top = targetRect.top - ch - gap
+        left = targetRect.left + targetRect.width / 2 - cw / 2
+        arrow = 'bottom'
+      } else if (placement === 'left') {
+        top = targetRect.top + targetRect.height / 2 - ch / 2
+        left = targetRect.left - cw - gap
+        arrow = 'right'
+      } else {
+        top = targetRect.top + targetRect.height / 2 - ch / 2
+        left = targetRect.left + targetRect.width + gap
+        arrow = 'left'
+      }
+
+      left = Math.max(12, Math.min(left, vw - cw - 12))
+      top = Math.max(12, Math.min(top, vh - ch - 12))
+
+      setCardPos({ top, left, arrow })
     }
-
-    if (placement === 'bottom') {
-      top = targetRect.top + targetRect.height + gap
-      left = targetRect.left + targetRect.width / 2 - cw / 2
-      arrow = 'top'
-    } else if (placement === 'top') {
-      top = targetRect.top - ch - gap
-      left = targetRect.left + targetRect.width / 2 - cw / 2
-      arrow = 'bottom'
-    } else if (placement === 'left') {
-      top = targetRect.top + targetRect.height / 2 - ch / 2
-      left = targetRect.left - cw - gap
-      arrow = 'right'
-    } else {
-      top = targetRect.top + targetRect.height / 2 - ch / 2
-      left = targetRect.left + targetRect.width + gap
-      arrow = 'left'
-    }
-
-    left = Math.max(12, Math.min(left, vw - cw - 12))
-    top = Math.max(12, Math.min(top, vh - ch - 12))
-
-    setCardPos({ top, left, arrow })
+    recalc()
+    // Recalculate after card has rendered to get accurate dimensions
+    const timer = setTimeout(recalc, 50)
+    return () => clearTimeout(timer)
   }, [targetRect, step])
 
   // Keyboard
