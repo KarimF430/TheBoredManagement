@@ -14,6 +14,7 @@ import { useCampaignStore } from '@/lib/store'
 import { useFilterStore } from '@/lib/filter-store'
 import { DashboardCtx } from '@/lib/dashboard-context'
 import SharedFilterBar from '@/components/SharedFilterBar'
+import TutorialTrigger from '@/components/tutorial/TutorialTrigger'
 
 const VideosTab = lazy(() => import('@/components/tabs/VideosTab'))
 const KeywordsTab = lazy(() => import('@/components/tabs/KeywordsTab'))
@@ -282,6 +283,7 @@ export default function OverviewPage() {
   }), [dashboardData, overview, videos, keywords, campaignBrands, regionalApiStats, regionalApiCounts, totalRegionalViews, hasData, showDemo, distinctBrands, distinctLanguages])
 
   return (
+    <>
     <DashboardCtx.Provider value={ctxValue}>
     <div style={{ position: 'relative', minHeight: '100vh' }}>
       <style>{`
@@ -300,7 +302,7 @@ export default function OverviewPage() {
       `}</style>
 
       {/* ── HEADER ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, gap: 12, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, gap: 12, flexWrap: 'wrap' }} data-tutorial="filter-bar">
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
             <h1 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.4px' }}>
@@ -345,7 +347,7 @@ export default function OverviewPage() {
           { id: 'alerts', label: 'Alerts', icon: Bell },
           { id: 'settings', label: 'Settings', icon: Settings },
         ].map(({ id, label, icon: Icon }) => (
-          <button key={id} className={`tab-pill ${activeTab === id ? 'on' : ''}`} onClick={() => setActiveTab(id as any)}
+          <button key={id} data-tab={id} className={`tab-pill ${activeTab === id ? 'on' : ''}`} onClick={() => setActiveTab(id as any)}
             style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Icon size={12} />{label}
           </button>
@@ -544,5 +546,7 @@ export default function OverviewPage() {
       )}
     </div>
     </DashboardCtx.Provider>
+    <TutorialTrigger />
+    </>
   )
 }

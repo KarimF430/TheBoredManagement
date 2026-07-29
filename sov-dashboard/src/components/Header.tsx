@@ -164,6 +164,7 @@ export default function Header() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <select
             className="input"
+            data-tutorial="campaign-selector"
             value={activeCampaignId}
             onChange={e => setActiveCampaignId(e.target.value)}
             style={{ width: 220, height: 36, fontSize: 12.5, fontWeight: 600, padding: '0 12px', backgroundPosition: 'right 10px center' }}

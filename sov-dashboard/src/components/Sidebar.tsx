@@ -147,7 +147,7 @@ export default function Sidebar() {
       </div>
 
       {/* ── Navigation ── */}
-      <nav style={{
+      <nav data-tutorial="sidebar-nav" style={{
         flex: 1,
         padding: collapsed ? '8px 6px' : '6px 10px',
         overflowY: 'auto',

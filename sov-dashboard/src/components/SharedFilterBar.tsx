@@ -57,9 +57,9 @@ export default function SharedFilterBar({ children, hasActiveFilters, onReset, s
   }
 
   return (
-    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', ...style }}>
+    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'nowrap', overflowX: 'auto', ...style }}>
       {/* Format Toggle */}
-      <div style={{ display: 'flex', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
         {FORMAT_OPTIONS.map(opt => (
           <button
             key={opt.value}
@@ -82,7 +82,7 @@ export default function SharedFilterBar({ children, hasActiveFilters, onReset, s
       </div>
 
       {/* Ownership */}
-      <div style={{ minWidth: 140 }}>
+      <div style={{ minWidth: 140, flexShrink: 0 }}>
         <select
           className="input"
           value={ownership}
@@ -96,7 +96,7 @@ export default function SharedFilterBar({ children, hasActiveFilters, onReset, s
       </div>
 
       {/* Date Range Toggle */}
-      <div style={{ display: 'flex', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
         {DATE_RANGE_OPTIONS.map(opt => (
           <button
             key={opt.value}
@@ -144,7 +144,7 @@ export default function SharedFilterBar({ children, hasActiveFilters, onReset, s
 
       {/* Language Filter */}
       {!hideLanguageFilter && languages.length > 0 && (
-        <div style={{ minWidth: 130 }}>
+        <div style={{ minWidth: 150, flexShrink: 0 }}>
           <select
             className="input"
             value={language}
@@ -164,8 +164,8 @@ export default function SharedFilterBar({ children, hasActiveFilters, onReset, s
 
       {/* Views Update */}
       {showViewsUpdate && (
-        <button onClick={onViewsUpdate} disabled={isViewsUpdating}
-          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: '1px solid #E2E8F0', background: '#FFF', color: '#475569', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+        <button onClick={onViewsUpdate} disabled={isViewsUpdating} data-tutorial="views-update"
+          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: '1px solid #E2E8F0', background: '#FFF', color: '#475569', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, whiteSpace: 'nowrap' }}>
           <RefreshCw size={12} style={{ animation: isViewsUpdating ? 'spin 1s linear infinite' : 'none' }} />
           {isViewsUpdating ? 'Updating…' : 'Views Update'}
         </button>
@@ -173,7 +173,7 @@ export default function SharedFilterBar({ children, hasActiveFilters, onReset, s
 
       {/* Active filter highlight badge */}
       {globalActive && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, background: '#FEF2F2', border: '1px solid #FECACA', fontSize: 10, fontWeight: 700, color: '#DC2626', whiteSpace: 'nowrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, background: '#FEF2F2', border: '1px solid #FECACA', fontSize: 10, fontWeight: 700, color: '#DC2626', whiteSpace: 'nowrap', flexShrink: 0 }}>
           <Filter size={11} />
           {[ownership !== 'all' && 'ownership', format !== 'all' && 'format', dateRange !== 'All' && 'date', language !== 'all' && 'language'].filter(Boolean).length} active
         </div>
@@ -181,7 +181,7 @@ export default function SharedFilterBar({ children, hasActiveFilters, onReset, s
 
       {/* Reset */}
       {showReset && (
-        <button className="btn btn-ghost btn-sm" onClick={handleReset} style={{ color: '#EF4444' }}>
+        <button className="btn btn-ghost btn-sm" onClick={handleReset} style={{ color: '#EF4444', flexShrink: 0, whiteSpace: 'nowrap' }}>
           Reset Filters
         </button>
       )}
