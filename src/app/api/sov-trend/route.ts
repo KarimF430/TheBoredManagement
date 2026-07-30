@@ -13,13 +13,14 @@ export async function GET(req: NextRequest) {
     const format = req.nextUrl.searchParams.get('format') // 'all' | 'long' | 'short'
     const dateFrom = req.nextUrl.searchParams.get('date_from')
     const dateTo = req.nextUrl.searchParams.get('date_to')
+    const language = req.nextUrl.searchParams.get('language') // 'all' | 'ja' | 'en' | etc.
 
     const { authorized, error } = await authorizeCampaignAccess(req, campaignId)
     if (!authorized) return error
     if (!campaignId) return NextResponse.json({ data: [], brands: [], has_scrape_data: false })
 
-    const key = `${cacheKey.sovTrend(campaignId, 'all', String(days))}:${isOurs || 'all'}:${format || 'all'}:${dateFrom || ''}:${dateTo || ''}`
-    const data = await getCached(key, () => fetchSovTrend(campaignId, days, isOurs, format, dateFrom, dateTo), CACHE_TTL.sov_trend)
+    const key = `${cacheKey.sovTrend(campaignId, 'all', String(days))}:${isOurs || 'all'}:${format || 'all'}:${dateFrom || ''}:${dateTo || ''}:${language || 'all'}`
+    const data = await getCached(key, () => fetchSovTrend(campaignId, days, isOurs, format, dateFrom, dateTo, language), CACHE_TTL.sov_trend)
     return NextResponse.json(data)
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unknown error'
@@ -34,8 +35,29 @@ async function fetchSovTrend(
   isOurs?: string | null,
   format?: string | null,
   dateFrom?: string | null,
-  dateTo?: string | null
+  dateTo?: string | null,
+  language?: string | null
 ) {
+  // If language is specified, get keyword IDs for that language
+  let languageVideoIds: Set<string> | null = null
+  if (language && language !== 'all') {
+    const { data: langKws } = await supabase.from('keywords').select('id').eq('campaign_id', campaignId).eq('language', language)
+    const kwIds = (langKws || []).map((k: any) => k.id)
+    if (kwIds.length === 0) {
+      return { data: [], brands: [], has_scrape_data: false }
+    }
+    const BATCH = 1000
+    languageVideoIds = new Set<string>()
+    for (let i = 0; i < kwIds.length; i += BATCH) {
+      const [kvRes, ksRes] = await Promise.all([
+        supabase.from('keyword_videos').select('video_id').in('keyword_id', kwIds.slice(i, i + BATCH)),
+        supabase.from('keyword_shorts').select('video_id').in('keyword_id', kwIds.slice(i, i + BATCH)),
+      ])
+      for (const r of kvRes.data || []) languageVideoIds.add(r.video_id)
+      for (const r of ksRes.data || []) languageVideoIds.add(r.video_id)
+    }
+  }
+
   // Parallel: get brand names from campaign_brands AND brand_tags simultaneously
   const [cbRes, btRes] = await Promise.all([
     supabase.from('campaign_brands').select('name').eq('campaign_id', campaignId),
@@ -59,6 +81,11 @@ async function fetchSovTrend(
     const { data: kvRows } = await supabase.from(table).select('video_id').eq('campaign_id', campaignId)
     const validVideoIds = new Set((kvRows || []).map((r: any) => r.video_id))
     brandTags = brandTags.filter((bt: any) => validVideoIds.has(bt.video_id))
+  }
+
+  // Filter by language if specified
+  if (brandTags.length > 0 && languageVideoIds) {
+    brandTags = brandTags.filter((bt: any) => languageVideoIds!.has(bt.video_id))
   }
 
   if (brandTags.length === 0) {

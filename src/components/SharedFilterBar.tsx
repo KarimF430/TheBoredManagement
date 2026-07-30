@@ -15,6 +15,8 @@ interface SharedFilterBarProps {
   onViewsUpdate?: () => void
   /** Whether Views Update is currently loading */
   isViewsUpdating?: boolean
+  /** Available languages for the language dropdown */
+  languages?: string[]
   style?: React.CSSProperties
 }
 
@@ -33,13 +35,13 @@ const DATE_RANGE_OPTIONS = [
   { value: 'Custom', label: 'Custom' },
 ]
 
-export default function SharedFilterBar({ children, hasActiveFilters, onReset, showViewsUpdate, onViewsUpdate, isViewsUpdating, style }: SharedFilterBarProps) {
+export default function SharedFilterBar({ children, hasActiveFilters, onReset, showViewsUpdate, onViewsUpdate, isViewsUpdating, languages, style }: SharedFilterBarProps) {
   const {
-    ownership, format, dateRange, customDateFrom, customDateTo,
-    setOwnership, setFormat, setDateRange, setCustomDateFrom, setCustomDateTo,
+    ownership, format, dateRange, customDateFrom, customDateTo, language,
+    setOwnership, setFormat, setDateRange, setCustomDateFrom, setCustomDateTo, setLanguage,
     resetFilters,
   } = useFilterStore()
-  const globalActive = ownership !== 'all' || format !== 'all' || dateRange !== 'All' || customDateFrom !== '' || customDateTo !== ''
+  const globalActive = ownership !== 'all' || format !== 'all' || dateRange !== 'All' || customDateFrom !== '' || customDateTo !== '' || language !== 'all'
   const showReset = globalActive || hasActiveFilters
 
   const handleReset = () => {
@@ -136,6 +138,21 @@ export default function SharedFilterBar({ children, hasActiveFilters, onReset, s
       {/* Page-specific filters */}
       {children}
 
+      {/* Language Filter */}
+      {languages && languages.length > 0 && (
+        <div style={{ minWidth: 150, flexShrink: 0 }}>
+          <select
+            className="input"
+            value={language}
+            onChange={e => setLanguage(e.target.value)}
+            style={{ cursor: 'pointer', padding: '6px 12px', borderColor: language !== 'all' ? '#7C3AED' : undefined }}
+          >
+            <option value="all">All Languages</option>
+            {languages.map(l => <option key={l} value={l}>{l}</option>)}
+          </select>
+        </div>
+      )}
+
       {/* Views Update */}
       {showViewsUpdate && (
         <button onClick={onViewsUpdate} disabled={isViewsUpdating}
@@ -149,7 +166,7 @@ export default function SharedFilterBar({ children, hasActiveFilters, onReset, s
       {globalActive && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, background: '#FEF2F2', border: '1px solid #FECACA', fontSize: 10, fontWeight: 700, color: '#DC2626', whiteSpace: 'nowrap' }}>
           <Filter size={11} />
-          {[ownership !== 'all' && 'ownership', format !== 'all' && 'format', dateRange !== 'All' && 'date'].filter(Boolean).length} active
+          {[ownership !== 'all' && 'ownership', format !== 'all' && 'format', dateRange !== 'All' && 'date', language !== 'all' && 'language'].filter(Boolean).length} active
         </div>
       )}
 

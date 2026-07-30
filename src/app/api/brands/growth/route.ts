@@ -13,11 +13,12 @@ export async function GET(req: NextRequest) {
     const format = req.nextUrl.searchParams.get('format') // 'all' | 'long' | 'short'
     const dateFrom = req.nextUrl.searchParams.get('date_from')
     const dateTo = req.nextUrl.searchParams.get('date_to')
+    const language = req.nextUrl.searchParams.get('language')
 
     if (!campaignId) return NextResponse.json({ data: [], period, has_scrape_data: false })
 
-    const key = `${cacheKey.brandGrowth(campaignId, metric, period)}:${isOurs || 'all'}:${format || 'all'}:${dateFrom || ''}:${dateTo || ''}`
-    const data = await getCached(key, () => fetchGrowth(campaignId!, metric, period, isOurs, format, dateFrom, dateTo), CACHE_TTL.brand_growth)
+    const key = `${cacheKey.brandGrowth(campaignId, metric, period)}:${isOurs || 'all'}:${format || 'all'}:${dateFrom || ''}:${dateTo || ''}:${language || 'all'}`
+    const data = await getCached(key, () => fetchGrowth(campaignId!, metric, period, isOurs, format, dateFrom, dateTo, language), CACHE_TTL.brand_growth)
     return NextResponse.json(data)
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unknown error'
@@ -33,7 +34,8 @@ async function fetchGrowth(
   isOurs?: string | null,
   format?: string | null,
   dateFrom?: string | null,
-  dateTo?: string | null
+  dateTo?: string | null,
+  language?: string | null
 ) {
   let periodDays = period === '24h' ? 1 : period === '30d' ? 30 : 7
   let periodStart = new Date(Date.now() - periodDays * 86400000).toISOString().split('T')[0]
@@ -60,6 +62,27 @@ async function fetchGrowth(
     const { data: kvRows } = await supabase.from(table).select('video_id').eq('campaign_id', campaignId)
     const validVideoIds = new Set((kvRows || []).map((r: any) => r.video_id))
     brandTags = brandTags.filter((bt: any) => validVideoIds.has(bt.video_id))
+  }
+
+  // Filter by language if specified
+  if (brandTags && brandTags.length > 0 && language && language !== 'all') {
+    const { data: langKws } = await supabase.from('keywords').select('id').eq('campaign_id', campaignId).eq('language', language)
+    const kwIds = (langKws || []).map((k: any) => k.id)
+    if (kwIds.length === 0) {
+      brandTags = []
+    } else {
+      const BATCH = 1000
+      const langVideoIds = new Set<string>()
+      for (let i = 0; i < kwIds.length; i += BATCH) {
+        const [kvRes, ksRes] = await Promise.all([
+          supabase.from('keyword_videos').select('video_id').in('keyword_id', kwIds.slice(i, i + BATCH)),
+          supabase.from('keyword_shorts').select('video_id').in('keyword_id', kwIds.slice(i, i + BATCH)),
+        ])
+        for (const r of kvRes.data || []) langVideoIds.add(r.video_id)
+        for (const r of ksRes.data || []) langVideoIds.add(r.video_id)
+      }
+      brandTags = brandTags.filter((bt: any) => langVideoIds.has(bt.video_id))
+    }
   }
 
   if (!brandTags || brandTags.length === 0) {

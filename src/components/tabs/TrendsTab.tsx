@@ -37,7 +37,7 @@ function computeBrandStats(data: any[], brands: string[]) {
 
 export default function TrendsTab() {
   const { activeCampaignId } = useCampaignStore()
-  const { search, ownership, dateRange, customDateFrom, customDateTo } = useFilterStore()
+  const { search, ownership, dateRange, customDateFrom, customDateTo, language } = useFilterStore()
   const [chartType, setChartType] = useState<'area' | 'line'>('area')
   const [activeBrands, setActiveBrands] = useState<string[]>([])
   const [showAvg, setShowAvg] = useState(false)
@@ -55,11 +55,12 @@ export default function TrendsTab() {
   }, [dateRange, customDateFrom, customDateTo])
 
   const trendTabQuery = useQuery({
-    queryKey: ['trends-tab', activeCampaignId, days, ownership, metric],
+    queryKey: ['trends-tab', activeCampaignId, days, ownership, metric, language],
     queryFn: async () => {
       const params = new URLSearchParams({ campaign_id: activeCampaignId!, days })
       if (ownership !== 'all') params.set('is_ours', ownership === 'ours' ? 'true' : 'false')
       if (metric === 'frequency') params.set('metric', 'frequency')
+      if (language !== 'all') params.set('language', language)
       const res = await fetch(`/api/sov-trend?${params}`)
       if (!res.ok) throw new Error('Failed to fetch trend data')
       return res.json()

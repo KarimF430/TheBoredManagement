@@ -36,7 +36,7 @@ type SortKey = 'growth' | 'name' | 'current'
 
 export default function GrowthTab() {
   const { activeCampaignId } = useCampaignStore()
-  const { ownership, dateRange } = useFilterStore()
+  const { ownership, dateRange, language } = useFilterStore()
   const [metric, setMetric] = useState<'views' | 'frequency'>('views')
   const [sortBy, setSortBy] = useState<SortKey>('growth')
 
@@ -46,10 +46,11 @@ export default function GrowthTab() {
   }, [dateRange])
 
   const growthTabQuery = useQuery({
-    queryKey: ['growth-tab', activeCampaignId, metric, period, ownership],
+    queryKey: ['growth-tab', activeCampaignId, metric, period, ownership, language],
     queryFn: async () => {
       const params = new URLSearchParams({ campaign_id: activeCampaignId!, metric, period })
       if (ownership !== 'all') params.set('is_ours', ownership === 'ours' ? 'true' : 'false')
+      if (language !== 'all') params.set('language', language)
       const res = await fetch(`/api/brands/growth?${params}`)
       const d = await res.json()
       return (d.data ?? []) as any[]

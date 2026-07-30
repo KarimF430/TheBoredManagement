@@ -8,7 +8,7 @@ import {
 } from './youtube-oauth'
 import { decryptApiKey } from './crypto'
 import { fetchTranscript } from './transcript'
-import { analyzeBrandsFromTranscript } from './brand-analyzer'
+import { analyzeBrandsFromTranscript, detectIrrelevantVideo } from './brand-analyzer'
 import { getQueue, QUEUE_NAMES, addJob, ScrapeJobData, DailyViewsJobData } from './queue'
 
 export interface ScrapeResult {
@@ -483,8 +483,26 @@ export async function scrapeKeyword(
     return true
   })
 
+  // Filter out blacklisted videos (irrelevant content detected in previous runs)
+  const hitYoutubeIds = filteredHits.map(h => h.youtube_id)
+  const blacklisted = await queryAll<{ youtube_id: string }>(
+    `SELECT youtube_id FROM video_blacklist WHERE youtube_id = ANY($1)`,
+    [hitYoutubeIds]
+  )
+  const blacklistSet = new Set(blacklisted.map(b => b.youtube_id))
+  const blacklistFilteredHits = filteredHits.filter(h => !blacklistSet.has(h.youtube_id))
+
+  // Also filter out videos already marked as irrelevant in the videos table
+  const remainingIds = blacklistFilteredHits.map(h => h.youtube_id)
+  const irrelevantVideos = await queryAll<{ youtube_id: string }>(
+    `SELECT youtube_id FROM videos WHERE youtube_id = ANY($1) AND is_irrelevant = TRUE`,
+    [remainingIds]
+  )
+  const irrelevantSet = new Set(irrelevantVideos.map(v => v.youtube_id))
+  const finalHits = blacklistFilteredHits.filter(h => !irrelevantSet.has(h.youtube_id))
+
   const poolIds = await getCampaignPoolIds(campaignId)
-  const unknownIds = filteredHits.map(h => h.youtube_id).filter(id => !poolIds.has(id))
+  const unknownIds = finalHits.map(h => h.youtube_id).filter(id => !poolIds.has(id))
 
   let fetchedVideos: YouTubeVideo[] = []
   if (unknownIds.length > 0) {
@@ -605,46 +623,39 @@ export async function saveScrapeResults(
   )
   const existingMap = new Map(existingRows.map(r => [r.youtube_id, r.id]))
 
-  // 5. Batch: Insert new videos — 1 query
+  // 5. Batch: Insert new videos — use parameterized queries
   const newVideos = videos.filter(v => !existingMap.has(v.youtube_id))
   if (newVideos.length > 0) {
-    const valueRows = newVideos.map(v => {
-      const tags = videoBrandMap.get(v.youtube_id) || []
-      const tagsArr = tags.length > 0
-        ? `ARRAY[${tags.map(t => `'${t.replace(/'/g, "''")}'`).join(',')}]`
-        : `'{}'::text[]`
-      return `('${v.youtube_id}','${v.title.replace(/'/g,"''")}','${(v.description || '').replace(/'/g,"''")}','${v.channel_name.replace(/'/g,"''")}','${v.channel_id}',${v.view_count || 0},'${v.published_at}','${v.duration || ''}',${v.duration_sec || 0},'${(v.thumbnail_url || '').replace(/'/g,"''")}',${tagsArr})`
-    })
-    const inserted = await queryAll<{ id: string; youtube_id: string }>(
-      `INSERT INTO videos (youtube_id, title, description, channel_name, channel_id, view_count, published_at, duration, duration_sec, thumbnail_url, tags)
-       VALUES ${valueRows.join(',')}
-       ON CONFLICT (youtube_id) DO UPDATE SET
-         view_count = EXCLUDED.view_count, title = EXCLUDED.title, channel_name = EXCLUDED.channel_name,
-         duration = EXCLUDED.duration, duration_sec = EXCLUDED.duration_sec, thumbnail_url = EXCLUDED.thumbnail_url, tags = EXCLUDED.tags
-       RETURNING id, youtube_id`
-    )
-    for (const r of inserted) existingMap.set(r.youtube_id, r.id)
+    // Insert in chunks of 50 to avoid parameter limits
+    for (let chunk = 0; chunk < newVideos.length; chunk += 50) {
+      const chunkVideos = newVideos.slice(chunk, chunk + 50)
+      for (const v of chunkVideos) {
+        const tags = videoBrandMap.get(v.youtube_id) || []
+        const inserted = await queryAll<{ id: string; youtube_id: string }>(
+          `INSERT INTO videos (youtube_id, title, description, channel_name, channel_id, view_count, published_at, duration, duration_sec, thumbnail_url, tags)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+           ON CONFLICT (youtube_id) DO UPDATE SET
+             view_count = EXCLUDED.view_count, title = EXCLUDED.title, channel_name = EXCLUDED.channel_name,
+             duration = EXCLUDED.duration, duration_sec = EXCLUDED.duration_sec, thumbnail_url = EXCLUDED.thumbnail_url, tags = EXCLUDED.tags
+           RETURNING id, youtube_id`,
+          [v.youtube_id, v.title, v.description || '', v.channel_name, v.channel_id,
+           v.view_count || 0, v.published_at, v.duration || '', v.duration_sec || 0,
+           v.thumbnail_url || '', tags]
+        )
+        for (const r of inserted) existingMap.set(r.youtube_id, r.id)
+      }
+    }
   }
 
-  // 6. Batch: Update existing videos — 1 query (only if there are existing)
+  // 6. Batch: Update existing videos — parameterized
   if (newVideos.length < videos.length) {
     const existingToUpdate = videos.filter(v => existingMap.has(v.youtube_id))
-    const cases = existingToUpdate.map(v => {
-      const id = existingMap.get(v.youtube_id)!
-      return `WHEN youtube_id = '${v.youtube_id}' THEN ${v.view_count || 0}`
-    }).join(' ')
-    const titleCases = existingToUpdate.map(v => {
-      return `WHEN youtube_id = '${v.youtube_id}' THEN '${v.title.replace(/'/g,"''")}'`
-    }).join(' ')
-    const tagsCases = existingToUpdate.map(v => {
+    for (const v of existingToUpdate) {
       const tags = videoBrandMap.get(v.youtube_id) || []
-      const tagsArr = tags.length > 0
-        ? `ARRAY[${tags.map(t => `'${t.replace(/'/g, "''")}'`).join(',')}]`
-        : `'{}'::text[]`
-      return `WHEN youtube_id = '${v.youtube_id}' THEN ${tagsArr}`
-    }).join(' ')
-    if (cases) {
-      await queryAll(`UPDATE videos SET view_count = CASE ${cases} ELSE view_count END WHERE youtube_id = ANY($1)`, [existingToUpdate.map(v => v.youtube_id)])
+      await queryAll(
+        `UPDATE videos SET view_count = $1, title = $2, tags = $3 WHERE youtube_id = $4`,
+        [v.view_count || 0, v.title, tags, v.youtube_id]
+      )
     }
   }
 
@@ -734,61 +745,69 @@ export async function runDailyViewUpdatePg(campaignId?: string): Promise<{
 
   // 2. Batch YouTube API calls in groups of 50 (YouTube max)
   for (let i = 0; i < rows.length; i += 50) {
-    const batch = rows.slice(i, i + 50)
-    const ids = batch.map(r => r.youtube_id).filter(Boolean)
+    try {
+      const batch = rows.slice(i, i + 50)
+      const ids = batch.map(r => r.youtube_id).filter(Boolean)
 
-    if (ids.length === 0) continue
+      if (ids.length === 0) continue
 
-    const stats = await getViewCountsOAuth(ids)
-    quotaCost += 1
-    batches++
+      const stats = await getViewCountsOAuth(ids)
+      quotaCost += 1
+      batches++
 
-    // 3. Batch UPDATE videos — 1 query per batch
-    const viewMap = new Map<string, number>()
-    const deletedIds: string[] = []
-    for (const stat of stats) {
-      if (stat.is_deleted) {
-        deletedIds.push(stat.youtube_id)
-      } else {
-        viewMap.set(stat.youtube_id, stat.view_count)
+      // 3. Batch UPDATE videos — 1 query per batch
+      const viewMap = new Map<string, number>()
+      const deletedIds: string[] = []
+      for (const stat of stats) {
+        if (stat.is_deleted) {
+          deletedIds.push(stat.youtube_id)
+        } else {
+          viewMap.set(stat.youtube_id, stat.view_count)
+        }
       }
-    }
 
-    // Batch mark deleted videos
-    if (deletedIds.length > 0) {
-      await queryAll(
-        `UPDATE videos SET is_deleted = TRUE WHERE youtube_id = ANY($1)`,
-        [deletedIds]
-      )
-      deleted += deletedIds.length
-    }
+      // Batch mark deleted videos
+      if (deletedIds.length > 0) {
+        await queryAll(
+          `UPDATE videos SET is_deleted = TRUE WHERE youtube_id = ANY($1)`,
+          [deletedIds]
+        )
+        deleted += deletedIds.length
+      }
 
-    // Batch update view counts
-    if (viewMap.size > 0) {
-      const ids = Array.from(viewMap.keys())
-      const cases = ids.map(id =>
-        `WHEN youtube_id = '${id}' THEN ${viewMap.get(id)}`
-      ).join(' ')
-      await queryAll(
-        `UPDATE videos SET view_count = CASE ${cases} ELSE view_count END WHERE youtube_id = ANY($1)`,
-        [ids]
-      )
-    }
+      // Batch update view counts — use parameterized CASE
+      if (viewMap.size > 0) {
+        const entries = Array.from(viewMap.entries())
+        const params: (string | number)[] = []
+        const cases = entries.map(([id, count], idx) => {
+          params.push(id, count)
+          return `WHEN youtube_id = $${idx * 2 + 1} THEN $${idx * 2 + 2}`
+        }).join(' ')
+        const idsParam = entries.map(e => e[0])
+        await queryAll(
+          `UPDATE videos SET view_count = CASE ${cases} ELSE view_count END WHERE youtube_id = ANY($${params.length + 1})`,
+          [...params, idsParam]
+        )
+      }
 
-    // 4. Batch UPSERT view_snapshots — 1 query per batch
-    const vsRows = batch
-      .filter(r => viewMap.has(r.youtube_id))
-      .map(r => ({
-        video_id: r.video_id,
-        campaign_id: r.campaign_id,
-        view_count: viewMap.get(r.youtube_id)!,
-        snapshot_date: today,
-      }))
-    if (vsRows.length > 0) {
-      await batchUpsert('view_snapshots', vsRows, 'video_id,campaign_id,snapshot_date')
-    }
+      // 4. Batch UPSERT view_snapshots — 1 query per batch
+      const vsRows = batch
+        .filter(r => viewMap.has(r.youtube_id))
+        .map(r => ({
+          video_id: r.video_id,
+          campaign_id: r.campaign_id,
+          view_count: viewMap.get(r.youtube_id)!,
+          snapshot_date: today,
+        }))
+      if (vsRows.length > 0) {
+        await batchUpsert('view_snapshots', vsRows, 'video_id,campaign_id,snapshot_date')
+      }
 
-    updated += viewMap.size
+      updated += viewMap.size
+    } catch (batchErr: any) {
+      console.error(`View update batch ${i}-${i + 50} failed:`, batchErr?.message || batchErr)
+      // Continue to next batch — don't let one batch kill the whole update
+    }
   }
 
   // 5. Update system metadata — 1 query
@@ -856,11 +875,11 @@ export async function runBrandAnalysisPg(campaignId?: string, limit: number = 10
     : []
 
   // 2. Get videos to analyze — 1 query (include channel_name + description for analyst prompt)
-  let videos: { id: string; youtube_id: string; title: string; channel_name: string; description: string }[]
+  let videos: { id: string; youtube_id: string; title: string; channel_name: string; description: string; is_irrelevant: boolean }[]
 
   if (campaignId) {
-    videos = await queryAll<{ id: string; youtube_id: string; title: string; channel_name: string; description: string }>(
-      `SELECT v.id, v.youtube_id, v.title, v.channel_name, v.description FROM videos v
+    videos = await queryAll<{ id: string; youtube_id: string; title: string; channel_name: string; description: string; is_irrelevant: boolean }>(
+      `SELECT v.id, v.youtube_id, v.title, v.channel_name, v.description, COALESCE(v.is_irrelevant, FALSE) as is_irrelevant FROM videos v
        WHERE v.is_deleted = FALSE AND v.id IN (SELECT video_id FROM campaign_videos WHERE campaign_id = $1)
        AND v.id NOT IN (SELECT video_id FROM brand_analysis)
        ORDER BY v.view_count DESC
@@ -868,8 +887,8 @@ export async function runBrandAnalysisPg(campaignId?: string, limit: number = 10
       [campaignId, limit]
     )
   } else {
-    videos = await queryAll<{ id: string; youtube_id: string; title: string; channel_name: string; description: string }>(
-      `SELECT v.id, v.youtube_id, v.title, v.channel_name, v.description FROM videos v
+    videos = await queryAll<{ id: string; youtube_id: string; title: string; channel_name: string; description: string; is_irrelevant: boolean }>(
+      `SELECT v.id, v.youtube_id, v.title, v.channel_name, v.description, COALESCE(v.is_irrelevant, FALSE) as is_irrelevant FROM videos v
        WHERE v.is_deleted = FALSE
        AND v.id NOT IN (SELECT video_id FROM brand_analysis)
        ORDER BY v.view_count DESC
@@ -884,10 +903,42 @@ export async function runBrandAnalysisPg(campaignId?: string, limit: number = 10
 
   for (const video of videos) {
     try {
+      // 0. Check if already marked as irrelevant — skip immediately
+      if (video.is_irrelevant) {
+        continue
+      }
+
+      // 1. Detect irrelevance using heuristics + LLM (fast, ~200ms)
+      const relevance = await detectIrrelevantVideo(video.title, video.channel_name || '', video.description || '')
+      if (relevance.is_irrelevant && relevance.score >= 0.8) {
+        // Store irrelevance data for future scrapes
+        await queryAll(
+          `UPDATE videos SET is_irrelevant = TRUE, irrelevant_reason = $1, irrelevant_score = $2, irrelevant_category = $3, irrelevant_detected_at = NOW() WHERE id = $4`,
+          [relevance.reason, relevance.score, relevance.category, video.id]
+        ).catch(() => {
+          // Column may not exist yet — fallback to just is_irrelevant
+          return queryAll(
+            `UPDATE videos SET is_irrelevant = TRUE, irrelevant_reason = $1, irrelevant_detected_at = NOW() WHERE id = $2`,
+            [relevance.reason, video.id]
+          )
+        })
+
+        // Also add to permanent blacklist for future scrapes
+        await queryAll(
+          `INSERT INTO video_blacklist (youtube_id, reason, category, detected_by)
+           VALUES ($1, $2, $3, 'ai') ON CONFLICT (youtube_id) DO NOTHING`,
+          [video.youtube_id, relevance.reason, relevance.category]
+        ).catch(() => {
+          // Blacklist table may not exist yet — non-fatal
+        })
+
+        continue
+      }
+
       let transcriptText = ''
       let language = 'en'
 
-      // 3. Check for existing transcript — 1 query
+      // 2. Check for existing transcript — 1 query
       const existingTranscript = await queryOne<{ transcript_text: string; language: string }>(
         `SELECT transcript_text, language FROM video_transcripts WHERE video_id = $1`,
         [video.id]

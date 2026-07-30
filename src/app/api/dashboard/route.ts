@@ -14,16 +14,17 @@ export const maxDuration = 60  // CRITICAL: prevents Vercel's 10s default timeou
 //
 export async function GET(req: NextRequest) {
   try {
-    const cid    = req.nextUrl.searchParams.get('campaign_id')
-    const isOurs = req.nextUrl.searchParams.get('is_ours')
-    const format = req.nextUrl.searchParams.get('format') // 'all' | 'long' | 'short'
+    const cid      = req.nextUrl.searchParams.get('campaign_id')
+    const isOurs   = req.nextUrl.searchParams.get('is_ours')
+    const format   = req.nextUrl.searchParams.get('format') // 'all' | 'long' | 'short'
+    const language = req.nextUrl.searchParams.get('language') // 'all' | 'te' | 'ta' | etc.
 
     const { authorized, error } = await authorizeCampaignAccess(req, cid)
     if (!authorized) return error
 
     const data = await getCached(
-      `dashboard:v9:${cid}:${isOurs || 'all'}:${format || 'all'}`,
-      () => fetchDashboard(cid!, isOurs, format),
+      `dashboard:v10:${cid}:${isOurs || 'all'}:${format || 'all'}:${language || 'all'}`,
+      () => fetchDashboard(cid!, isOurs, format, language),
       CACHE_TTL.overview_kpis
     )
     return NextResponse.json(data)
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-async function fetchDashboard(cid: string, isOurs?: string | null, format?: string | null) {
+async function fetchDashboard(cid: string, isOurs?: string | null, format?: string | null, language?: string | null) {
   const today = new Date().toISOString().split('T')[0]
   const d1    = new Date(Date.now() - 86400000).toISOString().split('T')[0]
   const d7    = new Date(Date.now() - 7  * 86400000).toISOString().split('T')[0]
@@ -45,6 +46,16 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
   const formatFilter = format === 'long' ? 'AND kv.video_id IS NOT NULL AND ks.video_id IS NULL'
                      : format === 'short' ? 'AND kv.video_id IS NULL AND ks.video_id IS NOT NULL'
                      : ''
+
+  // Build language filter — get keyword IDs for the selected language
+  let languageKeywordIds: string[] | null = null
+  if (language && language !== 'all') {
+    const { data: langKws } = await supabase.from('keywords').select('id').eq('campaign_id', cid).eq('language', language)
+    languageKeywordIds = (langKws || []).map((k: any) => k.id)
+    if (languageKeywordIds.length === 0) {
+      return { overview: { totalKeywords: 0, totalVideos: 0, rankedVideos: 0, uniqueVideos: 0, uniqueVideoViewership: 0, uniqueChannels: 0, mostRankingChannel: null, newVideosLast7Days: 0, untaggedVideos: 0, totalViewership: 0, top5ByViewership: [], top5ByFrequency: [], growth: { h24: 0, d7: 0, d30: 0 }, activeScrapingJobs: 0, transcriptCoverage: 0, dailyViews: [], dailyNewVideos: [], dailyKeywordsAdded: [], ourVideos: { count: 0, views: 0 }, lastUpdatedViews: null, lastUpdatedRanking: null, rankedVideoCount: 0 }, keywords: [], topVideos: [], campaignBrands: [], regionalStats: {}, regionalVideoCounts: {}, totalRegionalViews: 0 }
+    }
+  }
 
   // ── Parallel DB execution: Phase 1 (No row fetching!) ──────────────────────
   const [
@@ -71,8 +82,11 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
     transcriptRow,
   ] = await Promise.all([
     // Active keywords list (~50 rows max)
-    supabase.from('keywords').select('id, text, language, category, type, status')
-      .eq('campaign_id', cid).eq('status', 'active'),
+    languageKeywordIds
+      ? supabase.from('keywords').select('id, text, language, category, type, status')
+          .eq('campaign_id', cid).eq('status', 'active').in('id', languageKeywordIds)
+      : supabase.from('keywords').select('id, text, language, category, type, status')
+          .eq('campaign_id', cid).eq('status', 'active'),
     // Campaign brands list (~5 rows max)
     supabase.from('campaign_brands').select('name').eq('campaign_id', cid),
     // Total videos in campaign count — filtered by format
@@ -129,21 +143,31 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
     queryAll<{ video_id: string }>(`
       SELECT DISTINCT video_id
       FROM (
-        SELECT video_id, ROW_NUMBER() OVER (PARTITION BY keyword_id ORDER BY rank ASC) as rn
+        SELECT video_id, keyword_id, ROW_NUMBER() OVER (PARTITION BY keyword_id ORDER BY rank ASC) as rn
         FROM keyword_videos
         WHERE campaign_id = $1
         UNION ALL
-        SELECT video_id, ROW_NUMBER() OVER (PARTITION BY keyword_id ORDER BY rank ASC) as rn
+        SELECT video_id, keyword_id, ROW_NUMBER() OVER (PARTITION BY keyword_id ORDER BY rank ASC) as rn
         FROM keyword_shorts
         WHERE campaign_id = $1
       ) t
       WHERE rn <= 10
+      ${languageKeywordIds ? `AND keyword_id = ANY($2)` : ''}
       ${format === 'long' ? 'AND video_id IN (SELECT video_id FROM keyword_videos WHERE campaign_id = $1)' : ''}
       ${format === 'short' ? 'AND video_id IN (SELECT video_id FROM keyword_shorts WHERE campaign_id = $1)' : ''}
-    `, [cid]),
+    `, languageKeywordIds ? [cid, languageKeywordIds] : [cid]),
 
     // Ranked videos unique count
-    format === 'long'
+    languageKeywordIds
+      ? queryAll<{ cnt: number }>(`
+          SELECT COUNT(DISTINCT video_id)::INT as cnt
+          FROM (
+            SELECT video_id, keyword_id FROM keyword_videos WHERE campaign_id = $1 AND keyword_id = ANY($2)
+            UNION ALL
+            SELECT video_id, keyword_id FROM keyword_shorts WHERE campaign_id = $1 AND keyword_id = ANY($2)
+          ) t
+        `, [cid, languageKeywordIds])
+      : format === 'long'
       ? queryAll<{ cnt: number }>(`SELECT COUNT(DISTINCT video_id)::INT as cnt FROM keyword_videos WHERE campaign_id = $1`, [cid])
       : format === 'short'
       ? queryAll<{ cnt: number }>(`SELECT COUNT(DISTINCT video_id)::INT as cnt FROM keyword_shorts WHERE campaign_id = $1`, [cid])
@@ -191,7 +215,8 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
         GROUP BY keyword_id
       ) sf ON sf.keyword_id = k.id
       WHERE k.campaign_id = $1 AND k.status = 'active'
-    `, [cid]),
+      ${languageKeywordIds ? `AND k.id = ANY($2)` : ''}
+    `, languageKeywordIds ? [cid, languageKeywordIds] : [cid]),
 
     // Regional language views & count
     queryAll<{ language: string; total_views: number; video_count: number }>(`
@@ -202,15 +227,16 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
       FROM (
         SELECT DISTINCT video_id
         FROM (
-          SELECT video_id, ROW_NUMBER() OVER (PARTITION BY keyword_id ORDER BY rank ASC) as rn
+          SELECT video_id, keyword_id, ROW_NUMBER() OVER (PARTITION BY keyword_id ORDER BY rank ASC) as rn
           FROM keyword_videos
           WHERE campaign_id = $1
           UNION ALL
-          SELECT video_id, ROW_NUMBER() OVER (PARTITION BY keyword_id ORDER BY rank ASC) as rn
+          SELECT video_id, keyword_id, ROW_NUMBER() OVER (PARTITION BY keyword_id ORDER BY rank ASC) as rn
           FROM keyword_shorts
           WHERE campaign_id = $1
         ) t
         WHERE rn <= 10
+        ${languageKeywordIds ? `AND keyword_id = ANY($2)` : ''}
         ${format === 'long' ? 'AND video_id IN (SELECT video_id FROM keyword_videos WHERE campaign_id = $1)' : ''}
         ${format === 'short' ? 'AND video_id IN (SELECT video_id FROM keyword_shorts WHERE campaign_id = $1)' : ''}
       ) uv
@@ -222,8 +248,9 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
       ) kv ON kv.video_id = uv.video_id
       JOIN keywords k ON k.id = kv.keyword_id
       WHERE v.is_deleted = FALSE AND v.view_count IS NOT NULL
+      ${languageKeywordIds ? `AND kv.keyword_id = ANY($2)` : ''}
       GROUP BY k.language
-    `, [cid]),
+    `, languageKeywordIds ? [cid, languageKeywordIds] : [cid]),
 
     // Daily views group by — scoped to top-10 ranked videos per keyword (matches queryViewSumSQL)
     queryAll<{ snapshot_date: string; total_views: number }>(`
@@ -234,21 +261,22 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
       JOIN (
         SELECT DISTINCT video_id
         FROM (
-          SELECT video_id, ROW_NUMBER() OVER (PARTITION BY keyword_id ORDER BY rank ASC) as rn
+          SELECT video_id, keyword_id, ROW_NUMBER() OVER (PARTITION BY keyword_id ORDER BY rank ASC) as rn
           FROM keyword_videos WHERE campaign_id = $1
           UNION ALL
-          SELECT video_id, ROW_NUMBER() OVER (PARTITION BY keyword_id ORDER BY rank ASC) as rn
+          SELECT video_id, keyword_id, ROW_NUMBER() OVER (PARTITION BY keyword_id ORDER BY rank ASC) as rn
           FROM keyword_shorts WHERE campaign_id = $1
         ) t
         WHERE rn <= 10
+        ${languageKeywordIds ? `AND keyword_id = ANY($2)` : ''}
         ${format === 'long' ? 'AND video_id IN (SELECT video_id FROM keyword_videos WHERE campaign_id = $1)' : ''}
         ${format === 'short' ? 'AND video_id IN (SELECT video_id FROM keyword_shorts WHERE campaign_id = $1)' : ''}
       ) uv ON uv.video_id = vs.video_id
       WHERE vs.campaign_id = $1
-        AND vs.snapshot_date >= $2::date
+        AND vs.snapshot_date >= $3::date
       GROUP BY vs.snapshot_date
       ORDER BY vs.snapshot_date ASC
-    `, [cid, thirtyDaysAgo]),
+    `, languageKeywordIds ? [cid, languageKeywordIds, thirtyDaysAgo] : [cid, thirtyDaysAgo]),
 
     // Daily new videos added — filtered by format
     queryAll<{ date: string; count: number }>(`
@@ -276,7 +304,7 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
       ORDER BY DATE(created_at) ASC
     `, [cid, thirtyDaysAgo]),
 
-    // Transcript coverage count — filtered by format
+    // Transcript coverage count — filtered by format/language
     queryAll<{ covered: number }>(`
       SELECT COUNT(*)::INT as covered
       FROM video_transcripts vt
@@ -285,7 +313,8 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
         AND vt.fetch_status = 'success'
         ${format === 'long' ? 'AND cv.video_id IN (SELECT DISTINCT video_id FROM keyword_videos WHERE campaign_id = $1)' : ''}
         ${format === 'short' ? 'AND cv.video_id IN (SELECT DISTINCT video_id FROM keyword_shorts WHERE campaign_id = $1)' : ''}
-    `, [cid]),
+        ${languageKeywordIds ? `AND cv.video_id IN (SELECT DISTINCT video_id FROM keyword_videos WHERE campaign_id = $1 AND keyword_id = ANY($2) UNION ALL SELECT DISTINCT video_id FROM keyword_shorts WHERE campaign_id = $1 AND keyword_id = ANY($2))` : ''}
+    `, languageKeywordIds ? [cid, languageKeywordIds] : [cid]),
   ])
 
   // Get timestamps

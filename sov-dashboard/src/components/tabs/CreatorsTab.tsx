@@ -97,15 +97,16 @@ export default function CreatorsTab() {
   const [expandedKws, setExpandedKws] = useState<Set<string>>(new Set())
   const [kwSortMode, setKwSortMode] = useState<'views' | 'frequency'>('views')
   const [kwFormatFilter, setKwFormatFilter] = useState<'all' | 'short' | 'long'>('all')
+  const [topSortMode, setTopSortMode] = useState<'views' | 'keywords'>('views')
   const router = useRouter()
 
   useEffect(() => { setMounted(true) }, [])
 
   const { data: rawCreators = [], isLoading } = useQuery({
-    queryKey: ['creators', activeCampaignId, format],
+    queryKey: ['creators', activeCampaignId, format, topSortMode],
     queryFn: async () => {
       if (!activeCampaignId) return []
-      const res = await fetch(`/api/creators?campaign_id=${activeCampaignId}&format=${format}`)
+      const res = await fetch(`/api/creators?campaign_id=${activeCampaignId}&format=${format}&sort_by=${topSortMode}`)
       if (!res.ok) return []
       const d = await res.json()
       return d.creators || []
@@ -180,6 +181,9 @@ export default function CreatorsTab() {
 
   const { channels, scatterData, brandAlignmentData, allBrands, maxDailyGrowth } = analytics
   const filteredChannels = channels.filter((c: any) => c.name.toLowerCase().includes(search.toLowerCase()))
+  const topSortedChannels = [...filteredChannels].sort((a: any, b: any) =>
+    topSortMode === 'keywords' ? b.kwCount - a.kwCount : b.views - a.views
+  )
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingBottom: 40 }}>
@@ -243,9 +247,25 @@ export default function CreatorsTab() {
 
       {/* Top 10 Creators Intelligence */}
       <div style={{ marginBottom: 10 }}>
-        <div style={{ fontSize: 16, fontWeight: 800, color: '#0F172A', marginBottom: 16 }}>Top 10 Creators Intelligence</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#0F172A' }}>Top 10 Creators Intelligence</div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              onClick={() => setTopSortMode('views')}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 8, border: topSortMode === 'views' ? '1.5px solid #1A73E8' : '1px solid #E2E8F0', background: topSortMode === 'views' ? '#EFF6FF' : '#FFF', color: topSortMode === 'views' ? '#1A73E8' : '#64748B', fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' }}
+            >
+              <Eye size={13} /> By Views
+            </button>
+            <button
+              onClick={() => setTopSortMode('keywords')}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 8, border: topSortMode === 'keywords' ? '1.5px solid #1A73E8' : '1px solid #E2E8F0', background: topSortMode === 'keywords' ? '#EFF6FF' : '#FFF', color: topSortMode === 'keywords' ? '#1A73E8' : '#64748B', fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' }}
+            >
+              <Hash size={13} /> By Keywords
+            </button>
+          </div>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16 }}>
-          {filteredChannels.slice(0, 10).map((c: any, i: number) => (
+          {topSortedChannels.slice(0, 10).map((c: any, i: number) => (
             <div
               key={c.id}
               onClick={() => fetchCreatorDetail(c.id)}

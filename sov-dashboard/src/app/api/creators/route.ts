@@ -6,6 +6,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const campaign_id = searchParams.get('campaign_id')
     const format = searchParams.get('format') || 'all'
+    const sortBy = searchParams.get('sort_by') || 'views'
 
     if (!campaign_id) {
       return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
@@ -186,7 +187,7 @@ export async function GET(request: Request) {
         kws: Array.from(c.kws),
         creatorVideos: c.videos.sort((a: any, b: any) => b.view_count - a.view_count)
       }
-    }).sort((a, b) => b.views - a.views)
+    }).sort((a, b) => sortBy === 'keywords' ? b.kwCount - a.kwCount : b.views - a.views)
 
     return NextResponse.json({ creators })
   } catch (e: any) {

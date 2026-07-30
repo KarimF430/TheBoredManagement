@@ -124,7 +124,7 @@ function TabLoader({ label }: { label?: string }) {
 
 export default function OverviewPage() {
   const { campaigns, activeCampaignId, fetchCampaigns } = useCampaignStore()
-  const { format, ownership, dateRange, customDateFrom, customDateTo } = useFilterStore()
+  const { format, ownership, dateRange, customDateFrom, customDateTo, language } = useFilterStore()
   const [activeTab, setActiveTab] = useState<'overview' | 'brands' | 'creators' | 'rankings' | 'videos' | 'keywords' | 'trends' | 'growth'>('overview')
   const [showDemo, setShowDemo] = useState(false)
   const [drawerType, setDrawerType] = useState<'views_detail' | 'brand_sov_detail' | 'creator_detail' | 'rank_detail' | null>(null)
@@ -135,13 +135,14 @@ export default function OverviewPage() {
   const formatParam = format && format !== 'all' ? `&format=${format}` : ''
   const timeRangeParam = dateRange && dateRange !== 'All' ? `&time_range=${dateRange}` : ''
   const customDateParam = dateRange === 'Custom' && customDateFrom && customDateTo ? `&date_from=${customDateFrom}&date_to=${customDateTo}` : ''
+  const languageParam = language && language !== 'all' ? `&language=${language}` : ''
 
   const dashboardQuery = useQuery({
-    queryKey: ['dashboard', activeCampaignId, format, ownership, dateRange, customDateFrom, customDateTo],
+    queryKey: ['dashboard', activeCampaignId, format, ownership, dateRange, customDateFrom, customDateTo, language],
     queryFn: async () => {
       const [kpisRes, fullRes] = await Promise.all([
-        fetch(`/api/dashboard/kpis?campaign_id=${activeCampaignId}${formatParam}${timeRangeParam}${customDateParam}`),
-        fetch(`/api/dashboard?campaign_id=${activeCampaignId}${formatParam}${isOursParam}${timeRangeParam}${customDateParam}`),
+        fetch(`/api/dashboard/kpis?campaign_id=${activeCampaignId}${formatParam}${timeRangeParam}${customDateParam}${languageParam}`),
+        fetch(`/api/dashboard?campaign_id=${activeCampaignId}${formatParam}${isOursParam}${timeRangeParam}${customDateParam}${languageParam}`),
       ])
       const kpis = kpisRes.ok ? await kpisRes.json() : null
       const d = await fullRes.json()
@@ -325,6 +326,7 @@ export default function OverviewPage() {
             showViewsUpdate
             onViewsUpdate={handleViewsUpdate}
             isViewsUpdating={isRefreshingViews || dashboardQuery.isRefetching}
+            languages={distinctLanguages}
           />
         </div>
       </div>

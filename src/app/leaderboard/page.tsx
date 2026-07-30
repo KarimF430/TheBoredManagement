@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback, Suspense, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink, Download, ChevronUp, ChevronDown, Search, AlertCircle, Plus, X, Tag, Brain, Loader2 } from 'lucide-react'
 import { useCampaignStore } from '@/lib/store'
@@ -27,6 +27,18 @@ interface VideoRow {
   keywords_appeared: string[]
   tags: string[]
   keyword_ranks?: KeywordRank[]
+}
+
+interface AnalysisProgress {
+  total: number
+  processed: number
+  success: number
+  failed: number
+  skipped: number
+  currentVideo: string
+  currentStep: string
+  phase: 'starting' | 'fetching_transcript' | 'transcribing' | 'matching' | 'classifying' | 'analyzing' | 'complete' | 'error'
+  errors: Array<{ youtube_id: string; title: string; error: string }>
 }
 
 const BRAND_COLORS: Record<string, string> = {
@@ -99,7 +111,8 @@ function LeaderboardContent() {
   const [campaignBrands, setCampaignBrands] = useState<string[]>([])
   const [customTagInput, setCustomTagInput] = useState('')
   const [analyzingId, setAnalyzingId] = useState<string | null>(null)
-  const [batchAnalyzing, setBatchAnalyzing] = useState(false)
+  const [analysisProgress, setAnalysisProgress] = useState<AnalysisProgress | null>(null)
+  const cancelRef = useRef(false)
   const [expandedKeywords, setExpandedKeywords] = useState<Set<string>>(new Set())
 
   const fetchBrands = useCallback(async (campId: string) => {
@@ -213,22 +226,102 @@ function LeaderboardContent() {
   }
 
   const handleBatchAnalyze = async () => {
-    if (!activeCampaignId || videos.length === 0) return
-    setBatchAnalyzing(true)
+    if (!activeCampaignId) return
+    cancelRef.current = false
+
+    setAnalysisProgress({
+      total: 0, processed: 0, success: 0, failed: 0, skipped: 0,
+      currentVideo: '', currentStep: 'Fetching video list...', phase: 'starting', errors: [],
+    })
+
     try {
-      const ids = videos.map(v => v.youtube_id)
-      const res = await fetch('/api/brands/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ video_ids: ids, campaign_id: activeCampaignId, force: false }),
+      const formatParam = format === 'short' ? 'short' : format === 'long' ? 'long' : 'all'
+      const idsRes = await fetch(`/api/videos/ids?campaign_id=${activeCampaignId}&format=${formatParam}`)
+      const idsData = await idsRes.json()
+
+      if (idsData.error) {
+        setAnalysisProgress({ total: 0, processed: 0, success: 0, failed: 1, skipped: 0, currentVideo: '', currentStep: idsData.error, phase: 'error', errors: [{ youtube_id: '', title: 'Error', error: idsData.error }] })
+        return
+      }
+
+      const allVideos = idsData.videos as { id: string; youtube_id: string; title: string; channel_name: string; description: string }[]
+
+      if (!allVideos || allVideos.length === 0) {
+        setAnalysisProgress({ total: 0, processed: 0, success: 0, failed: 0, skipped: 0, currentVideo: '', currentStep: 'All videos already analyzed!', phase: 'complete', errors: [] })
+        setTimeout(() => setAnalysisProgress(null), 3000)
+        return
+      }
+
+      let processed = 0
+      let success = 0
+      let failed = 0
+      let skipped = 0
+      const errors: { youtube_id: string; title: string; error: string }[] = []
+      const BATCH = 5
+
+      for (let i = 0; i < allVideos.length; i += BATCH) {
+        if (cancelRef.current) break
+
+        const batch = allVideos.slice(i, i + BATCH)
+        const batchIds = batch.map(v => v.youtube_id)
+        const batchTitles = batch.map(v => v.title).join(', ')
+
+        setAnalysisProgress({
+          total: allVideos.length, processed, success, failed, skipped,
+          currentVideo: batchTitles, currentStep: `Analyzing batch ${Math.floor(i / BATCH) + 1}... (${processed}/${allVideos.length})`, phase: 'analyzing', errors,
+        })
+
+        try {
+          const res = await fetch('/api/brands/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ video_ids: batchIds, campaign_id: activeCampaignId, force: false }),
+          })
+
+          const result = await res.json()
+
+          for (const r of (result.results || [])) {
+            processed++
+            if (r.status === 'analyzed') {
+              const brands = r.high_confidence_brands?.length || r.brands_detected || 0
+              if (brands > 0) success++
+              else skipped++
+            } else if (r.status === 'error') {
+              failed++
+              const v = batch.find(bv => bv.youtube_id === r.youtube_id)
+              errors.push({ youtube_id: r.youtube_id, title: v?.title || r.youtube_id, error: r.error || 'Failed' })
+            } else if (r.status === 'already_analyzed') {
+              skipped++
+            } else {
+              skipped++
+            }
+          }
+        } catch (err: any) {
+          processed += batch.length
+          failed += batch.length
+          for (const v of batch) {
+            errors.push({ youtube_id: v.youtube_id, title: v.title, error: err?.message || 'Network error' })
+          }
+        }
+
+        setAnalysisProgress({
+          total: allVideos.length, processed, success, failed, skipped,
+          currentVideo: '', currentStep: `${processed}/${allVideos.length} done \u2014 ${success} brands, ${skipped} no brands${failed > 0 ? ', ' + failed + ' failed' : ''}`, phase: 'analyzing', errors,
+        })
+      }
+
+      setAnalysisProgress({
+        total: allVideos.length, processed, success, failed, skipped,
+        currentVideo: '', currentStep: `Done! ${success} brands found in ${success} videos, ${skipped} had no brands, ${failed} failed`, phase: 'complete', errors,
       })
-      const result = await res.json()
-      // Refresh video list to get updated tags
+
       leaderboardQuery.refetch()
-    } catch (e) {
-      console.error('Batch analysis failed:', e)
-    } finally {
-      setBatchAnalyzing(false)
+    } catch (e: any) {
+      setAnalysisProgress({
+        total: 0, processed: 0, success: 0, failed: 1, skipped: 0,
+        currentVideo: '', currentStep: e?.message || 'Failed', phase: 'error',
+        errors: [{ youtube_id: '', title: 'Error', error: e?.message || 'Unknown' }],
+      })
     }
   }
 
@@ -288,22 +381,70 @@ function LeaderboardContent() {
           <button className="btn btn-ghost btn-sm" onClick={handleExportCSV}>
             <Download size={13} /> Export CSV
           </button>
-          <button
-            className="btn btn-sm"
-            onClick={handleBatchAnalyze}
-            disabled={batchAnalyzing}
-            style={{
-              background: batchAnalyzing ? '#F1F5F9' : 'rgba(124,58,237,0.08)',
-              border: `1px solid ${batchAnalyzing ? '#E2E8F0' : 'rgba(124,58,237,0.25)'}`,
-              color: '#7C3AED',
-              fontWeight: 700,
-            }}
-          >
-            {batchAnalyzing ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Brain size={13} />}
-            {batchAnalyzing ? 'Analyzing...' : 'AI Analyze All'}
-          </button>
+
+          {/* AI Analyze All button + inline progress */}
+          <div style={{ position: 'relative' }}>
+            <button
+              className="btn btn-sm"
+              onClick={handleBatchAnalyze}
+              disabled={!!analysisProgress}
+              style={{
+                background: analysisProgress ? '#F1F5F9' : 'rgba(124,58,237,0.08)',
+                border: `1px solid ${analysisProgress ? '#E2E8F0' : 'rgba(124,58,237,0.25)'}`,
+                color: '#7C3AED',
+                fontWeight: 700,
+              }}
+            >
+              {analysisProgress ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Brain size={13} />}
+              {analysisProgress ? (analysisProgress.currentStep || 'Analyzing...') : 'AI Analyze All'}
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Inline progress panel — rendered below header, above filters */}
+      {analysisProgress && (
+        <div style={{
+          margin: '0 24px 16px', padding: '14px 16px',
+          background: '#FFFFFF', borderRadius: 12,
+          border: '1px solid #E2E8F0',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Loader2 size={14} style={{ animation: 'spin 1s linear infinite', color: '#7C3AED' }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>{analysisProgress.currentStep}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 11, color: '#64748B' }}>
+                {analysisProgress.processed}/{analysisProgress.total}
+              </span>
+              {analysisProgress.success > 0 && <span style={{ fontSize: 11, color: '#22C55E', fontWeight: 600 }}>{analysisProgress.success} brands</span>}
+              {analysisProgress.skipped > 0 && <span style={{ fontSize: 11, color: '#F59E0B', fontWeight: 600 }}>{analysisProgress.skipped} no brands</span>}
+              {analysisProgress.failed > 0 && <span style={{ fontSize: 11, color: '#EF4444', fontWeight: 600 }}>{analysisProgress.failed} failed</span>}
+              {analysisProgress.phase !== 'complete' && analysisProgress.phase !== 'error' && (
+                <button onClick={() => { cancelRef.current = true }} style={{ fontSize: 11, color: '#EF4444', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Cancel</button>
+              )}
+              {(analysisProgress.phase === 'complete' || analysisProgress.phase === 'error') && (
+                <button onClick={() => setAnalysisProgress(null)} style={{ fontSize: 11, color: '#64748B', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Dismiss</button>
+              )}
+            </div>
+          </div>
+          <div style={{ height: 4, borderRadius: 2, background: '#F1F5F9', overflow: 'hidden' }}>
+            <div style={{
+              height: '100%', borderRadius: 2,
+              background: analysisProgress.phase === 'complete' ? '#22C55E' : analysisProgress.phase === 'error' ? '#EF4444' : 'linear-gradient(90deg, #7C3AED, #A78BFA)',
+              width: `${analysisProgress.total > 0 ? Math.round((analysisProgress.processed / analysisProgress.total) * 100) : 0}%`,
+              transition: 'width 0.3s ease',
+            }} />
+          </div>
+          {analysisProgress.errors.length > 0 && (
+            <div style={{ marginTop: 6, fontSize: 10, color: '#EF4444' }}>
+              {analysisProgress.errors.length} error{analysisProgress.errors.length > 1 ? 's' : ''}: {analysisProgress.errors.slice(0, 3).map(e => e.title).join(', ')}{analysisProgress.errors.length > 3 ? ` +${analysisProgress.errors.length - 3} more` : ''}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Page-specific filters: Brand, Keyword, Channel */}
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', padding: '0 24px', marginBottom: 16 }}>
@@ -344,7 +485,7 @@ function LeaderboardContent() {
         </div>
       ) : (
         <div className="card" style={{ padding: 0, overflow: 'hidden', position: 'relative' }}>
-          {isPageLoading && (
+          {isPageLoading && !analysisProgress && (
             <div style={{
               position: 'absolute', inset: 0, zIndex: 50,
               background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(2px)',
