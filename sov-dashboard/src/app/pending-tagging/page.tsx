@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Video, Search, ExternalLink, ChevronLeft, ChevronRight, Tag, Brain, AlertCircle, Check, Loader2, Filter, Info, Eye, TrendingUp, ArrowUpDown, Youtube, RefreshCw } from 'lucide-react'
+import { Video, Search, ExternalLink, ChevronLeft, ChevronRight, Tag, Brain, AlertCircle, Check, Loader2, Filter, Info, Eye, TrendingUp, ArrowUpDown, RefreshCw } from 'lucide-react'
 import { useCampaignStore } from '@/lib/store'
 import { useFilterStore } from '@/lib/filter-store'
 import Link from 'next/link'

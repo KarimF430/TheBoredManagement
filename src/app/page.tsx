@@ -125,7 +125,7 @@ function TabLoader({ label }: { label?: string }) {
 export default function OverviewPage() {
   const { campaigns, activeCampaignId, fetchCampaigns } = useCampaignStore()
   const { format, ownership, dateRange, customDateFrom, customDateTo } = useFilterStore()
-  const [activeTab, setActiveTab] = useState<'overview' | 'brands' | 'creators' | 'rankings' | 'videos' | 'keywords' | 'trends' | 'growth' | 'alerts' | 'settings'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'brands' | 'creators' | 'rankings' | 'videos' | 'keywords' | 'trends' | 'growth'>('overview')
   const [showDemo, setShowDemo] = useState(false)
   const [drawerType, setDrawerType] = useState<'views_detail' | 'brand_sov_detail' | 'creator_detail' | 'rank_detail' | null>(null)
   const [isRefreshingViews, setIsRefreshingViews] = useState(false)
@@ -340,8 +340,6 @@ export default function OverviewPage() {
           { id: 'keywords', label: 'Keywords', icon: Search },
           { id: 'trends', label: 'Trends', icon: TrendingUp },
           { id: 'growth', label: 'Growth', icon: Activity },
-          { id: 'alerts', label: 'Alerts', icon: Bell },
-          { id: 'settings', label: 'Settings', icon: Settings },
         ].map(({ id, label, icon: Icon }) => (
           <button key={id} className={`tab-pill ${activeTab === id ? 'on' : ''}`} onClick={() => setActiveTab(id as any)}
             style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -388,8 +386,6 @@ export default function OverviewPage() {
             {activeTab === 'keywords' && <Suspense fallback={<TabLoader label="Loading keywords…" />}><KeywordsTab /></Suspense>}
             {activeTab === 'trends' && <Suspense fallback={<TabLoader label="Loading trends…" />}><TrendsTab /></Suspense>}
             {activeTab === 'growth' && <Suspense fallback={<TabLoader label="Loading growth…" />}><GrowthTab /></Suspense>}
-            {activeTab === 'alerts' && <Suspense fallback={<TabLoader label="Loading alerts…" />}><AlertsTab /></Suspense>}
-            {activeTab === 'settings' && <Suspense fallback={<TabLoader label="Loading settings…" />}><SettingsTab /></Suspense>}
           </motion.div>
         </AnimatePresence>
       </div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { authorizeCampaignAccess } from '@/lib/auth'
+import { invalidateCampaign } from '@/lib/cache'
 
 export async function PATCH(req: NextRequest) {
   try {
@@ -27,6 +28,8 @@ export async function PATCH(req: NextRequest) {
     if (inserts.length > 0) {
       await supabase.from('brand_tags').upsert(inserts, { onConflict: 'video_id,brand_name,campaign_id', ignoreDuplicates: true })
     }
+
+    await invalidateCampaign(campaign_id)
 
     return NextResponse.json({ ok: true, tags })
   } catch (e: unknown) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { queryAll } from '@/lib/supabase'
 import { scrapeKeyword } from '@/lib/scrape-pipeline-pg'
 import { authorizeCampaignAccess } from '@/lib/auth'
+import { invalidateCampaign } from '@/lib/cache'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -92,6 +93,36 @@ export async function POST(req: NextRequest) {
 
     const totalRanked = results.reduce((s, r) => s + r.ranked, 0)
     const totalQuota = results.reduce((s, r) => s + r.quota_cost, 0)
+
+    await invalidateCampaign(campaign_id)
+
+    // Auto-refresh view snapshots so Trends/Growth have data
+    try {
+      const nowIso = new Date().toISOString()
+      const todayStr = nowIso.split('T')[0]
+      const rankedVideos = await queryAll<{ video_id: string }>(`
+        SELECT DISTINCT video_id FROM (
+          SELECT video_id FROM keyword_videos WHERE campaign_id = $1
+          UNION ALL
+          SELECT video_id FROM keyword_shorts WHERE campaign_id = $1
+        ) t
+      `, [campaign_id])
+      const videoIds = rankedVideos.map(v => v.video_id)
+      if (videoIds.length > 0) {
+        const { data: vids } = await import('@/lib/supabase').then(m =>
+          m.supabase.from('videos').select('id, view_count').in('id', videoIds.slice(0, 1000))
+        )
+        if (vids && vids.length > 0) {
+          const snapshots = vids.map((v: any) => ({
+            campaign_id, video_id: v.id, snapshot_date: todayStr, view_count: v.view_count || 0,
+          }))
+          const { supabase } = await import('@/lib/supabase')
+          await supabase.from('view_snapshots').upsert(snapshots, { onConflict: 'campaign_id,video_id,snapshot_date' })
+        }
+      }
+    } catch (e) {
+      console.error('Auto-refresh views after scrape failed (non-fatal):', e)
+    }
 
     return NextResponse.json({
       ok: true,

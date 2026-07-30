@@ -48,22 +48,22 @@ try {
 export const redis = redisInstance
 
 export const CACHE_TTL = {
-  overview_kpis: 43200,
-  brand_sov: 43200,
-  video_leaderboard: 43200,
-  sov_trend: 43200,
-  brand_detail: 43200,
-  brand_growth: 43200,
-  dropped_rankings: 43200,
-  multi_keyword: 43200,
+  overview_kpis: 300,
+  brand_sov: 300,
+  video_leaderboard: 300,
+  sov_trend: 300,
+  brand_detail: 300,
+  brand_growth: 300,
+  dropped_rankings: 300,
+  multi_keyword: 300,
   system_metadata: 30,
-  keywords_sov: 43200,
-  brands_overview: 43200,
-  campaigns: 43200,
-  videos_campaign: 43200,
-  videos_pending: 43200,
-  campaign_videos: 43200,
-  keywords: 43200,
+  keywords_sov: 300,
+  brands_overview: 300,
+  campaigns: 300,
+  videos_campaign: 300,
+  videos_pending: 300,
+  campaign_videos: 300,
+  keywords: 300,
   views_snapshot: 60,
 } as const
 
@@ -93,8 +93,14 @@ export async function getCached<T>(
       if (redis) {
         const cached = await redis.get<T>(key)
         if (cached !== null) {
-          setL1(key, cached) // promote to L1
-          return cached
+          // If cached value is empty data, skip cache and re-fetch
+          const isCachedEmpty = cached && typeof cached === 'object' && 'data' in cached && Array.isArray((cached as any).data) && (cached as any).data.length === 0
+          if (!isCachedEmpty) {
+            setL1(key, cached) // promote to L1
+            return cached
+          }
+          // Stale empty cache — delete and fall through to re-fetch
+          redis.del(key).catch(() => {})
         }
       }
     } catch {}
@@ -102,13 +108,16 @@ export async function getCached<T>(
     // L3: Fetch fresh from database
     const fresh = await fetcher()
 
-    // Write to L1 + L2 simultaneously (fire-and-forget for Redis)
-    setL1(key, fresh)
-    try {
-      if (redis) {
-        redis.setex(key, ttl, JSON.stringify(fresh)).catch(() => {})
-      }
-    } catch {}
+    // Don't cache empty results — allow re-fetch on next request
+    const isEmpty = fresh && typeof fresh === 'object' && 'data' in fresh && Array.isArray((fresh as any).data) && (fresh as any).data.length === 0
+    if (!isEmpty) {
+      setL1(key, fresh)
+      try {
+        if (redis) {
+          redis.setex(key, ttl, JSON.stringify(fresh)).catch(() => {})
+        }
+      } catch {}
+    }
 
     return fresh
   })

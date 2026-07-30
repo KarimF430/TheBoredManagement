@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { refreshMaterializedViews, setSystemMetadata, getSystemMetadata } from '@/lib/migrations'
 import { getViewCountsOAuth } from '@/lib/youtube-oauth'
 import { verifyToken } from '@/lib/auth'
+import { invalidateL1 } from '@/lib/cache'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -41,11 +42,13 @@ async function handleCron(req: NextRequest) {
     const result = await runWeeklyKeywordRefreshPg(campaignId)
     await refreshMaterializedViews()
     await setSystemMetadata('last_ranking_refresh', new Date().toISOString())
+    invalidateL1()
     return NextResponse.json({ ok: true, weekly_refresh: { ...result, status: 'completed' } })
   }
 
   if (job === 'refresh_views') {
     await refreshMaterializedViews()
+    invalidateL1()
     return NextResponse.json({ ok: true, message: 'Materialized views refreshed' })
   }
 
@@ -230,6 +233,8 @@ async function runDailyViewsAll(req: NextRequest) {
   } catch (err) {
     console.error('Materialized view refresh failed:', err)
   }
+
+  invalidateL1()
 
   return NextResponse.json({
     ok: true,

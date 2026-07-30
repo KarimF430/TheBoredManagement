@@ -48,9 +48,9 @@ export default function SharedFilterBar({ children, hasActiveFilters, onReset, s
   }
 
   return (
-    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', ...style }}>
+    <div style={{ display: 'flex', gap: 10, flexWrap: 'nowrap', alignItems: 'center', overflowX: 'auto', overflowY: 'hidden', paddingBottom: 2, ...style }}>
       {/* Format Toggle */}
-      <div style={{ display: 'flex', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
         {FORMAT_OPTIONS.map(opt => (
           <button
             key={opt.value}
@@ -73,7 +73,7 @@ export default function SharedFilterBar({ children, hasActiveFilters, onReset, s
       </div>
 
       {/* Ownership */}
-      <div style={{ minWidth: 140 }}>
+      <div style={{ minWidth: 140, flexShrink: 0 }}>
         <select
           className="input"
           value={ownership}
@@ -87,7 +87,7 @@ export default function SharedFilterBar({ children, hasActiveFilters, onReset, s
       </div>
 
       {/* Date Range Toggle */}
-      <div style={{ display: 'flex', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
         {DATE_RANGE_OPTIONS.map(opt => (
           <button
             key={opt.value}
@@ -139,7 +139,7 @@ export default function SharedFilterBar({ children, hasActiveFilters, onReset, s
       {/* Views Update */}
       {showViewsUpdate && (
         <button onClick={onViewsUpdate} disabled={isViewsUpdating}
-          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: '1px solid #E2E8F0', background: '#FFF', color: '#475569', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: '1px solid #E2E8F0', background: '#FFF', color: '#475569', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
           <RefreshCw size={12} style={{ animation: isViewsUpdating ? 'spin 1s linear infinite' : 'none' }} />
           {isViewsUpdating ? 'Updating…' : 'Views Update'}
         </button>

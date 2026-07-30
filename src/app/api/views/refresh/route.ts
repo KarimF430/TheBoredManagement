@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabase, queryAll } from '@/lib/supabase'
+import { invalidateCampaign } from '@/lib/cache'
 
 export async function POST(req: Request) {
   try {
@@ -51,6 +52,8 @@ export async function POST(req: Request) {
           .upsert(snapshots, { onConflict: 'campaign_id,video_id,snapshot_date' })
       }
     }
+
+    await invalidateCampaign(campaign_id)
 
     return NextResponse.json({
       success: true,

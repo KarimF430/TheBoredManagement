@@ -183,13 +183,13 @@ export default function LoginPage() {
     fontSize: 13.5, boxSizing: 'border-box' as const,
     fontFamily: 'inherit',
     border: '1.5px solid',
-    borderColor: focusedField === field ? '#F58220' : 'rgba(26,115,232,0.12)',
+    borderColor: focusedField === field ? '#F58220' : 'rgba(255,255,255,0.1)',
     borderRadius: 10,
-    background: focusedField === field ? '#FFF' : '#FAFBFC',
+    background: focusedField === field ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)',
     outline: 'none',
     transition: 'all 0.2s ease',
-    boxShadow: focusedField === field ? '0 0 0 4px rgba(245,130,32,0.1)' : 'none',
-    color: '#0F172A',
+    boxShadow: focusedField === field ? '0 0 0 4px rgba(245,130,32,0.15)' : 'none',
+    color: '#F1F5F9',
   })
 
   return (
@@ -207,17 +207,17 @@ export default function LoginPage() {
         transition={{ duration: 0.6, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
         style={{
           position: 'relative', zIndex: 1,
-          background: 'rgba(255,255,255,0.9)',
+          background: 'rgba(20,20,30,0.85)',
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
           borderRadius: 22,
           padding: '40px 36px 32px',
           width: '100%', maxWidth: 400,
-          border: '1.5px solid rgba(255,255,255,0.7)',
+          border: '1.5px solid rgba(255,255,255,0.08)',
           boxShadow: [
-            '0 4px 24px -2px rgba(0,0,0,0.04)',
-            '0 12px 48px -12px rgba(0,0,0,0.06)',
-            'inset 0 1px 0 rgba(255,255,255,0.8)',
+            '0 4px 24px -2px rgba(0,0,0,0.3)',
+            '0 12px 48px -12px rgba(0,0,0,0.5)',
+            'inset 0 1px 0 rgba(255,255,255,0.05)',
           ].join(', '),
         }}
       >
@@ -234,18 +234,20 @@ export default function LoginPage() {
           transition={{ duration: 0.4, delay: 0.15 }}
           style={{ textAlign: 'center', marginBottom: 28 }}
         >
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-            <Logo h={52} />
+          <div style={{
+            display: 'flex', justifyContent: 'center', marginBottom: 16,
+            background: 'rgba(255,255,255,0.95)', borderRadius: 16, padding: '12px 20px',
+            boxShadow: '0 4px 20px rgba(245,130,32,0.15)',
+          }}>
+            <Logo h={44} />
           </div>
           <h1 style={{
-            fontSize: 20, fontWeight: 800, color: '#0F172A',
+            fontSize: 20, fontWeight: 800, color: '#F1F5F9',
             margin: '0 0 4px', letterSpacing: '-0.3px',
-            background: 'linear-gradient(135deg, #0F172A 0%, #334155 100%)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
           }}>
             SOV Panel
           </h1>
-          <p style={{ fontSize: 13, color: '#64748B', margin: 0, fontWeight: 500 }}>
+          <p style={{ fontSize: 13, color: '#94A3B8', margin: 0, fontWeight: 500 }}>
             Sign in to your analytics workspace
           </p>
         </motion.div>
@@ -257,9 +259,9 @@ export default function LoginPage() {
             exit={{ opacity: 0, height: 0 }}
             style={{
               display: 'flex', gap: 10, padding: '10px 14px', borderRadius: 10,
-              background: 'linear-gradient(135deg, #FEF2F2, #FFF5F5)',
-              border: '1.5px solid rgba(255,45,85,0.15)',
-              color: '#B91C1C', fontSize: 12.5, fontWeight: 500, marginBottom: 20,
+              background: 'linear-gradient(135deg, rgba(220,38,38,0.12), rgba(220,38,38,0.06))',
+              border: '1.5px solid rgba(220,38,38,0.2)',
+              color: '#FCA5A5', fontSize: 12.5, fontWeight: 500, marginBottom: 20,
               alignItems: 'flex-start',
             }}
           >
@@ -277,7 +279,7 @@ export default function LoginPage() {
         >
           <div>
             <label style={{
-              display: 'block', fontSize: 10.5, fontWeight: 700, color: '#475569',
+              display: 'block', fontSize: 10.5, fontWeight: 700, color: '#94A3B8',
               textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 6,
             }}>
               Email Address
@@ -286,7 +288,7 @@ export default function LoginPage() {
               <Mail size={15} style={{
                 position: 'absolute', left: 13, top: '50%',
                 transform: 'translateY(-50%)',
-                color: focusedField === 'email' ? '#F58220' : '#94A3B8',
+                color: focusedField === 'email' ? '#F58220' : '#64748B',
                 pointerEvents: 'none', transition: 'color 0.2s ease', zIndex: 1,
               }} />
               <input
@@ -302,7 +304,7 @@ export default function LoginPage() {
 
           <div>
             <label style={{
-              display: 'block', fontSize: 10.5, fontWeight: 700, color: '#475569',
+              display: 'block', fontSize: 10.5, fontWeight: 700, color: '#94A3B8',
               textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: 6,
             }}>
               Password
@@ -311,7 +313,7 @@ export default function LoginPage() {
               <Lock size={15} style={{
                 position: 'absolute', left: 13, top: '50%',
                 transform: 'translateY(-50%)',
-                color: focusedField === 'password' ? '#F58220' : '#94A3B8',
+                color: focusedField === 'password' ? '#F58220' : '#64748B',
                 pointerEvents: 'none', transition: 'color 0.2s ease', zIndex: 1,
               }} />
               <input
@@ -365,7 +367,7 @@ export default function LoginPage() {
 
         <div style={{
           marginTop: 20, textAlign: 'center', fontSize: 11.5,
-          color: '#94A3B8', fontWeight: 500, lineHeight: 1.5,
+          color: '#64748B', fontWeight: 500, lineHeight: 1.5,
         }}>
           Powered by{' '}
           <span style={{ fontWeight: 700, color: '#F58220' }}>TheBoredMonkey</span>
