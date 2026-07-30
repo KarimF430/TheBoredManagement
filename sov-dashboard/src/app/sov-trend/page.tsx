@@ -184,6 +184,33 @@ export default function SovTrendPage() {
   const toggleBrand = (b: string) =>
     setActiveBrands(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])
 
+  // These must run on EVERY render. They used to sit below the loading /
+  // empty-state early returns, so the first render (loading) ran fewer hooks
+  // than the second (data present) — "Rendered more hooks than during the
+  // previous render". Derived values are cheap and safe to compute against
+  // the empty defaults, so hoisting them above the guards is the fix.
+  const brandStats = useMemo(() => computeBrandStats(data, brands), [data, brands])
+  const hhi = useMemo(() => computeHHI(brands, data), [brands, data])
+  const brandRanks = useMemo(() => computeBrandRanks(data, brands), [data, brands])
+
+  const volatilityData = useMemo(() => {
+    return brands.map(b => ({
+      brand: b,
+      volatility: computeVolatility(b, data),
+      color: brandColor(b),
+    })).sort((a, b) => b.volatility - a.volatility)
+  }, [brands, data])
+
+  const brandCards = useMemo(() => {
+    return brandStats.map((bs, i) => {
+      const signal = bs.delta > 1 ? 'Accelerating' : bs.delta < -1 ? 'Declining' : 'Stable'
+      const signalIcon = signal === 'Accelerating' ? ArrowUpRight : signal === 'Declining' ? ArrowDownRight : Minus
+      const signalColor = signal === 'Accelerating' ? '#10B981' : signal === 'Declining' ? '#EF4444' : '#F59E0B'
+      const momentum = signal === 'Accelerating' ? 'Accelerating' : signal === 'Declining' ? 'Declining' : 'Stable'
+      return { ...bs, signal, signalIcon, signalColor, momentum, idx: i + 1 }
+    })
+  }, [brandStats])
+
   if (loading) return (
     <div className="anim-fade-up">
       <PageSkeleton cols={6} rows={3} />
@@ -210,39 +237,15 @@ export default function SovTrendPage() {
     </div>
   )
 
-  const brandStats = computeBrandStats(data, brands)
   const effectiveActiveBrands = activeBrands.length > 0 ? activeBrands : brands
   const chartData = showAvg && data.length > 0
     ? effectiveActiveBrands.reduce((d, b) => rollingAvg(d, b), data)
     : data
 
   const lastSnapshot = data.length > 0 ? data[data.length - 1] : null
-
-  const hhi = useMemo(() => computeHHI(brands, data), [brands, data])
   const leaderSov = brandStats.length > 0 ? brandStats[0].current : 0
   const daysTracked = data.length
-
-  const brandRanks = useMemo(() => computeBrandRanks(data, brands), [data, brands])
-
-  const volatilityData = useMemo(() => {
-    return brands.map(b => ({
-      brand: b,
-      volatility: computeVolatility(b, data),
-      color: brandColor(b),
-    })).sort((a, b) => b.volatility - a.volatility)
-  }, [brands, data])
-
   const maxVolatility = volatilityData.length > 0 ? volatilityData[0].volatility : 1
-
-  const brandCards = useMemo(() => {
-    return brandStats.map((bs, i) => {
-      const signal = bs.delta > 1 ? 'Accelerating' : bs.delta < -1 ? 'Declining' : 'Stable'
-      const signalIcon = signal === 'Accelerating' ? ArrowUpRight : signal === 'Declining' ? ArrowDownRight : Minus
-      const signalColor = signal === 'Accelerating' ? '#10B981' : signal === 'Declining' ? '#EF4444' : '#F59E0B'
-      const momentum = signal === 'Accelerating' ? 'Accelerating' : signal === 'Declining' ? 'Declining' : 'Stable'
-      return { ...bs, signal, signalIcon, signalColor, momentum, idx: i + 1 }
-    })
-  }, [brandStats])
 
   return (
     <div className="anim-fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingBottom: 40 }}>
