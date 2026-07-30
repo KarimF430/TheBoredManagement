@@ -42,33 +42,76 @@ export default function TutorialOverlay() {
     return () => { delete (window as any).__replayTutorial }
   }, [startTutorial])
 
-  // Find target element
-  const updateHighlight = useCallback(() => {
+  // Measure only — never scrolls. Scrolling from here would re-enter via the
+  // scroll listener and fight its own smooth-scroll animation, which is what
+  // made the card land in arbitrary positions.
+  const measureTarget = useCallback(() => {
     if (!step?.target) { setTargetRect(null); return }
     const el = document.querySelector(step.target) as HTMLElement | null
     if (!el) { setTargetRect(null); return }
-    el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
-    // Wait for scroll to settle, then measure
-    const measure = () => {
-      const r = el.getBoundingClientRect()
-      const pad = 6
-      setTargetRect({ top: r.top - pad, left: r.left - pad, width: r.width + pad * 2, height: r.height + pad * 2 })
-    }
-    setTimeout(measure, 100)
-    setTimeout(measure, 300)
+    const r = el.getBoundingClientRect()
+    // A zero-size box means the element is mounted but not laid out yet.
+    if (r.width === 0 && r.height === 0) { setTargetRect(null); return }
+    const pad = 6
+    const next = { top: r.top - pad, left: r.left - pad, width: r.width + pad * 2, height: r.height + pad * 2 }
+    // The settle loop runs every frame; skip no-op updates so we don't
+    // re-render (and re-run card positioning) ~40 times per step.
+    setTargetRect(prev =>
+      prev && prev.top === next.top && prev.left === next.left &&
+      prev.width === next.width && prev.height === next.height
+        ? prev
+        : next
+    )
   }, [step])
 
+  // Per step: wait for the target to exist, scroll to it once, then track it
+  // until the smooth scroll settles.
+  useEffect(() => {
+    if (!isActive || !step) return
+    let cancelled = false
+    let raf = 0
+    const giveUpAt = performance.now() + 3000
+
+    const trackUntilSettled = () => {
+      const settleBy = performance.now() + 700
+      const tick = () => {
+        if (cancelled) return
+        measureTarget()
+        if (performance.now() < settleBy) raf = requestAnimationFrame(tick)
+      }
+      raf = requestAnimationFrame(tick)
+    }
+
+    const waitForTarget = () => {
+      if (cancelled) return
+      if (!step.target) { setTargetRect(null); return }
+      const el = document.querySelector(step.target) as HTMLElement | null
+      if (!el) {
+        // Target may belong to a lazily-mounted tab; keep looking briefly
+        // instead of giving up and centring the card on screen.
+        if (performance.now() < giveUpAt) { raf = requestAnimationFrame(waitForTarget); return }
+        setTargetRect(null)
+        return
+      }
+      el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
+      trackUntilSettled()
+    }
+
+    waitForTarget()
+    return () => { cancelled = true; cancelAnimationFrame(raf) }
+  }, [isActive, step, measureTarget])
+
+  // Keep the highlight glued to the target while the user scrolls or resizes.
   useEffect(() => {
     if (!isActive) return
-    updateHighlight()
-    const onScroll = () => updateHighlight()
-    window.addEventListener('resize', onScroll)
-    window.addEventListener('scroll', onScroll, true)
+    const onChange = () => measureTarget()
+    window.addEventListener('resize', onChange)
+    window.addEventListener('scroll', onChange, true)
     return () => {
-      window.removeEventListener('resize', onScroll)
-      window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', onChange)
+      window.removeEventListener('scroll', onChange, true)
     }
-  }, [isActive, updateHighlight])
+  }, [isActive, measureTarget])
 
   // Position card relative to target
   useEffect(() => {
@@ -130,12 +173,10 @@ export default function TutorialOverlay() {
     return () => window.removeEventListener('keydown', h)
   }, [isActive, isLast])
 
-  // Lock scroll
-  useEffect(() => {
-    if (isActive) document.body.style.overflow = 'hidden'
-    else document.body.style.overflow = ''
-    return () => { document.body.style.overflow = '' }
-  }, [isActive])
+  // NOTE: body scroll is deliberately NOT locked. Steps target elements further
+  // down the page, and locking overflow made scrollIntoView a no-op for them —
+  // the highlight then sat off-screen while the card was clamped to the edge.
+  // The scroll listener above keeps the highlight aligned instead.
 
   const handleNext = () => {
     completeStep(step.id)
@@ -174,8 +215,9 @@ export default function TutorialOverlay() {
         )}
       </AnimatePresence>
 
-      {/* Click backdrop to dismiss */}
-      <div onClick={skipTutorial} style={{ position:'fixed', inset:0, zIndex:10002, cursor:'pointer' }} />
+      {/* Click backdrop to dismiss — must sit BELOW the cutout (10002) so the
+          highlight ring is not overpainted by a transparent catcher. */}
+      <div onClick={skipTutorial} style={{ position:'fixed', inset:0, zIndex:10000, cursor:'pointer' }} />
 
       {/* Tooltip card */}
       <AnimatePresence mode="wait">

@@ -92,51 +92,42 @@ function LeaderboardContent() {
   const [selectedKeyword, setSelectedKeyword] = useState(initialKeywordId)
   const [selectedChannel, setSelectedChannel] = useState('')
   const { search, ownership, format, setSearch, setOwnership, setFormat } = useFilterStore()
-  const [keywords, setKeywords] = useState<any[]>([])
 
   // Tag editing state
   const [editingVideoId, setEditingVideoId] = useState<string | null>(null)
-  const [campaignBrands, setCampaignBrands] = useState<string[]>([])
   const [customTagInput, setCustomTagInput] = useState('')
   const [analyzingId, setAnalyzingId] = useState<string | null>(null)
   const [batchAnalyzing, setBatchAnalyzing] = useState(false)
   const [expandedKeywords, setExpandedKeywords] = useState<Set<string>>(new Set())
 
-  const fetchBrands = useCallback(async (campId: string) => {
-    try {
-      const res = await fetch(`/api/brands?campaign_id=${campId}`)
-      const d = await res.json()
-      if (d.data) {
-        setCampaignBrands(d.data.map((b: any) => b.brand_name ?? b.name))
-      }
-    } catch (e) {
-      console.error(e)
-    }
-  }, [])
-
-  const fetchKeywords = useCallback(async (campId: string) => {
-    try {
-      const res = await fetch(`/api/keywords?campaign_id=${campId}`)
-      const d = await res.json()
-      if (d.keywords) {
-        setKeywords(d.keywords)
-      }
-    } catch (e) {
-      console.error(e)
-    }
-  }, [])
-
   useEffect(() => {
     fetchCampaigns()
   }, [fetchCampaigns])
 
-  // Campaign-level data: only refetch when campaign changes
-  useEffect(() => {
-    if (activeCampaignId) {
-      fetchBrands(activeCampaignId)
-      fetchKeywords(activeCampaignId)
-    }
-  }, [activeCampaignId, fetchBrands, fetchKeywords])
+  // Campaign-level reference data for the filter dropdowns. Cached by React
+  // Query so navigating back to the leaderboard doesn't refetch both lists.
+  const brandsQuery = useQuery<string[]>({
+    queryKey: ['leaderboard-brands', activeCampaignId],
+    queryFn: async () => {
+      const res = await fetch(`/api/brands?campaign_id=${activeCampaignId}`)
+      const d = await res.json()
+      return (d.data ?? []).map((b: any) => b.brand_name ?? b.name)
+    },
+    enabled: !!activeCampaignId,
+  })
+
+  const keywordsQuery = useQuery<any[]>({
+    queryKey: ['leaderboard-keywords', activeCampaignId],
+    queryFn: async () => {
+      const res = await fetch(`/api/keywords?campaign_id=${activeCampaignId}`)
+      const d = await res.json()
+      return d.keywords ?? []
+    },
+    enabled: !!activeCampaignId,
+  })
+
+  const campaignBrands = brandsQuery.data ?? []
+  const keywords = keywordsQuery.data ?? []
 
   // Filter-dependent data: refetch when filters change
   const leaderboardQuery = useQuery<unknown, Error, { data: VideoRow[]; total: number; channels: string[] }>({

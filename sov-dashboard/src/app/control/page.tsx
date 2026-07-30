@@ -6,9 +6,11 @@ import {
   ChevronDown, ChevronUp, Search, Check, AlertTriangle,
   Zap, BarChart2, CheckCircle, XCircle, Loader2, X,
   Hash, Users as UsersIcon, Shield, ShieldCheck, ShieldAlert,
-  Eye, UserPlus, UserMinus, MoreVertical, ShoppingBag, Activity,
+  Eye, UserPlus, UserMinus, MoreVertical, ShoppingBag, Activity, Pencil,
 } from 'lucide-react'
 import { AMAZON_INDIA_CATEGORIES } from '@/lib/amazon-india'
+import { useCampaignStore } from '@/lib/store'
+import { normalizeKeyword, dedupeKeywords } from '@/lib/keyword-utils'
 
 interface Campaign {
   id: string; name: string; category: string; sub_category: string; description: string
@@ -82,15 +84,25 @@ function ScrapeStatusIcon({ status }: { status: string }) {
 export default function ControlPage() {
   const [tab, setTab] = useState<'campaigns' | 'members'>('campaigns')
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
-  const [activeCampaign, setActiveCampaign] = useState<string | null>(null)
-  const [keywords, setKeywords] = useState<Keyword[]>([])
-  const [brands, setBrands] = useState<any[]>([])
-  const [jobs, setJobs] = useState<ScrapeJob[]>([])
+  const { activeCampaignId, setActiveCampaignId } = useCampaignStore()
+  const activeCampaign = activeCampaignId || null
+  const setActiveCampaign = useCallback((id: string | null) => setActiveCampaignId(id ?? ''), [setActiveCampaignId])
+  // Detail is stored together with the campaign it belongs to, so the previous
+  // campaign's keywords are structurally impossible to render after a switch —
+  // no clearing effect, and a failed fetch can't leave stale rows on screen.
+  const [detail, setDetail] = useState<{ campaignId: string; keywords: Keyword[]; jobs: ScrapeJob[] }>(
+    { campaignId: '', keywords: [], jobs: [] }
+  )
+  const [detailLoading, setDetailLoading] = useState(false)
+  const isDetailCurrent = !!activeCampaign && detail.campaignId === activeCampaign
+  const keywords = isDetailCurrent ? detail.keywords : []
+  const jobs = isDetailCurrent ? detail.jobs : []
   const [loading, setLoading] = useState(false)
   const [scraping, setScraping] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' | 'info' | 'warning' } | null>(null)
   const [search, setSearch] = useState('')
   const pollRef = useRef<NodeJS.Timeout | null>(null)
+  const detailReqRef = useRef(0)
 
   const [selCategory, setSelCategory] = useState('')
   const [selSubCategory, setSelSubCategory] = useState('')
@@ -109,6 +121,8 @@ export default function ControlPage() {
   const [bulkKw, setBulkKw] = useState('')
   const [kwLang, setKwLang] = useState('en')
   const [kwType, setKwType] = useState<'generic' | 'branded' | 'comparison'>('generic')
+  const [editKw, setEditKw] = useState<Pick<Keyword, 'id' | 'text' | 'language' | 'category'> | null>(null)
+  const [savingEdit, setSavingEdit] = useState(false)
 
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
@@ -128,11 +142,20 @@ export default function ControlPage() {
   }, [showToast])
 
   const fetchCampaignDetail = useCallback(async (id: string) => {
+    const reqId = ++detailReqRef.current
+    setDetailLoading(true)
     try {
-      const [campaignRes, brandsRes] = await Promise.all([fetch(`/api/campaigns/${id}`), fetch(`/api/brands?campaign_id=${id}`)])
-      const [campaignData, brandsData] = await Promise.all([campaignRes.json(), brandsRes.json()])
-      setKeywords(campaignData.keywords ?? []); setJobs(campaignData.jobs ?? []); setBrands(brandsData.data ?? [])
-    } catch { showToast('Failed to load campaign data', 'error') }
+      const res = await fetch(`/api/campaigns/${id}`)
+      const data = await res.json()
+      if (reqId !== detailReqRef.current) return   // a newer campaign was selected
+      setDetail({ campaignId: id, keywords: data.keywords ?? [], jobs: data.jobs ?? [] })
+    } catch {
+      if (reqId !== detailReqRef.current) return
+      setDetail({ campaignId: id, keywords: [], jobs: [] })
+      showToast('Failed to load campaign data', 'error')
+    } finally {
+      if (reqId === detailReqRef.current) setDetailLoading(false)
+    }
   }, [showToast])
 
   const fetchMembers = useCallback(async (campaignId: string) => {
@@ -163,7 +186,18 @@ export default function ControlPage() {
   }
 
   useEffect(() => { fetchCampaigns() }, [fetchCampaigns])
-  useEffect(() => { if (activeCampaign) fetchCampaignDetail(activeCampaign) }, [activeCampaign, fetchCampaignDetail])
+
+  useEffect(() => {
+    if (activeCampaign) fetchCampaignDetail(activeCampaign)
+  }, [activeCampaign, fetchCampaignDetail])
+
+  useEffect(() => {
+    const onKeywordAdded = () => {
+      if (activeCampaign) { fetchCampaignDetail(activeCampaign); fetchCampaigns() }
+    }
+    window.addEventListener('keyword-added', onKeywordAdded)
+    return () => window.removeEventListener('keyword-added', onKeywordAdded)
+  }, [activeCampaign, fetchCampaignDetail, fetchCampaigns])
   useEffect(() => {
     const hasRunning = jobs.some(j => j.status === 'running' || j.status === 'pending')
     if (hasRunning && activeCampaign) {
@@ -205,18 +239,47 @@ export default function ControlPage() {
 
   const addKeywords = async () => {
     if (!bulkKw.trim() || !activeCampaign) return showToast('Enter at least one keyword', 'error')
-    const kwList = bulkKw.split('\n').map(l => l.trim()).filter(Boolean).map(text => ({ text, language: kwLang, type: kwType }))
+    const parsed = bulkKw.split('\n').map(l => l.trim()).filter(Boolean).map(text => ({ text, language: kwLang, type: kwType }))
+    const { unique, duplicates } = dedupeKeywords(parsed, keywords)
+
+    if (unique.length === 0) {
+      return showToast(`All ${duplicates.length} keyword(s) already exist in ${kwLang.toUpperCase()}`, 'warning')
+    }
+
     setLoading(true)
     try {
-      const r = await fetch('/api/keywords', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ campaign_id: activeCampaign, keywords: kwList }) })
+      const r = await fetch('/api/keywords', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ campaign_id: activeCampaign, keywords: unique }) })
       const d = await r.json()
       if (!r.ok) return showToast(d.error, 'error')
-      setBulkKw(''); setShowAddKw(false); await fetchCampaignDetail(activeCampaign); await fetchCampaigns(); showToast(`${d.added} keyword(s) added`)
+      setBulkKw(''); setShowAddKw(false); await fetchCampaignDetail(activeCampaign); await fetchCampaigns()
+      showToast(duplicates.length > 0 ? `${d.added} added, ${duplicates.length} duplicate(s) skipped` : `${d.added} keyword(s) added`)
     } finally { setLoading(false) }
   }
 
   const deleteKeyword = async (id: string) => {
     try { await fetch(`/api/keywords?id=${id}`, { method: 'DELETE' }); if (activeCampaign) await fetchCampaignDetail(activeCampaign); await fetchCampaigns(); showToast('Keyword removed') } catch { showToast('Failed', 'error') }
+  }
+
+  const saveEditKeyword = async () => {
+    if (!editKw) return
+    const text = editKw.text.trim()
+    if (!text) return showToast('Keyword cannot be empty', 'error')
+
+    const clash = keywords.find(k => k.id !== editKw.id && normalizeKeyword(k.text) === normalizeKeyword(text) && k.language === editKw.language)
+    if (clash) return showToast(`"${clash.text}" already exists in ${editKw.language.toUpperCase()}`, 'error')
+
+    setSavingEdit(true)
+    try {
+      const r = await fetch('/api/keywords', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editKw.id, text, language: editKw.language, category: editKw.category }),
+      })
+      const d = await r.json()
+      if (!r.ok) return showToast(d.error || 'Update failed', 'error')
+      setEditKw(null)
+      if (activeCampaign) await fetchCampaignDetail(activeCampaign)
+      showToast('Keyword updated')
+    } catch { showToast('Connection error', 'error') } finally { setSavingEdit(false) }
   }
 
   const toggleKeyword = async (id: string, current: string) => {
@@ -464,7 +527,11 @@ export default function ControlPage() {
 
                 {/* Keyword list - improved card-style rows */}
                 <div style={{ maxHeight: 480, overflowY: 'auto' }}>
-                  {filteredKw.length === 0 ? (
+                  {detailLoading && filteredKw.length === 0 ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 40, color: '#94A3B8', fontSize: 13 }}>
+                      <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Loading keywords…
+                    </div>
+                  ) : filteredKw.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: 40, color: '#CBD5E1', fontSize: 13 }}>
                       {search ? 'No matching keywords.' : 'No keywords yet. Add keywords above.'}
                     </div>
@@ -521,6 +588,11 @@ export default function ControlPage() {
                               }}
                               title={kw.status === 'active' ? 'Pause' : 'Activate'}>
                               {kw.status === 'active' ? <Pause size={10} /> : <Play size={10} />}
+                            </button>
+                            <button onClick={() => setEditKw({ id: kw.id, text: kw.text, language: kw.language, category: kw.category })}
+                              style={{ padding: '3px 5px', borderRadius: 4, border: 'none', cursor: 'pointer', background: 'rgba(245,130,32,0.08)', color: '#F58220', display: 'flex', alignItems: 'center' }}
+                              title="Edit keyword">
+                              <Pencil size={10} />
                             </button>
                             <button onClick={() => triggerScrape(kw.id)}
                               style={{ padding: '3px 5px', borderRadius: 4, border: 'none', cursor: 'pointer', background: 'rgba(26,115,232,0.06)', color: '#1A73E8', display: 'flex', alignItems: 'center' }}
@@ -683,6 +755,51 @@ export default function ControlPage() {
       )}
 
       {/* ════════════════════════ DELETE CONFIRMATION MODAL ════════════════════════ */}
+      {editKw && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}
+          onClick={e => { if (e.target === e.currentTarget) setEditKw(null) }}>
+          <div className="card" style={{ maxWidth: 460, width: '100%', padding: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(245,130,32,0.1)', color: '#F58220', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Pencil size={17} /></div>
+              <div>
+                <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0F172A', margin: 0 }}>Edit Keyword</h3>
+                <p style={{ fontSize: 12, color: '#64748B', margin: '2px 0 0' }}>Update the text, language or type</p>
+              </div>
+            </div>
+
+            <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 4 }}>Keyword</label>
+            <input className="input" value={editKw.text} autoFocus
+              onChange={e => setEditKw(p => p && { ...p, text: e.target.value })}
+              onKeyDown={e => { if (e.key === 'Enter') saveEditKeyword(); if (e.key === 'Escape') setEditKw(null) }}
+              style={{ marginBottom: 12, fontSize: 13 }} />
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 4 }}>Language</label>
+                <select className="input" value={editKw.language} onChange={e => setEditKw(p => p && { ...p, language: e.target.value })} style={{ height: 34, fontSize: 12, width: '100%' }}>
+                  <option value="en">English</option>
+                  <option value="hi">Hindi</option><option value="ta">Tamil</option><option value="te">Telugu</option>
+                  <option value="kn">Kannada</option><option value="ml">Malayalam</option><option value="bn">Bengali</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 4 }}>Type</label>
+                <select className="input" value={editKw.category} onChange={e => setEditKw(p => p && { ...p, category: e.target.value as Keyword['category'] })} style={{ height: 34, fontSize: 12, width: '100%' }}>
+                  <option value="generic">Generic</option><option value="branded">Branded</option><option value="comparison">Comparison</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-blue btn-sm" onClick={saveEditKeyword} disabled={savingEdit} style={{ flex: 1, height: 36 }}>
+                {savingEdit ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={12} />} Save Changes
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setEditKw(null)} style={{ height: 36 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {deleteTarget && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
           <div className="card" style={{ maxWidth: 420, width: '100%', padding: 24, position: 'relative' }}>

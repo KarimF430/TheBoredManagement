@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase, queryAll } from '@/lib/supabase'
 import { getCached, CACHE_TTL, cacheKey } from '@/lib/cache'
 import { authorizeCampaignAccess } from '@/lib/auth'
+import { parseLanguageParam } from '@/lib/keyword-utils'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
@@ -15,12 +16,13 @@ export async function GET(req: NextRequest) {
   try {
     const cid    = req.nextUrl.searchParams.get('campaign_id')
     const format = req.nextUrl.searchParams.get('format') // 'all' | 'long' | 'short'
+    const language = parseLanguageParam(req.nextUrl.searchParams.get('language'))
     if (!cid) return NextResponse.json({ error: 'campaign_id required' }, { status: 400 })
     const { authorized, error: authError } = await authorizeCampaignAccess(req, cid)
     if (!authorized) return authError!
 
-    const key = cacheKey.kpis(cid) + `:${format || 'all'}`
-    const data = await getCached(key, () => fetchKpis(cid, format), CACHE_TTL.overview_kpis)
+    const key = cacheKey.kpis(cid) + `:${format || 'all'}:${language || 'all'}`
+    const data = await getCached(key, () => fetchKpis(cid, format, language), CACHE_TTL.overview_kpis)
 
     return NextResponse.json(data, {
       headers: {
@@ -35,7 +37,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-async function fetchKpis(cid: string, format?: string | null) {
+async function fetchKpis(cid: string, format?: string | null, language?: string | null) {
   const today = new Date().toISOString().split('T')[0]
   const d1 = new Date(Date.now() - 86400000).toISOString().split('T')[0]
   const d7 = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]
@@ -54,6 +56,22 @@ async function fetchKpis(cid: string, format?: string | null) {
       } WHERE campaign_id = $1)`
     : ''
 
+  // Restrict to videos reached by keywords in the selected language. `language`
+  // is validated by parseLanguageParam before it gets here.
+  const langVideoIds = (col: string) => language
+    ? `AND ${col} IN (
+        SELECT kv.video_id FROM keyword_videos kv
+        JOIN keywords k ON k.id = kv.keyword_id
+        WHERE kv.campaign_id = $1 AND k.language = '${language}'
+        UNION
+        SELECT ks.video_id FROM keyword_shorts ks
+        JOIN keywords k ON k.id = ks.keyword_id
+        WHERE ks.campaign_id = $1 AND k.language = '${language}'
+      )`
+    : ''
+  const langCvFilter = langVideoIds('cv.video_id')
+  const langVsFilter = langVideoIds('vs.video_id')
+
   // All queries run in parallel — each is a COUNT or materialized view read.
   const [
     kwRes,        // keyword count
@@ -69,9 +87,13 @@ async function fetchKpis(cid: string, format?: string | null) {
     vs1dRes,      // yesterday's view snapshot total (format-filtered)
     vs7dRes,      // 7-day-ago view snapshot total (format-filtered)
   ] = await Promise.all([
-    supabase.from('keywords')
-      .select('id', { count: 'exact', head: true })
-      .eq('campaign_id', cid).eq('status', 'active'),
+    (() => {
+      let q = supabase.from('keywords')
+        .select('id', { count: 'exact', head: true })
+        .eq('campaign_id', cid).eq('status', 'active')
+      if (language) q = q.eq('language', language)
+      return q
+    })(),
 
     // Format-filtered video count
     format === 'long'
@@ -81,6 +103,7 @@ async function fetchKpis(cid: string, format?: string | null) {
           JOIN videos v ON v.id = cv.video_id
           WHERE cv.campaign_id = $1
             AND ((v.duration_sec IS NULL OR v.duration_sec > 60) OR cv.video_id IN (SELECT video_id FROM keyword_videos WHERE campaign_id = $1))
+            ${langCvFilter}
         `, [cid])
       : format === 'short'
       ? queryAll<{ cnt: number }>(`
@@ -89,6 +112,13 @@ async function fetchKpis(cid: string, format?: string | null) {
           JOIN videos v ON v.id = cv.video_id
           WHERE cv.campaign_id = $1
             AND ((v.duration_sec IS NOT NULL AND v.duration_sec <= 60) OR cv.video_id IN (SELECT video_id FROM keyword_shorts WHERE campaign_id = $1))
+            ${langCvFilter}
+        `, [cid])
+      : language
+      ? queryAll<{ cnt: number }>(`
+          SELECT COUNT(DISTINCT cv.video_id)::INT as cnt
+          FROM campaign_videos cv
+          WHERE cv.campaign_id = $1 ${langCvFilter}
         `, [cid])
       : supabase.from('campaign_videos')
           .select('video_id', { count: 'exact', head: true })
@@ -102,6 +132,7 @@ async function fetchKpis(cid: string, format?: string | null) {
           JOIN videos v ON v.id = cv.video_id
           WHERE cv.campaign_id = $1 AND cv.first_seen_at >= $2
             AND ((v.duration_sec IS NULL OR v.duration_sec > 60) OR cv.video_id IN (SELECT video_id FROM keyword_videos WHERE campaign_id = $1))
+            ${langCvFilter}
         `, [cid, new Date(Date.now() - 7 * 86400000).toISOString()])
       : format === 'short'
       ? queryAll<{ cnt: number }>(`
@@ -110,6 +141,13 @@ async function fetchKpis(cid: string, format?: string | null) {
           JOIN videos v ON v.id = cv.video_id
           WHERE cv.campaign_id = $1 AND cv.first_seen_at >= $2
             AND ((v.duration_sec IS NOT NULL AND v.duration_sec <= 60) OR cv.video_id IN (SELECT video_id FROM keyword_shorts WHERE campaign_id = $1))
+            ${langCvFilter}
+        `, [cid, new Date(Date.now() - 7 * 86400000).toISOString()])
+      : language
+      ? queryAll<{ cnt: number }>(`
+          SELECT COUNT(DISTINCT cv.video_id)::INT as cnt
+          FROM campaign_videos cv
+          WHERE cv.campaign_id = $1 AND cv.first_seen_at >= $2 ${langCvFilter}
         `, [cid, new Date(Date.now() - 7 * 86400000).toISOString()])
       : supabase.from('campaign_videos')
           .select('video_id', { count: 'exact', head: true })
@@ -154,18 +192,21 @@ async function fetchKpis(cid: string, format?: string | null) {
       FROM view_snapshots vs
       WHERE vs.campaign_id = $1 AND vs.snapshot_date = $2::date
       ${formatVideoIdsSubquery}
+      ${langVsFilter}
     `, [cid, today]),
     queryAll<{ total_views: number }>(`
       SELECT COALESCE(SUM(vs.view_count), 0)::BIGINT as total_views
       FROM view_snapshots vs
       WHERE vs.campaign_id = $1 AND vs.snapshot_date = $2::date
       ${formatVideoIdsSubquery}
+      ${langVsFilter}
     `, [cid, d1]),
     queryAll<{ total_views: number }>(`
       SELECT COALESCE(SUM(vs.view_count), 0)::BIGINT as total_views
       FROM view_snapshots vs
       WHERE vs.campaign_id = $1 AND vs.snapshot_date = $2::date
       ${formatVideoIdsSubquery}
+      ${langVsFilter}
     `, [cid, d7]),
   ])
 

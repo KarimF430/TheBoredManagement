@@ -132,24 +132,6 @@ function Bar100({ value, color }: { value: number; color: string }) {
   )
 }
 
-function Tip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null
-  return (
-    <div style={{ background: '#0F172A', borderRadius: 8, padding: '8px 12px', boxShadow: '0 4px 24px rgba(0,0,0,0.3)', minWidth: 130 }}>
-      {label && <p style={{ fontSize: 10, color: '#64748B', margin: '0 0 6px', fontWeight: 600 }}>{label}</p>}
-      {payload.map((p: any, i: number) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-          <div style={{ width: 6, height: 6, borderRadius: '50%', background: p.color || p.fill, flexShrink: 0 }} />
-          <span style={{ fontSize: 11, color: '#94A3B8', flex: 1 }}>{p.name}</span>
-          <span style={{ fontSize: 11.5, fontWeight: 700, color: '#FFF' }}>
-            {typeof p.value === 'number' ? (p.value > 9999 ? fmt(p.value) : p.value % 1 !== 0 ? p.value.toFixed(1) : p.value) : p.value}
-          </span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 function Rank({ n }: { n: number }) {
   const c = n <= 3 ? '#059669' : n <= 5 ? '#1A73E8' : n <= 10 ? '#7C3AED' : '#D97706'
   const bg = n <= 3 ? 'rgba(5,150,105,0.08)' : n <= 5 ? 'rgba(26,115,232,0.08)' : n <= 10 ? 'rgba(124,58,237,0.08)' : 'rgba(217,119,6,0.08)'
@@ -566,7 +548,7 @@ export default function OverviewTab() {
           const totalGain = data.length >= 2 ? data[data.length - 1].views - data[0].views : 0
           const avgGain = data.length >= 2 ? totalGain / (data.length - 1) : 0
 
-          const chartData = chartViewMode === 'daily_gain' && data.length >= 2
+          const chartData = chartViewMode === 'daily_gain'
             ? data.map((d: any, i: number) => ({ ...d, gain: i > 0 ? d.views - data[i - 1].views : 0 }))
             : data
 
@@ -579,6 +561,27 @@ export default function OverviewTab() {
           const range = maxVal - minVal || 1
           const yMin = Math.max(0, minVal - range * 0.15)
           const yMax = maxVal + range * 0.2
+
+          const renderTooltip = ({ active, payload, label }: any) => {
+            if (!active || !payload?.length) return null
+            const item = data.find((d: any) => d.date === label)
+            const idx = data.findIndex((d: any) => d.date === label)
+            const prevVal = idx > 0 ? data[idx - 1]?.views || 0 : 0
+            return (
+              <div style={{ background: '#0F172A', borderRadius: 10, padding: '12px 16px', boxShadow: '0 8px 32px rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.06)', minWidth: 180 }}>
+                <div style={{ fontSize: 11, color: '#64748B', fontWeight: 700, marginBottom: 8, borderBottom: '1px solid #334155', paddingBottom: 6 }}>{label}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}><span style={{ fontSize: 10, color: '#94A3B8' }}>Cumulative</span><span style={{ fontSize: 12, fontWeight: 700, color: '#FFF' }}>{fmt(item?.views || 0)}</span></div>
+                {idx > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 10, color: '#94A3B8' }}>Day gain</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: (item?.views || 0) - prevVal >= 0 ? '#34D399' : '#F87171' }}>
+                      {(item?.views || 0) - prevVal >= 0 ? '+' : ''}{fmt((item?.views || 0) - prevVal)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )
+          }
 
           return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -599,39 +602,19 @@ export default function OverviewTab() {
               </div>
               <div style={{ height: 200 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  {data.length >= 2 ? (
+                  {chartViewMode !== 'daily_gain' && data.length >= 2 ? (
                     <AreaChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                       <defs>
                         <linearGradient id="gv3" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={chartViewMode === 'daily_gain' ? '#8B5CF6' : '#10B981'} stopOpacity={0.18} />
-                          <stop offset="100%" stopColor={chartViewMode === 'daily_gain' ? '#8B5CF6' : '#10B981'} stopOpacity={0} />
+                          <stop offset="0%" stopColor="#10B981" stopOpacity={0.18} />
+                          <stop offset="100%" stopColor="#10B981" stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
                       <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                      <YAxis domain={chartViewMode === 'daily_gain' ? [gainMin - gainRange * 0.15, gainMax + gainRange * 0.2] : [yMin, yMax]} tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} tickFormatter={(v: any) => fmt(v)} />
-                      <RechartsTooltip content={({ active, payload, label }: any) => {
-                        if (!active || !payload?.length) return null
-                        const item = data.find((d: any) => d.date === label)
-                        const idx = data.findIndex((d: any) => d.date === label)
-                        const val = chartViewMode === 'daily_gain' ? (payload[0]?.payload?.gain || 0) : (payload[0]?.value || 0)
-                        const prevVal = idx > 0 ? data[idx - 1]?.views || 0 : 0
-                        return (
-                          <div style={{ background: '#0F172A', borderRadius: 10, padding: '12px 16px', boxShadow: '0 8px 32px rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.06)', minWidth: 180 }}>
-                            <div style={{ fontSize: 11, color: '#64748B', fontWeight: 700, marginBottom: 8, borderBottom: '1px solid #334155', paddingBottom: 6 }}>{label}</div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}><span style={{ fontSize: 10, color: '#94A3B8' }}>Cumulative</span><span style={{ fontSize: 12, fontWeight: 700, color: '#FFF' }}>{fmt(item?.views || 0)}</span></div>
-                            {idx > 0 && (
-                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ fontSize: 10, color: '#94A3B8' }}>Day gain</span>
-                                <span style={{ fontSize: 12, fontWeight: 700, color: (item?.views || 0) - prevVal >= 0 ? '#34D399' : '#F87171' }}>
-                                  {(item?.views || 0) - prevVal >= 0 ? '+' : ''}{fmt((item?.views || 0) - prevVal)}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        )
-                      }} />
-                      <Area type="monotone" dataKey={chartViewMode === 'daily_gain' ? 'gain' : 'views'} stroke={chartViewMode === 'daily_gain' ? '#8B5CF6' : '#10B981'} strokeWidth={2.5} fill="url(#gv3)" dot={{ r: 3.5, fill: chartViewMode === 'daily_gain' ? '#8B5CF6' : '#10B981', strokeWidth: 0 }} activeDot={{ r: 6, strokeWidth: 0, fill: chartViewMode === 'daily_gain' ? '#8B5CF6' : '#10B981' }} />
+                      <YAxis domain={[yMin, yMax]} tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} tickFormatter={(v: any) => fmt(v)} />
+                      <RechartsTooltip content={renderTooltip} />
+                      <Area type="monotone" dataKey="views" stroke="#10B981" strokeWidth={2.5} fill="url(#gv3)" dot={{ r: 3.5, fill: '#10B981', strokeWidth: 0 }} activeDot={{ r: 6, strokeWidth: 0, fill: '#10B981' }} />
                     </AreaChart>
                   ) : (
                     <BarChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }} barCategoryGap="25%">
@@ -644,7 +627,7 @@ export default function OverviewTab() {
                       <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
                       <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
                       <YAxis domain={chartViewMode === 'daily_gain' ? [gainMin - gainRange * 0.15, gainMax + gainRange * 0.2] : [yMin, yMax]} tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} tickFormatter={(v: any) => fmt(v)} />
-                      <RechartsTooltip content={<Tip />} />
+                      <RechartsTooltip content={renderTooltip} cursor={{ fill: 'rgba(139,92,246,0.06)' }} />
                       <Bar dataKey={chartViewMode === 'daily_gain' ? 'gain' : 'views'} radius={[5, 5, 0, 0]} fill="url(#barGrad)" />
                     </BarChart>
                   )}

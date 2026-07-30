@@ -134,14 +134,17 @@ const fadeUp = {
 
 export default function VideosTab() {
   const { activeCampaignId, campaigns } = useCampaignStore()
-  const { format: globalFormat, setFormat: setGlobalFormat } = useFilterStore()
+  // Format/ownership live in the shared store so the global SharedFilterBar and
+  // this tab's own controls stay in sync instead of silently diverging.
+  const {
+    format: formatTab, setFormat: setFormatTab,
+    ownership: ownershipFilter, setOwnership: setOwnershipFilter,
+  } = useFilterStore()
 
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 300)
   const [sort, setSort] = useState<'views' | 'rank' | 'date' | 'engagement'>('views')
-  const [formatTab, setFormatTab] = useState<'all' | 'long' | 'short'>('all')
-  const [ownershipFilter, setOwnershipFilter] = useState<'all' | 'ours' | 'theirs'>('all')
   const [showFilters, setShowFilters] = useState(false)
   const [expandedVideo, setExpandedVideo] = useState<string | null>(null)
 
@@ -159,7 +162,7 @@ export default function VideosTab() {
   const limit = 20
   const campaign = campaigns.find(c => c.id === activeCampaignId)
 
-  useEffect(() => { setPage(1) }, [debouncedSearch])
+  useEffect(() => { setPage(1) }, [debouncedSearch, formatTab, ownershipFilter])
 
   const analyticsQuery = useQuery({
     queryKey: ['videos-analytics', activeCampaignId, formatTab, ownershipFilter],

@@ -1,4 +1,29 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { hasDirectPg, pgQuery, reportPgConnectionFailure } from './pg'
+
+// Faults that mean "direct pg is unusable" rather than "this query is wrong".
+// These must fall back to the RPC path instead of surfacing, otherwise a
+// misconfigured DATABASE_URL takes the whole app down rather than just making
+// it slower. Genuine SQL errors (syntax, constraint, type) are NOT in here and
+// still propagate.
+const PG_UNUSABLE_ERRORS = new Set([
+  // socket / DNS level
+  'ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT', 'ECONNRESET', 'EHOSTUNREACH', 'EPIPE', 'EAI_AGAIN',
+  // Postgres auth & connection SQLSTATEs
+  '28P01', // invalid_password
+  '28000', // invalid_authorization_specification
+  '3D000', // invalid_catalog_name
+  '08001', // sqlclient_unable_to_establish_sqlconnection
+  '08006', // connection_failure
+  '53300', // too_many_connections
+  'XX000', // Supavisor: "Tenant or user not found"
+])
+
+function isConnectionError(e: any): boolean {
+  if (PG_UNUSABLE_ERRORS.has(e?.code)) return true
+  const m = String(e?.message ?? '')
+  return /timeout exceeded when trying to connect|tenant or user not found|password authentication failed|self.signed certificate/i.test(m)
+}
 
 let _supabase: SupabaseClient | null = null
 
@@ -65,6 +90,22 @@ function inlineParams(sql: string, params: any[]): string {
 }
 
 export async function queryAll<T = any>(sql: string, params: any[] = []): Promise<T[]> {
+  // Fast path: one pooled TCP connection instead of an HTTPS round-trip per
+  // statement. Params are passed through natively, so nothing is string-
+  // interpolated into SQL here (no injection surface, and Postgres can reuse
+  // query plans). JS arrays map to Postgres arrays for `= ANY($n)`.
+  if (hasDirectPg()) {
+    try {
+      return await pgQuery<T>(sql, params)
+    } catch (e: any) {
+      // Surface real SQL errors; only fall back when the pooler itself is
+      // unreachable, so a broken query doesn't silently take the slow path.
+      if (!isConnectionError(e)) throw new Error(`SQL error: ${e.message}`)
+      reportPgConnectionFailure()
+      console.warn('pg pool unreachable, falling back to exec_sql RPC:', e.message)
+    }
+  }
+
   const inlined = inlineParams(sql, params)
   const trimmed = inlined.trim().toUpperCase()
   const isQuery = trimmed.startsWith('SELECT')

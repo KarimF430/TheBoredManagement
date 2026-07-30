@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useCampaignStore } from '@/lib/store'
 import { CATEGORIES } from '@/lib/categories'
 import { Plus, Search, HelpCircle, Globe, Tag, X, Check, Loader2, Sparkles } from 'lucide-react'
 
 export default function Header() {
+  const router = useRouter()
   const { campaigns, activeCampaignId, setActiveCampaignId, fetchCampaigns } = useCampaignStore()
 
   // Modal States
@@ -64,9 +66,10 @@ export default function Header() {
       setProjectDesc('')
       setShowProjModal(false)
       
-      await fetchCampaigns()
+      await fetchCampaigns(true)
       if (d.campaign?.id) {
         setActiveCampaignId(d.campaign.id)
+        router.push('/control')
       }
     } catch {
       showToast('Connection error', 'error')
@@ -100,12 +103,16 @@ export default function Header() {
       const d = await r.json()
       if (!r.ok) return showToast(d.error || 'Failed to add keywords', 'error')
 
-      showToast(`Added ${d.added} keyword(s) successfully!`)
+      showToast(
+        d.skipped > 0
+          ? `Added ${d.added} keyword(s), skipped ${d.skipped} duplicate(s)`
+          : `Added ${d.added} keyword(s) successfully!`
+      )
       setKeywordText('')
       setShowKwModal(false)
-      
-      // Refresh current page if needed
-      window.dispatchEvent(new CustomEvent('keyword-added'))
+
+      window.dispatchEvent(new CustomEvent('keyword-added', { detail: { campaignId: activeCampaignId } }))
+      router.push('/control')
     } catch {
       showToast('Connection error', 'error')
     } finally {

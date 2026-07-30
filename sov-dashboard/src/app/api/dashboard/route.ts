@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase, queryAll } from '@/lib/supabase'
 import { getCached, CACHE_TTL } from '@/lib/cache'
 import { authorizeCampaignAccess } from '@/lib/auth'
+import { parseLanguageParam } from '@/lib/keyword-utils'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60  // CRITICAL: prevents Vercel's 10s default timeout
@@ -17,7 +18,7 @@ export async function GET(req: NextRequest) {
     const cid    = req.nextUrl.searchParams.get('campaign_id')
     const isOurs = req.nextUrl.searchParams.get('is_ours')
     const format = req.nextUrl.searchParams.get('format') // 'all' | 'long' | 'short'
-    const language = req.nextUrl.searchParams.get('language') // language code or 'all'
+    const language = parseLanguageParam(req.nextUrl.searchParams.get('language'))
 
     const { authorized, error } = await authorizeCampaignAccess(req, cid)
     if (!authorized) return error

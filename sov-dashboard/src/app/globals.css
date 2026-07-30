@@ -71,10 +71,17 @@
   --border-radius-xs: 5px;
 }
 
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+/* Kept inside @layer base on purpose. Unlayered rules outcrank every layered
+   rule in the cascade, so an unlayered `* { margin:0; padding:0 }` silently
+   defeats all Tailwind spacing utilities (p-*, m-*, space-y-*). Layering it
+   lets utilities win while inline styles — which the rest of this app relies
+   on — still beat both. */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 }
 
 html {

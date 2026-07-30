@@ -130,6 +130,7 @@ export default function OverviewPage() {
   const [showDemo, setShowDemo] = useState(false)
   const [drawerType, setDrawerType] = useState<'views_detail' | 'brand_sov_detail' | 'creator_detail' | 'rank_detail' | null>(null)
   const [isRefreshingViews, setIsRefreshingViews] = useState(false)
+  const [viewsRefreshMsg, setViewsRefreshMsg] = useState<{ text: string; type: 'ok' | 'warn' | 'error' } | null>(null)
 
   const campaign = campaigns.find(c => c.id === activeCampaignId)
   const isOursParam = ownership && ownership !== 'all' ? `&is_ours=${ownership}` : ''
@@ -142,7 +143,7 @@ export default function OverviewPage() {
     queryKey: ['dashboard', activeCampaignId, format, ownership, dateRange, customDateFrom, customDateTo, language],
     queryFn: async () => {
       const [kpisRes, fullRes] = await Promise.all([
-        fetch(`/api/dashboard/kpis?campaign_id=${activeCampaignId}${formatParam}${timeRangeParam}${customDateParam}`),
+        fetch(`/api/dashboard/kpis?campaign_id=${activeCampaignId}${formatParam}${timeRangeParam}${customDateParam}${languageParam}`),
         fetch(`/api/dashboard?campaign_id=${activeCampaignId}${formatParam}${isOursParam}${timeRangeParam}${customDateParam}${languageParam}`),
       ])
       const kpis = kpisRes.ok ? await kpisRes.json() : null
@@ -155,17 +156,28 @@ export default function OverviewPage() {
   const handleViewsUpdate = async () => {
     if (!activeCampaignId || isRefreshingViews) return
     setIsRefreshingViews(true)
+    setViewsRefreshMsg(null)
     try {
-      await fetch('/api/views/refresh', {
+      const r = await fetch('/api/views/refresh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ campaign_id: activeCampaignId }),
       })
+      const d = await r.json()
+      if (!r.ok) {
+        setViewsRefreshMsg({ text: d.error || 'Views refresh failed', type: 'error' })
+      } else if (d.partial) {
+        setViewsRefreshMsg({ text: `Refreshed ${d.updated} of ${d.total} videos — ${d.remaining} left, run again to continue`, type: 'warn' })
+      } else {
+        setViewsRefreshMsg({ text: `Refreshed ${d.updated} video${d.updated === 1 ? '' : 's'} from YouTube`, type: 'ok' })
+      }
       await dashboardQuery.refetch()
     } catch (e) {
       console.error(e)
+      setViewsRefreshMsg({ text: 'Connection error during views refresh', type: 'error' })
     } finally {
       setIsRefreshingViews(false)
+      setTimeout(() => setViewsRefreshMsg(null), 6000)
     }
   }
 
@@ -332,6 +344,17 @@ export default function OverviewPage() {
           />
         </div>
       </div>
+
+      {viewsRefreshMsg && (
+        <div role="status" style={{
+          marginBottom: 16, padding: '9px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+          background: viewsRefreshMsg.type === 'error' ? 'rgba(255,45,85,0.06)' : viewsRefreshMsg.type === 'warn' ? 'rgba(217,119,6,0.07)' : 'rgba(0,200,83,0.07)',
+          color: viewsRefreshMsg.type === 'error' ? '#DC2626' : viewsRefreshMsg.type === 'warn' ? '#B45309' : '#047857',
+          border: `1px solid ${viewsRefreshMsg.type === 'error' ? 'rgba(255,45,85,0.18)' : viewsRefreshMsg.type === 'warn' ? 'rgba(217,119,6,0.2)' : 'rgba(0,200,83,0.2)'}`,
+        }}>
+          {viewsRefreshMsg.text}
+        </div>
+      )}
 
       {/* ── TABS ── */}
       <div style={{ display: 'flex', borderBottom: '1px solid #E2E8F0', marginBottom: 24, overflowX: 'auto' }}>

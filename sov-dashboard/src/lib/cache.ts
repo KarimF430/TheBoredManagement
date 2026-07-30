@@ -40,9 +40,17 @@ try {
   const url = process.env.UPSTASH_REDIS_REST_URL
   if (url && url.startsWith('https://')) {
     redisInstance = Redis.fromEnv()
+  } else if (process.env.NODE_ENV === 'production') {
+    // Without L2, the only cache is per-instance memory, which is cold on most
+    // serverless invocations — every request recomputes. That is a severe,
+    // invisible performance cliff, so say so loudly rather than degrade quietly.
+    console.error(
+      '[cache] UPSTASH_REDIS_REST_URL missing or invalid — L2 cache DISABLED. ' +
+      'Cached API routes will recompute on nearly every request. See GET /api/health.'
+    )
   }
 } catch (e) {
-  console.warn('Upstash Redis initialization warning (expected during build/CI):', e)
+  console.error('[cache] Upstash Redis initialization failed — L2 cache DISABLED:', e)
 }
 
 export const redis = redisInstance

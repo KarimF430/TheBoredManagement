@@ -23,7 +23,7 @@ interface CampaignStore {
   activeCampaignId: string
   _campaignsFetched: boolean
   setActiveCampaignId: (id: string) => void
-  fetchCampaigns: () => Promise<void>
+  fetchCampaigns: (force?: boolean) => Promise<void>
 
   // Workspace / Access Control
   userProjects: ProjectWithRole[]
@@ -43,9 +43,9 @@ export const useCampaignStore = create<CampaignStore>()(
         if (prev !== id) set({ activeCampaignId: id })
       },
 
-      fetchCampaigns: async () => {
+      fetchCampaigns: async (force = false) => {
         const state = get()
-        if (state._campaignsFetched && state.campaigns.length > 0) return
+        if (!force && state._campaignsFetched && state.campaigns.length > 0) return
 
         try {
           const r = await fetch('/api/campaigns')
