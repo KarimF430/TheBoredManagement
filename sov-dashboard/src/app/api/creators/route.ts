@@ -187,8 +187,12 @@ export async function GET(request: Request) {
         brandsList,
         dailyGrowth: avgDailyGrowth,
         dailyGrowthPct: c.views > 0 ? Number(((avgDailyGrowth / c.views) * 100).toFixed(4)) : 0,
-        kws: Array.from(c.kws),
-        creatorVideos: c.videos.sort((a: any, b: any) => b.view_count - a.view_count)
+        // `kws` and `creatorVideos` are deliberately NOT returned here. They
+        // averaged ~10KB per creator (6.6KB of videos + 4.1KB of keywords) and
+        // pushed this response to 606KB for 530 creators, yet nothing renders
+        // them from the list: expanding a row calls /api/creators/[id] and
+        // reads creatorDetail.keywordRankings instead. Dropping them cuts the
+        // payload by roughly 10x with no UI change.
       }
     }).sort((a, b) => sortBy === 'keywords' ? b.kwCount - a.kwCount : b.views - a.views)
 
