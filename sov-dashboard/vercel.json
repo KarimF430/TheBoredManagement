@@ -1,5 +1,4 @@
 {
-  "//": "Functions MUST run next to the database. Supabase is in ap-southeast-1 (Singapore), so sin1 keeps DB round-trips at ~1-2ms. Vercel's default (iad1, Washington DC) puts every query on a trans-Pacific hop, and routes like /api/dashboard issue 21 of them.",
   "regions": ["sin1"],
   "crons": [
     {
