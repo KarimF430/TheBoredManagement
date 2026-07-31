@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabase, queryAll } from '@/lib/supabase'
 
 export const runtime = 'nodejs'
 
@@ -13,15 +13,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch last 2 snapshots for each video in the campaign
-    const { data: snapshots, error } = await supabase
-      .from('view_snapshots')
-      .select('video_id, view_count, snapshot_date')
-      .eq('campaign_id', campaign_id)
-      .in('video_id', video_ids)
-      .order('snapshot_date', { ascending: false })
-      .limit(video_ids.length * 2)
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    // ANY($2) instead of .in() — the caller passes a full page of video ids,
+    // which overflows the PostgREST URL once it exceeds ~300 entries.
+    const snapshots = await queryAll<any>(
+      `SELECT video_id, view_count, snapshot_date::text AS snapshot_date
+       FROM view_snapshots
+       WHERE campaign_id = $1 AND video_id = ANY($2)
+       ORDER BY snapshot_date DESC
+       LIMIT $3`,
+      [campaign_id, video_ids, video_ids.length * 2]
+    )
 
     // Group by video_id, take top 2 per video
     const byVideo: Record<string, { view_count: number; snapshot_date: string }[]> = {}

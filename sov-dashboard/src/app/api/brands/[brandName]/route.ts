@@ -19,7 +19,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ bran
     let allVids: any[] = []
 
     if (brandVideoIds.length > 0) {
-      const BATCH = 500
+      const BATCH = 200
       for (let i = 0; i < brandVideoIds.length; i += BATCH) {
         const batch = brandVideoIds.slice(i, i + BATCH)
         const { data } = await supabase.from('videos').select('id, youtube_id, view_count, title, channel_name, published_at').in('id', batch)
@@ -76,7 +76,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ bran
       const kvRes2 = await supabase.from('keyword_videos').select('keyword_id').in('video_id', brandVideoIds.slice(0, 200))
       const kwIds2 = [...new Set((kvRes2.data || []).map((k: any) => k.keyword_id))]
       if (kwIds2.length > 0) {
-        const BATCH = 500
+        const BATCH = 200
         const allKw: any[] = []
         for (let i = 0; i < kwIds2.length; i += BATCH) {
           const { data } = await supabase.from('keywords').select('language').in('id', kwIds2.slice(i, i + BATCH))

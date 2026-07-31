@@ -38,7 +38,7 @@ async function fetchCampaignVideos(campaignId: string, page: number, limit: numb
   for (const r of cvRows) firstSeenMap.set(r.video_id, r.first_seen_at)
 
   // Parallel batch fetch videos
-  const BATCH = 500
+  const BATCH = 200
   const videoBatchPromises = []
   for (let i = 0; i < videoIds.length; i += BATCH) {
     let vidQuery = supabase.from('videos').select('id, youtube_id, title, channel_name, channel_id, tags, view_count, duration, duration_sec, thumbnail_url, published_at, is_deleted')

@@ -1,4 +1,25 @@
-import { Pool, type PoolConfig } from 'pg'
+import { Pool, types as pgTypes, type PoolConfig } from 'pg'
+
+/**
+ * Return BIGINT/NUMERIC as JS numbers, matching what the exec_sql RPC path
+ * produced.
+ *
+ * node-postgres defaults these to *strings* (int8 can exceed Number.MAX_SAFE_
+ * INTEGER, so it refuses to guess). The RPC path went through JSON, where they
+ * arrived as numbers. Callers all over the app do `sum + row.total_views`, so
+ * strings turn addition into concatenation — "147..." + "147..." produced view
+ * counts like 9.16e+124 on the Creators page.
+ *
+ * Safe here: the values are view counts and row counts (~1e10 at most), far
+ * below the 2^53 precision limit. Anything that could genuinely exceed that
+ * would have been broken on the JSON path too.
+ */
+const OID_INT8 = 20
+const OID_NUMERIC = 1700
+
+const toNumber = (v: string | null) => (v === null ? null : Number(v))
+pgTypes.setTypeParser(OID_INT8, toNumber)
+pgTypes.setTypeParser(OID_NUMERIC, toNumber)
 
 /**
  * Direct pooled Postgres access.

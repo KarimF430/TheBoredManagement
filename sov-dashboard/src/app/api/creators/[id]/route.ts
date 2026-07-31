@@ -50,11 +50,12 @@ export async function GET(
       WHERE ks.campaign_id = $1 AND ks.video_id = ANY($2)
     `, [campaignId, videoIds])
 
-    const { data: btRows } = await supabase
-      .from('brand_tags')
-      .select('video_id, brand_name')
-      .eq('campaign_id', campaignId)
-      .in('video_id', videoIds)
+    // ANY($2) instead of .in() — see creators/route.ts; .in() serialises ids
+    // into the URL and fails past ~300 of them.
+    const btRows = await queryAll<any>(
+      `SELECT video_id, brand_name FROM brand_tags WHERE campaign_id = $1 AND video_id = ANY($2)`,
+      [campaignId, videoIds]
+    )
 
     const videoMap = new Map<string, any>()
     videosRows.forEach((v: any) => {

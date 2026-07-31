@@ -335,7 +335,12 @@ export default function OverviewPage() {
             <span>Weekly run: Monday 11 PM</span>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        {/* minWidth:0 lets this shrink inside the flex row and lets the bar's own
+            overflowX take over. Without it the bar's intrinsic width grows when
+            the "N active" / "Reset Filters" chips appear, the header wraps, and
+            the whole page below jumps down — the filter UI appearing to "go
+            down" the moment you select anything. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap', minWidth: 0, flexShrink: 1 }}>
           <SharedFilterBar
             showViewsUpdate
             onViewsUpdate={handleViewsUpdate}

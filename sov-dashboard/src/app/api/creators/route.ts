@@ -52,12 +52,15 @@ export async function GET(request: Request) {
       WHERE ks.campaign_id = $1 AND ks.video_id = ANY($2)
     `, [campaign_id, videoIds])
 
-    // 3. Fetch brand tags
-    const { data: btRows } = await supabase
-      .from('brand_tags')
-      .select('video_id, brand_name')
-      .eq('campaign_id', campaign_id)
-      .in('video_id', videoIds)
+    // 3. Fetch brand tags.
+    // Uses `= ANY($2)` rather than PostgREST's .in(), which serialises every id
+    // into the URL. Past roughly 300 UUIDs the request exceeds the max URI
+    // length and fails outright, which silently zeroed the BRANDS count for
+    // every creator on campaigns with more than a few hundred videos.
+    const btRows = await queryAll<any>(
+      `SELECT video_id, brand_name FROM brand_tags WHERE campaign_id = $1 AND video_id = ANY($2)`,
+      [campaign_id, videoIds]
+    )
 
     // Map keywords & brands to videos
     const videoMap = new Map<string, any>()

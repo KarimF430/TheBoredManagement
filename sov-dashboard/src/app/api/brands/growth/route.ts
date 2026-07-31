@@ -87,7 +87,7 @@ async function fetchGrowth(
   const allVids = [...new Set((brandTags || []).map((bt: any) => bt.video_id))]
 
   // Parallel: fetch video views + snapshot data
-  const BATCH = 500
+  const BATCH = 200
   const videoBatchPromises = []
   for (let i = 0; i < allVids.length; i += BATCH) {
     videoBatchPromises.push(

@@ -67,7 +67,7 @@ async function fetchBrands(campaignId: string, isOurs?: string | null, format?: 
   const allVideoIds = [...new Set(btRows.map((bt: any) => bt.video_id))]
   const videoViews = new Map<string, number>()
   const videoIsOurs = new Map<string, boolean>()
-  const BATCH = 500
+  const BATCH = 200
   const videoBatchPromises = []
   for (let i = 0; i < allVideoIds.length; i += BATCH) {
     videoBatchPromises.push(

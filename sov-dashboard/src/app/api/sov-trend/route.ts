@@ -77,7 +77,7 @@ async function fetchSovTrend(
   // Fetch is_ours for filtering
   let filteredVideoIds = allVideoIds
   if (isOurs && allVideoIds.length > 0) {
-    const BATCH = 500
+    const BATCH = 200
     const vidBatchPromises = []
     for (let i = 0; i < allVideoIds.length; i += BATCH) {
       vidBatchPromises.push(

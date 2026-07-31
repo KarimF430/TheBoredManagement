@@ -68,7 +68,7 @@ async function fetchOverview(cid: string) {
     const untaggedVideos = allCvVideoIds.filter(id => !taggedIds.has(id)).length
 
     let videoRows: any[] = []
-    const BATCH = 500
+    const BATCH = 200
     const videoBatchPromises = []
     for (let i = 0; i < allCvVideoIds.length; i += BATCH) {
       videoBatchPromises.push(

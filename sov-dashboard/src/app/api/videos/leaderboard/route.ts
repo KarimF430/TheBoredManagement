@@ -82,20 +82,23 @@ async function fetchLeaderboard(campaignId: string, filters: { brandName: string
   const keywordIdSet = new Set(rankedVideos.map(r => r.keyword_id))
   const keywordIds = Array.from(keywordIdSet)
 
-  // Batch video fetch if too many IDs (Supabase .in() has limits)
-  const BATCH_SIZE = 500
-  const allVideos: any[] = []
-  for (let i = 0; i < videoIds.length; i += BATCH_SIZE) {
-    const batch = videoIds.slice(i, i + BATCH_SIZE)
-    const { data } = await supabase.from('videos')
-      .select('id, youtube_id, title, channel_name, channel_id, tags, view_count, duration, duration_sec, thumbnail_url, published_at, is_ours')
-      .in('id', batch)
-    if (data) allVideos.push(...data)
-  }
-
-  const [{ data: keywordRows }, { data: brandRows }] = await Promise.all([
-    supabase.from('keywords').select('id, text').in('id', keywordIds),
-    supabase.from('brand_tags').select('video_id, brand_name').in('video_id', videoIds).eq('campaign_id', campaignId),
+  // These use `= ANY($1)` rather than PostgREST's .in(), which serialises every
+  // id into the URL query string. At ~37 chars per UUID a few hundred ids blow
+  // past the max URI length and the request fails outright ("TypeError: fetch
+  // failed"), silently yielding an empty leaderboard. A bound array parameter
+  // has no such limit and needs no batching.
+  const [allVideos, keywordRows, brandRows] = await Promise.all([
+    queryAll<any>(
+      `SELECT id, youtube_id, title, channel_name, channel_id, tags, view_count,
+              duration, duration_sec, thumbnail_url, published_at, is_ours
+       FROM videos WHERE id = ANY($1)`,
+      [videoIds]
+    ),
+    queryAll<any>(`SELECT id, text FROM keywords WHERE id = ANY($1)`, [keywordIds]),
+    queryAll<any>(
+      `SELECT video_id, brand_name FROM brand_tags WHERE video_id = ANY($1) AND campaign_id = $2`,
+      [videoIds, campaignId]
+    ),
   ])
 
   const keywordTextMap = new Map((keywordRows || []).map((k: any) => [k.id, k.text]))

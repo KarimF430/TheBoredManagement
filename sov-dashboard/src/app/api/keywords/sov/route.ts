@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabase, queryAll } from '@/lib/supabase'
 import { getCached, cacheKey, CACHE_TTL } from '@/lib/cache'
 
 export const runtime = 'nodejs'
@@ -54,17 +54,23 @@ async function fetchKeywordSov(
 
   const kwIds = keywords.map((k: any) => k.id)
 
+  // ANY($1) instead of .in(): a campaign with a few hundred keywords pushes the
+  // PostgREST URL past its length limit and the whole request fails, which
+  // rendered the keyword SOV table empty rather than merely incomplete.
   const [kvRes, ksRes] = await Promise.all([
     format === 'short'
-      ? Promise.resolve({ data: [] })
-      : supabase.from('keyword_videos').select('keyword_id, video_id').in('keyword_id', kwIds).eq('campaign_id', campaignId),
+      ? Promise.resolve({ data: [] as any[] })
+      : queryAll<any>(
+          `SELECT keyword_id, video_id FROM keyword_videos WHERE keyword_id = ANY($1) AND campaign_id = $2`,
+          [kwIds, campaignId]
+        ).then(data => ({ data })),
     format === 'long'
-      ? Promise.resolve({ data: [] })
-      : supabase.from('keyword_shorts').select('keyword_id, video_id').in('keyword_id', kwIds).eq('campaign_id', campaignId),
+      ? Promise.resolve({ data: [] as any[] })
+      : queryAll<any>(
+          `SELECT keyword_id, video_id FROM keyword_shorts WHERE keyword_id = ANY($1) AND campaign_id = $2`,
+          [kwIds, campaignId]
+        ).then(data => ({ data })),
   ])
-
-  if ((kvRes as any).error) console.error('keyword_videos fetch error:', (kvRes as any).error.message)
-  if ((ksRes as any).error) console.error('keyword_shorts fetch error:', (ksRes as any).error.message)
 
   const kwVideoMap = new Map<string, Set<string>>()
   for (const kv of kvRes.data || []) {
@@ -78,7 +84,7 @@ async function fetchKeywordSov(
 
   const allVideoIds = [...new Set([...(kvRes.data || []).map((r: any) => r.video_id), ...(ksRes.data || []).map((r: any) => r.video_id)])]
 
-  const BATCH = 500
+  const BATCH = 200
   const videoBatchPromises = []
   for (let i = 0; i < allVideoIds.length; i += BATCH) {
     videoBatchPromises.push(

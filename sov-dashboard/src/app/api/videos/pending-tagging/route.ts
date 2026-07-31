@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabase, queryAll } from '@/lib/supabase'
 import { getCached, cacheKey, CACHE_TTL } from '@/lib/cache'
 import { authorizeCampaignAccess } from '@/lib/auth'
 
@@ -61,7 +61,7 @@ async function fetchPendingTagging(campaignId: string, page: number, limit: numb
   const videoIds = [...videoKeywordMap.keys()]
 
   // Parallel: fetch videos + brand_tags + keywords
-  const BATCH = 500
+  const BATCH = 200
   const videoBatchPromises = []
   for (let i = 0; i < videoIds.length; i += BATCH) {
     videoBatchPromises.push(
@@ -77,9 +77,13 @@ async function fetchPendingTagging(campaignId: string, page: number, limit: numb
     )
   }
 
-  const [videoBatchResults, { data: btRows }, kwBatchResults] = await Promise.all([
+  // ANY($1) instead of .in() — unbatched id lists overflow the PostgREST URL.
+  const [videoBatchResults, btRows, kwBatchResults] = await Promise.all([
     Promise.all(videoBatchPromises),
-    supabase.from('brand_tags').select('video_id, brand_name').in('video_id', videoIds).eq('campaign_id', campaignId),
+    queryAll<any>(
+      `SELECT video_id, brand_name FROM brand_tags WHERE video_id = ANY($1) AND campaign_id = $2`,
+      [videoIds, campaignId]
+    ),
     Promise.all(kwBatchPromises),
   ])
 
