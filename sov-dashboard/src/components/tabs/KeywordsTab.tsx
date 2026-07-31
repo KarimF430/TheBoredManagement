@@ -135,6 +135,8 @@ export default function KeywordsTab() {
   const [kwLang, setKwLang] = useState('en')
   const [kwType, setKwType] = useState<'generic' | 'branded' | 'comparison'>('generic')
   const [adding, setAdding] = useState(false)
+  const [addError, setAddError] = useState<string | null>(null)
+  const [fetchProgress, setFetchProgress] = useState<{ done: number; total: number; current: string } | null>(null)
   const { search } = useFilterStore()
   const [filterType, setFilterType] = useState<string>('all')
   const [filterLang, setFilterLang] = useState<string>('all')
@@ -160,14 +162,62 @@ export default function KeywordsTab() {
   const keywords = keywordsQuery.data ?? []
   const loading = keywordsQuery.isLoading
 
+  /**
+   * Add keywords and immediately fetch their first ranking.
+   *
+   * The keywords appear as soon as they are saved; the fetch then runs one
+   * keyword at a time (each costs YouTube quota and takes a few seconds) and
+   * the table refreshes after each one so results stream in.
+   */
   const addKeywords = async () => {
     if (!activeCampaignId || !bulkKw.trim()) return
     setAdding(true)
+    setAddError(null)
+    setFetchProgress(null)
     try {
       const items = bulkKw.split('\n').map(l => l.trim()).filter(Boolean).map(text => ({ text, language: kwLang, type: kwType }))
-      await fetch('/api/keywords', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ campaign_id: activeCampaignId, keywords: items }) })
-      setBulkKw(''); setShowAdd(false); keywordsQuery.refetch()
-    } catch { } finally { setAdding(false) }
+      const res = await fetch('/api/keywords', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaign_id: activeCampaignId, keywords: items }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || `Failed to add keywords (${res.status})`)
+
+      setBulkKw(''); setShowAdd(false)
+      await keywordsQuery.refetch()
+
+      const pending: Array<{ id: string; text: string }> = data?.pending_scrape ?? []
+      if (pending.length === 0) return
+
+      const failed: string[] = []
+      for (let i = 0; i < pending.length; i++) {
+        setFetchProgress({ done: i, total: pending.length, current: pending[i].text })
+        try {
+          const scrapeRes = await fetch('/api/scrape', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ campaign_id: activeCampaignId, keyword_id: pending[i].id, limit: 1 }),
+          })
+          if (!scrapeRes.ok) {
+            const err = await scrapeRes.json().catch(() => ({}))
+            failed.push(`${pending[i].text}: ${err?.error || scrapeRes.status}`)
+          }
+        } catch (e: any) {
+          failed.push(`${pending[i].text}: ${e?.message || 'request failed'}`)
+        }
+        await keywordsQuery.refetch()
+      }
+
+      if (failed.length > 0) {
+        setAddError(`Fetch failed for ${failed.length} keyword(s): ${failed.slice(0, 3).join('; ')}`)
+      }
+    } catch (e: any) {
+      setAddError(e?.message || 'Failed to add keywords')
+    } finally {
+      setAdding(false)
+      setFetchProgress(null)
+    }
   }
 
   const toggleStatus = async (id: string, currentStatus: string) => {
@@ -409,6 +459,22 @@ export default function KeywordsTab() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {(fetchProgress || addError) && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {fetchProgress && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 600, color: '#1A73E8', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 8, padding: '7px 12px' }}>
+              <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+              Fetching rankings {fetchProgress.done + 1}/{fetchProgress.total} — &ldquo;{fetchProgress.current}&rdquo;
+            </div>
+          )}
+          {addError && (
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#B91C1C', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '7px 12px' }}>
+              {addError}
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 12 }}>
         {[

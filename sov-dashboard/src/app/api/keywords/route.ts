@@ -117,6 +117,11 @@ export async function POST(req: NextRequest) {
     const { unique, duplicates } = dedupeKeywords(incoming, existing ?? [])
 
     let added = 0
+    // Ids of keywords that still need their first fetch — the client kicks off
+    // /api/scrape for these so a new keyword lands with its ranking.
+    const pendingScrape: Array<{ id: string; text: string }> = []
+    const failures: Array<{ text: string; error: string }> = []
+
     for (const kw of unique) {
       const { data, error } = await supabase
         .from('keywords')
@@ -126,12 +131,24 @@ export async function POST(req: NextRequest) {
         )
         .select('id')
         .maybeSingle()
-      if (data && !error) added++
+
+      if (error) {
+        console.error(`Failed to add keyword "${kw.text}":`, error.message)
+        failures.push({ text: kw.text, error: error.message })
+        continue
+      }
+      if (data) {
+        added++
+        pendingScrape.push({ id: data.id, text: kw.text })
+      }
     }
 
     if (added > 0) await invalidateCampaign(campaignId)
 
-    return NextResponse.json({ added, skipped: duplicates.length, duplicates }, { status: 201 })
+    return NextResponse.json(
+      { added, skipped: duplicates.length, duplicates, pending_scrape: pendingScrape, failures },
+      { status: 201 }
+    )
   } catch (e: any) {
     console.error('Keywords POST error:', e)
     return NextResponse.json({ error: e.message }, { status: 500 })

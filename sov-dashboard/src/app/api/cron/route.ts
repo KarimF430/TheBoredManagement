@@ -3,9 +3,13 @@ import { supabase } from '@/lib/supabase'
 import { refreshMaterializedViews, setSystemMetadata, getSystemMetadata } from '@/lib/migrations'
 import { getViewCountsOAuth } from '@/lib/youtube-oauth'
 import { verifyToken } from '@/lib/auth'
+import { invalidateL1 } from '@/lib/cache'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
+
+/** Leave room to finish DB writes and respond before the platform kills us. */
+const TIME_BUDGET_MS = 45_000
 
 export async function GET(req: NextRequest) {
   return handleCron(req)
@@ -32,36 +36,85 @@ async function handleCron(req: NextRequest) {
   const job = req.nextUrl.searchParams.get('job') ?? 'daily_views'
   const campaignId = req.nextUrl.searchParams.get('campaign_id') ?? undefined
 
-  if (job === 'daily_views' || job === 'auto') {
-    return runDailyViewsAll(req)
-  }
+  try {
+    if (job === 'daily_views' || job === 'auto') {
+      return await runDailyViewsAll(req)
+    }
 
-  if (job === 'weekly_refresh') {
-    const { runWeeklyKeywordRefreshPg } = await import('@/lib/scrape-pipeline-pg')
-    const result = await runWeeklyKeywordRefreshPg(campaignId)
-    await refreshMaterializedViews()
-    await setSystemMetadata('last_ranking_refresh', new Date().toISOString())
-    return NextResponse.json({ ok: true, weekly_refresh: { ...result, status: 'completed' } })
-  }
+    if (job === 'weekly_refresh') {
+      return await runWeeklyRefresh(req, campaignId)
+    }
 
-  if (job === 'refresh_views') {
-    await refreshMaterializedViews()
-    return NextResponse.json({ ok: true, message: 'Materialized views refreshed' })
-  }
+    if (job === 'refresh_views') {
+      const result = await refreshMaterializedViews()
+      invalidateL1()
+      return NextResponse.json({
+        ok: result.failed.length === 0,
+        message: `Refreshed ${result.refreshed.length} materialized view(s)`,
+        ...result,
+      })
+    }
 
-  if (job === 'sheets_sync') {
-    const { syncAllDataToSheets } = await import('@/lib/google-sheets')
-    try {
+    if (job === 'sheets_sync') {
+      const { syncAllDataToSheets } = await import('@/lib/google-sheets')
       const result = await syncAllDataToSheets()
       return NextResponse.json({ ok: true, ...result })
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Unknown error'
-      return NextResponse.json({ error: msg }, { status: 500 })
     }
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Unknown error'
+    console.error(`Cron job "${job}" failed:`, e)
+    return NextResponse.json({ ok: false, job, error: msg }, { status: 500 })
   }
 
   return NextResponse.json({ error: `Unknown job: ${job}` }, { status: 400 })
 }
+
+// ── Weekly ranking refresh ────────────────────────────────────────────────
+/**
+ * Re-runs the complete keyword fetch for every active keyword — of one campaign
+ * when `campaign_id` is given, otherwise of every project on the system.
+ *
+ * Chunked: the caller passes `offset` (and optionally `limit`) and repeats using
+ * the returned `next_offset` until `completed` is true. Progress is also stored in
+ * system_metadata so an interrupted run can resume without the caller's help.
+ */
+async function runWeeklyRefresh(req: NextRequest, campaignId?: string) {
+  const { runWeeklyKeywordRefreshPg } = await import('@/lib/scrape-pipeline-pg')
+
+  const params = req.nextUrl.searchParams
+  const limitRaw = parseInt(params.get('limit') ?? '', 10)
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 50) : 5
+
+  const resumeKey = campaignId ? `weekly_refresh_offset:${campaignId}` : 'weekly_refresh_offset'
+  let offset = parseInt(params.get('offset') ?? '', 10)
+  if (!Number.isFinite(offset) || offset < 0) {
+    const stored = await getSystemMetadata(resumeKey)
+    offset = stored ? parseInt(stored, 10) || 0 : 0
+  }
+
+  const result = await runWeeklyKeywordRefreshPg(campaignId, {
+    offset,
+    limit,
+    timeBudgetMs: TIME_BUDGET_MS,
+  })
+
+  if (result.completed) {
+    await supabase.from('system_metadata').delete().eq('key', resumeKey)
+    try {
+      await refreshMaterializedViews()
+      await setSystemMetadata('last_ranking_refresh', new Date().toISOString())
+    } catch (err) {
+      console.error('Materialized view refresh after weekly refresh failed:', err)
+    }
+    invalidateL1()
+  } else {
+    await setSystemMetadata(resumeKey, String(result.next_offset))
+  }
+
+  return NextResponse.json({ ok: true, job: 'weekly_refresh', ...result })
+}
+
+// ── Daily view refresh ────────────────────────────────────────────────────
 
 interface CvRow {
   video_id: string
@@ -73,6 +126,30 @@ interface CvRow {
   } | null
 }
 
+/** PostgREST caps a select at 1000 rows — page through the whole table. */
+async function loadAllCampaignVideos(campaignId?: string): Promise<CvRow[]> {
+  const PAGE = 1000
+  const all: CvRow[] = []
+
+  for (let from = 0; ; from += PAGE) {
+    let q = supabase
+      .from('campaign_videos')
+      .select('video_id, campaign_id, videos(id, youtube_id, is_deleted)')
+      .order('video_id', { ascending: true })
+      .range(from, from + PAGE - 1)
+    if (campaignId) q = q.eq('campaign_id', campaignId)
+
+    const { data, error } = await q
+    if (error) throw new Error(`Failed to load campaign_videos: ${error.message}`)
+    if (!data || data.length === 0) break
+
+    all.push(...(data as unknown as CvRow[]))
+    if (data.length < PAGE) break
+  }
+
+  return all
+}
+
 async function runDailyViewsAll(req: NextRequest) {
   const campaignId = req.nextUrl.searchParams.get('campaign_id') ?? undefined
   const startTime = Date.now()
@@ -80,57 +157,63 @@ async function runDailyViewsAll(req: NextRequest) {
 
   await setSystemMetadata('daily_views_start', new Date().toISOString())
 
-  // Use LEFT JOIN so orphaned campaign_videos rows don't drop videos from the list
-  let cvQuery = supabase
-    .from('campaign_videos')
-    .select('video_id, campaign_id, videos(id, youtube_id, is_deleted)')
-  if (campaignId) cvQuery = cvQuery.eq('campaign_id', campaignId)
+  const cvRows = await loadAllCampaignVideos(campaignId)
 
-  const { data: cvRows } = await cvQuery
-
-  if (!cvRows || cvRows.length === 0) {
+  if (cvRows.length === 0) {
     return NextResponse.json({
-      ok: true,
-      processed: 0,
-      total: 0,
-      elapsed_ms: 0,
+      ok: true, processed: 0, total: 0, total_unique: 0, total_entries: 0,
+      completed: true, remaining: 0, elapsed_ms: Date.now() - startTime,
     })
   }
 
-  // Build youtube_id → campaign entries map (skip videos without a matching videos row or with null youtube_id)
+  // One YouTube video may be tracked by several campaigns. It is polled ONCE
+  // (unique) and the resulting count is written to every campaign (total).
   const ytIdMap = new Map<string, Array<{ video_id: string; campaign_id: string }>>()
-  const seenYtIds = new Set<string>()
-
-  for (const raw of cvRows) {
-    const r = raw as unknown as CvRow
-    if (!r.videos) continue
-    if (r.videos.is_deleted) continue
-    if (!r.videos.youtube_id) continue
+  for (const r of cvRows) {
+    if (!r.videos || r.videos.is_deleted || !r.videos.youtube_id) continue
     const key = r.videos.youtube_id
-
-    if (!ytIdMap.has(key)) {
-      ytIdMap.set(key, [])
-      seenYtIds.add(r.videos.id)
-    }
-    ytIdMap.get(key)!.push({ video_id: r.videos.id, campaign_id: r.campaign_id })
+    const entry = { video_id: r.videos.id, campaign_id: r.campaign_id }
+    const existing = ytIdMap.get(key)
+    if (existing) existing.push(entry)
+    else ytIdMap.set(key, [entry])
   }
 
   const uniqueYtIds = Array.from(ytIdMap.keys())
   const totalEntries = Array.from(ytIdMap.values()).reduce((s, a) => s + a.length, 0)
 
-  // Resume from previous timed-out run
-  const resumeRaw = await getSystemMetadata('daily_views_resume_offset')
-  const resumeOffset = resumeRaw ? parseInt(resumeRaw, 10) : 0
+  // Explicit offset wins; otherwise resume where a previous run stopped.
+  const offsetParam = parseInt(req.nextUrl.searchParams.get('offset') ?? '', 10)
+  let startOffset = 0
+  if (Number.isFinite(offsetParam) && offsetParam >= 0) {
+    startOffset = offsetParam
+  } else {
+    const resumeRaw = await getSystemMetadata('daily_views_resume_offset')
+    startOffset = resumeRaw ? parseInt(resumeRaw, 10) || 0 : 0
+  }
+
+  // Optional ceiling on how many unique videos this call handles, so the caller
+  // can tune chunk size. The time budget still applies on top of it.
+  const limitRaw = parseInt(req.nextUrl.searchParams.get('limit') ?? '', 10)
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? limitRaw : Number.MAX_SAFE_INTEGER
+  const stopAt = Math.min(uniqueYtIds.length, startOffset + limit)
 
   const BATCH_SIZE = 50
   let updated = 0
   let deleted = 0
   let processed = 0
+  let failedBatches = 0
+  let offset = startOffset
+  let timedOut = false
 
-  try {
-    for (let i = resumeOffset; i < uniqueYtIds.length; i += BATCH_SIZE) {
-      const batchYtIds = uniqueYtIds.slice(i, i + BATCH_SIZE)
+  for (; offset < stopAt; offset += BATCH_SIZE) {
+    if (Date.now() - startTime > TIME_BUDGET_MS) {
+      timedOut = true
+      break
+    }
 
+    const batchYtIds = uniqueYtIds.slice(offset, offset + BATCH_SIZE)
+
+    try {
       const stats = await getViewCountsOAuth(batchYtIds)
 
       const viewMap = new Map<string, number>()
@@ -140,21 +223,16 @@ async function runDailyViewsAll(req: NextRequest) {
         else viewMap.set(stat.youtube_id, stat.view_count)
       }
 
-      // Mark deleted videos
       if (deletedIds.length > 0) {
         await supabase.from('videos').update({ is_deleted: true }).in('youtube_id', deletedIds)
         deleted += deletedIds.length
       }
 
-      // Update view counts in bulk
-      if (viewMap.size > 0) {
-        for (const [ytId, vc] of viewMap) {
-          await supabase.from('videos').update({ view_count: vc }).eq('youtube_id', ytId)
-        }
-        updated += viewMap.size
+      for (const [ytId, vc] of viewMap) {
+        const { error } = await supabase.from('videos').update({ view_count: vc }).eq('youtube_id', ytId)
+        if (!error) updated++
       }
 
-      // Upsert view snapshots for ALL campaign entries
       const vsRows: Array<{
         video_id: string
         campaign_id: string
@@ -164,71 +242,48 @@ async function runDailyViewsAll(req: NextRequest) {
       for (const ytId of batchYtIds) {
         const vc = viewMap.get(ytId)
         if (vc === undefined) continue
-        const entries = ytIdMap.get(ytId)!
-        for (const entry of entries) {
-          vsRows.push({
-            video_id: entry.video_id,
-            campaign_id: entry.campaign_id,
-            view_count: vc,
-            snapshot_date: today,
-          })
+        for (const entry of ytIdMap.get(ytId) ?? []) {
+          vsRows.push({ video_id: entry.video_id, campaign_id: entry.campaign_id, view_count: vc, snapshot_date: today })
         }
       }
 
       if (vsRows.length > 0) {
         const { error: upsertErr } = await supabase
           .from('view_snapshots')
-          .upsert(vsRows, {
-            onConflict: 'video_id,campaign_id,snapshot_date',
-            ignoreDuplicates: false,
-          })
+          .upsert(vsRows, { onConflict: 'video_id,campaign_id,snapshot_date', ignoreDuplicates: false })
         if (upsertErr) {
-          // Fallback: try PK without campaign_id if the constraint doesn't include it
+          // Older databases have a PK without campaign_id.
           const { error: fallbackErr } = await supabase
             .from('view_snapshots')
-            .upsert(vsRows, {
-              onConflict: 'video_id,snapshot_date',
-              ignoreDuplicates: false,
-            })
+            .upsert(vsRows, { onConflict: 'video_id,snapshot_date', ignoreDuplicates: false })
           if (fallbackErr) throw fallbackErr
         }
       }
 
       processed += batchYtIds.length
-
-      // Save resume offset
-      await supabase.from('system_metadata').upsert({
-        key: 'daily_views_resume_offset',
-        value: String(i + batchYtIds.length),
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'key' })
+    } catch (batchErr) {
+      // One bad batch must not cost the whole day's refresh.
+      failedBatches++
+      processed += batchYtIds.length
+      console.error(`Daily views batch at offset ${offset} failed:`, batchErr)
     }
 
-    // Clear resume state
-    await supabase.from('system_metadata').delete().eq('key', 'daily_views_resume_offset')
-    await setSystemMetadata('last_views_refresh', new Date().toISOString())
-  } catch (err) {
-    console.error('Daily views failed:', err)
-    return NextResponse.json({
-      ok: false,
-      processed,
-      updated,
-      deleted,
-      total_unique: uniqueYtIds.length,
-      total_entries: totalEntries,
-      completed: false,
-      resume_offset: processed > 0 ? processed : resumeOffset,
-      elapsed_ms: Date.now() - startTime,
-      error: err instanceof Error ? err.message : String(err),
-    }, { status: 500 })
+    await setSystemMetadata('daily_views_resume_offset', String(offset + batchYtIds.length))
   }
 
-  const elapsed = Date.now() - startTime
+  const nextOffset = Math.min(offset, uniqueYtIds.length)
+  const completed = nextOffset >= uniqueYtIds.length
 
-  try {
-    await refreshMaterializedViews()
-  } catch (err) {
-    console.error('Materialized view refresh failed:', err)
+  if (completed) {
+    await supabase.from('system_metadata').delete().eq('key', 'daily_views_resume_offset')
+    await setSystemMetadata('last_views_refresh', new Date().toISOString())
+
+    try {
+      await refreshMaterializedViews()
+    } catch (err) {
+      console.error('Materialized view refresh failed:', err)
+    }
+    invalidateL1()
   }
 
   return NextResponse.json({
@@ -236,9 +291,15 @@ async function runDailyViewsAll(req: NextRequest) {
     processed,
     updated,
     deleted,
+    failed_batches: failedBatches,
+    total: uniqueYtIds.length,
     total_unique: uniqueYtIds.length,
     total_entries: totalEntries,
-    completed: true,
-    elapsed_ms: elapsed,
+    offset: startOffset,
+    next_offset: nextOffset,
+    remaining: Math.max(0, uniqueYtIds.length - nextOffset),
+    completed,
+    timed_out: timedOut,
+    elapsed_ms: Date.now() - startTime,
   })
 }

@@ -3,10 +3,17 @@
   "autoPort": true,
   "configurations": [
     {
+      "name": "sov-panel",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000,
+      "autoPort": true
+    },
+    {
       "name": "sov-dashboard",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--prefix", "sov-dashboard"],
-      "port": 3000,
+      "port": 3001,
       "autoPort": true
     }
   ]

@@ -3,13 +3,12 @@ import {
   searchYouTubeOAuth,
   getVideoDetailsOAuth,
   getViewCountsOAuth,
-  getChannelDetailsOAuth,
   type SearchOrder,
 } from './youtube-oauth'
+import { filterEligibleChannels } from './channel-filter'
 import { decryptApiKey } from './crypto'
 import { fetchTranscript } from './transcript'
-import { analyzeBrandsFromTranscript } from './brand-analyzer'
-import { getQueue, QUEUE_NAMES, addJob, ScrapeJobData, DailyViewsJobData } from './queue'
+import { analyzeBrandsFromTranscript, detectIrrelevantVideo } from './brand-analyzer'
 
 export interface ScrapeResult {
   saved: number
@@ -18,6 +17,18 @@ export interface ScrapeResult {
   quota_cost: number
   new_videos_fetched: number
   reused_from_pool: number
+  /** Long-form videos ranked for this keyword (target: 10). */
+  long_form?: number
+  /** Short-form videos ranked for this keyword (target: 10). */
+  short_form?: number
+  /** Search pages walked to reach the targets. */
+  pages_fetched?: number
+  /** Hits dropped because the channel declares a non-Indian country. */
+  rejected_foreign?: number
+  /** Hits dropped because the channel belongs to a brand. */
+  rejected_brand?: number
+  /** True when the API returned nothing and the campaign pool was used instead. */
+  used_pool_fallback?: boolean
 }
 
 interface SearchHit {
@@ -54,15 +65,9 @@ function parseDurationSec(duration: string | null): number {
   return h * 3600 + m * 60 + s
 }
 
-function pgArray(items: string[]): string {
-  return `{${items.map(i => `"${i.replace(/"/g, '\\"')}"`).join(',')}}`
-}
 
-function isShortForm(durationSec: number): boolean {
-  // YouTube Shorts are officially <= 60 seconds.
-  // Videos with durationSec=0 are unknown (detail fetch failed) — do NOT classify as either format.
-  return durationSec > 0 && durationSec <= 60
-}
+
+
 
 function getWeekStart(): string {
   const d = new Date()
@@ -91,8 +96,9 @@ async function getKeyFromSupabase(minUnits: number = 100): Promise<{ api_key: st
 }
 
 async function searchYouTubeViaApiKey(
-  keyword: string, maxResults: number = 50, regionCode: string = 'IN', order: SearchOrder = 'relevance'
-): Promise<{ hits: SearchHit[]; quota_cost: number }> {
+  keyword: string, maxResults: number = 50, regionCode: string = 'IN', order: SearchOrder = 'relevance',
+  pageToken?: string
+): Promise<{ hits: SearchHit[]; quota_cost: number; nextPageToken?: string }> {
   const keyInfo = await getKeyFromSupabase(100)
   if (!keyInfo) throw new Error('NO_API_KEYS')
 
@@ -103,6 +109,7 @@ async function searchYouTubeViaApiKey(
   url.searchParams.set('maxResults', String(Math.min(maxResults, 50)))
   url.searchParams.set('regionCode', regionCode)
   url.searchParams.set('order', order)
+  if (pageToken) url.searchParams.set('pageToken', pageToken)
   url.searchParams.set('key', keyInfo.api_key)
 
   const res = await fetch(url.toString())
@@ -127,7 +134,7 @@ async function searchYouTubeViaApiKey(
     }))
     .filter((h: SearchHit) => Boolean(h.youtube_id))
 
-  return { hits, quota_cost: 100 }
+  return { hits, quota_cost: 100, nextPageToken: data.nextPageToken }
 }
 
 async function fetchVideoDetailsViaApiKey(youtubeIds: string[]): Promise<{ videos: YouTubeVideo[]; quota_cost: number }> {
@@ -173,32 +180,7 @@ async function getCampaignPoolIds(campaignId: string): Promise<Set<string>> {
   return new Set(rows.map(r => r.youtube_id).filter(Boolean))
 }
 
-async function loadCampaignPoolVideos(campaignId: string, limit: number = 50): Promise<YouTubeVideo[]> {
-  const rows = await queryAll<any>(
-    `SELECT v.youtube_id, v.title, v.description, v.channel_name, v.channel_id,
-            v.view_count, v.published_at, v.thumbnail_url, v.duration, v.duration_sec, v.tags
-     FROM campaign_videos cv
-     INNER JOIN videos v ON v.id = cv.video_id
-     WHERE cv.campaign_id = $1
-     ORDER BY v.view_count DESC
-     LIMIT ${limit}`,
-    [campaignId]
-  )
 
-  return rows.map(r => ({
-    youtube_id: r.youtube_id || '',
-    title: r.title || '',
-    description: r.description || '',
-    channel_name: r.channel_name || '',
-    channel_id: r.channel_id || '',
-    view_count: r.view_count || 0,
-    published_at: r.published_at || '',
-    thumbnail_url: r.thumbnail_url || '',
-    duration: r.duration || '',
-    duration_sec: r.duration_sec || 0,
-    tags: Array.isArray(r.tags) ? r.tags : [],
-  }))
-}
 
 const STOP_WORDS = new Set([
   'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with',
@@ -278,385 +260,408 @@ async function loadKeywordRelevantPoolVideos(campaignId: string, keywordText: st
   return scored.slice(0, limit).map(s => s.video)
 }
 
-async function loadVideosFromDb(youtubeIds: string[]): Promise<Map<string, YouTubeVideo>> {
-  if (youtubeIds.length === 0) return new Map()
 
-  const rows = await queryAll<any>(
-    `SELECT youtube_id, title, description, channel_name, channel_id, view_count, published_at, thumbnail_url, duration, duration_sec, tags
-     FROM videos WHERE youtube_id = ANY($1)`,
-    [youtubeIds]
-  )
 
-  const map = new Map<string, YouTubeVideo>()
-  for (const row of rows) {
-    map.set(row.youtube_id, {
-      youtube_id: row.youtube_id,
-      title: row.title || '',
-      description: row.description || '',
-      channel_name: row.channel_name || '',
-      channel_id: row.channel_id || '',
-      view_count: row.view_count || 0,
-      published_at: row.published_at || '',
-      thumbnail_url: row.thumbnail_url || '',
-      duration: row.duration || '',
-      duration_sec: row.duration_sec || 0,
-      tags: Array.isArray(row.tags) ? row.tags : [],
-    })
-  }
-  return map
-}
 
-function hitToPartialVideo(hit: SearchHit): YouTubeVideo {
-  return {
-    youtube_id: hit.youtube_id,
-    title: hit.title,
-    description: '',
-    channel_name: hit.channel_name,
-    channel_id: hit.channel_id,
-    view_count: 0,
-    published_at: hit.published_at,
-    thumbnail_url: hit.thumbnail_url,
-    duration: '',
-    duration_sec: 0,
-    tags: [],
-  }
-}
 
+/**
+ * Snapshot this keyword's current ranking into keyword_rank_history before it is
+ * overwritten. Without this the weekly refresh would destroy the very data that
+ * week-over-week movement is computed from.
+ */
 export async function archiveKeywordRanks(keywordId: string, campaignId: string): Promise<void> {
   const weekStart = getWeekStart()
 
-  // 1. Archive long-form — 1 query
-  await queryAll(`
-    INSERT INTO keyword_rank_history (id, keyword_id, campaign_id, video_id, rank, form_type, week_start)
-    SELECT gen_random_uuid()::text, keyword_id, campaign_id, video_id, rank, 'long', '${weekStart}'
-    FROM keyword_videos WHERE keyword_id = '${keywordId}'
-    ON CONFLICT (keyword_id, video_id, form_type, week_start) DO NOTHING
-  `)
+  const archive = async (table: 'keyword_videos' | 'keyword_shorts', formType: 'long' | 'short') => {
+    await queryAll(
+      `INSERT INTO keyword_rank_history (id, keyword_id, campaign_id, video_id, rank, form_type, week_start)
+       SELECT gen_random_uuid(), keyword_id, campaign_id, video_id, rank, $1, $2
+       FROM ${table} WHERE keyword_id = $3
+       ON CONFLICT (keyword_id, video_id, form_type, week_start) DO NOTHING`,
+      [formType, weekStart, keywordId]
+    )
+  }
 
-  // 2. Archive short-form — 1 query
-  await queryAll(`
-    INSERT INTO keyword_rank_history (id, keyword_id, campaign_id, video_id, rank, form_type, week_start)
-    SELECT gen_random_uuid()::text, keyword_id, campaign_id, video_id, rank, 'short', '${weekStart}'
-    FROM keyword_shorts WHERE keyword_id = '${keywordId}'
-    ON CONFLICT (keyword_id, video_id, form_type, week_start) DO NOTHING
-  `)
+  try {
+    await archive('keyword_videos', 'long')
+    await archive('keyword_shorts', 'short')
+  } catch (err) {
+    // History is valuable but must not block the refresh itself.
+    console.error(`Failed to archive ranks for keyword ${keywordId} (campaign ${campaignId}):`, err)
+  }
 }
 
+/** Videos at or under this length are Shorts. */
+const SHORT_MAX_SEC = 60
+
+/** How many videos we want per format for every keyword. */
+const TARGET_PER_FORMAT = 10
+
+/**
+ * How many 50-result search pages we are willing to walk to reach 10+10.
+ * Each page costs 100 quota units, so this is the main cost lever.
+ */
+function maxSearchPages(): number {
+  const raw = parseInt(process.env.YOUTUBE_MAX_SEARCH_PAGES ?? '3', 10)
+  if (!Number.isFinite(raw)) return 3
+  return Math.min(Math.max(raw, 1), 5)
+}
+
+function isQuotaError(err: unknown): boolean {
+  const msg = String((err as { message?: string })?.message ?? err ?? '')
+  return msg.includes('quota') || msg.includes('429') || msg.includes('403') || msg.includes('NO_API_KEYS')
+}
+
+/** A search hit carrying its true position in YouTube's relevance-ordered results. */
+interface RankedHit extends SearchHit {
+  serp_position: number
+}
+
+interface SearchPage {
+  hits: RankedHit[]
+  nextPageToken?: string
+  quotaCost: number
+}
+
+/**
+ * One page of relevance-ordered Indian results.
+ * Tries OAuth first, falls back to a stored API key, and preserves absolute
+ * result positions across pages via `offset`.
+ */
+async function fetchSearchPage(
+  keywordText: string,
+  offset: number,
+  pageToken: string | undefined
+): Promise<SearchPage> {
+  try {
+    const res = await searchYouTubeOAuth(keywordText, 50, 'IN', 'relevance', pageToken)
+    const hits = (res.items || [])
+      .filter(item => item.id?.videoId)
+      .map((item, index) => ({
+        position: offset + index + 1,
+        serp_position: offset + index + 1,
+        youtube_id: item.id.videoId,
+        title: item.snippet?.title ?? '',
+        channel_name: item.snippet?.channelTitle ?? '',
+        channel_id: item.snippet?.channelId ?? '',
+        published_at: item.snippet?.publishedAt ?? '',
+        thumbnail_url: item.snippet?.thumbnails?.medium?.url ?? '',
+      }))
+    return { hits, nextPageToken: res.nextPageToken, quotaCost: 100 }
+  } catch (oauthErr) {
+    console.error(`OAuth search failed for "${keywordText}" (offset ${offset}):`, oauthErr)
+
+    const res = await searchYouTubeViaApiKey(keywordText, 50, 'IN', 'relevance', pageToken)
+    const hits = res.hits.map((h, index) => ({
+      ...h,
+      position: offset + index + 1,
+      serp_position: offset + index + 1,
+    }))
+    return { hits, nextPageToken: res.nextPageToken, quotaCost: res.quota_cost }
+  }
+}
+
+/** Video details for any number of ids, in 50-id batches. Never throws. */
+async function fetchDetailsForAll(
+  youtubeIds: string[]
+): Promise<{ videos: Map<string, YouTubeVideo>; quotaCost: number }> {
+  const videos = new Map<string, YouTubeVideo>()
+  let quotaCost = 0
+
+  for (let i = 0; i < youtubeIds.length; i += 50) {
+    const batch = youtubeIds.slice(i, i + 50)
+    try {
+      const res = await getVideoDetailsOAuth(batch)
+      quotaCost += 1
+      for (const item of res.items || []) {
+        videos.set(item.id, {
+          youtube_id: item.id,
+          title: item.snippet?.title || '',
+          description: item.snippet?.description || '',
+          channel_name: item.snippet?.channelTitle || '',
+          channel_id: item.snippet?.channelId || '',
+          view_count: parseInt(item.statistics?.viewCount || '0', 10),
+          published_at: item.snippet?.publishedAt || '',
+          thumbnail_url: item.snippet?.thumbnails?.medium?.url || '',
+          duration: item.contentDetails?.duration || '',
+          duration_sec: parseDurationSec(item.contentDetails?.duration),
+          tags: [],
+        })
+      }
+    } catch (err) {
+      console.error('OAuth video details failed, trying API key fallback:', err)
+      try {
+        const { videos: kwVideos, quota_cost } = await fetchVideoDetailsViaApiKey(batch)
+        quotaCost += quota_cost
+        for (const v of kwVideos) videos.set(v.youtube_id, v)
+      } catch (err2) {
+        console.error('API key video details also failed for batch:', err2)
+        // Ids left without details are skipped from format ranking below.
+      }
+    }
+  }
+
+  return { videos, quotaCost }
+}
+
+/** Video ids that must never be ranked again (AI-detected irrelevant content). */
+async function loadExcludedVideoIds(youtubeIds: string[]): Promise<Set<string>> {
+  const excluded = new Set<string>()
+  if (youtubeIds.length === 0) return excluded
+
+  try {
+    const blacklisted = await queryAll<{ youtube_id: string }>(
+      `SELECT youtube_id FROM video_blacklist WHERE youtube_id = ANY($1)`,
+      [youtubeIds]
+    )
+    for (const b of blacklisted) excluded.add(b.youtube_id)
+  } catch {
+    // video_blacklist not migrated yet — nothing to exclude.
+  }
+
+  try {
+    const irrelevant = await queryAll<{ youtube_id: string }>(
+      `SELECT youtube_id FROM videos WHERE youtube_id = ANY($1) AND is_irrelevant = TRUE`,
+      [youtubeIds]
+    )
+    for (const v of irrelevant) excluded.add(v.youtube_id)
+  } catch {
+    // is_irrelevant column not migrated yet.
+  }
+
+  return excluded
+}
+
+/**
+ * Fetch one keyword's first-page ranking.
+ *
+ * Walks YouTube's relevance-ordered results (regionCode=IN) keeping each video's
+ * true search position, drops foreign and brand-owned channels, and keeps pulling
+ * the next result in line until it has 10 long-form and 10 short-form videos.
+ */
 export async function scrapeKeyword(
   campaignId: string,
   keywordId: string,
   keywordText: string,
   options: { archiveBefore?: boolean } = {}
 ): Promise<ScrapeResult> {
-  let hits: SearchHit[] = []
-  let quotaCost = 0
-
-  try {
-    const orders: SearchOrder[] = ['relevance', 'viewCount', 'date']
-    const seenIds = new Set<string>()
-    const allHits: SearchHit[] = []
-
-    for (const order of orders) {
-      try {
-        const searchRes = await searchYouTubeOAuth(keywordText, 20, 'IN', order)
-        for (const item of (searchRes.items || [])) {
-          const vid = item.id.videoId
-          if (vid && !seenIds.has(vid)) {
-            seenIds.add(vid)
-            allHits.push({
-              position: allHits.length + 1,
-              youtube_id: vid,
-              title: item.snippet?.title ?? '',
-              channel_name: item.snippet?.channelTitle ?? '',
-              channel_id: item.snippet?.channelId ?? '',
-              published_at: item.snippet?.publishedAt ?? '',
-              thumbnail_url: item.snippet?.thumbnails?.medium?.url ?? '',
-            })
-          }
-        }
-        quotaCost += 100
-      } catch (searchErr: any) {
-        const msg = String(searchErr?.message ?? '')
-        if (msg.includes('quota') || msg.includes('429') || msg.includes('403')) break
-      }
-    }
-
-    hits = allHits
-  } catch (err: any) {
-    const msg = String(err?.message ?? '')
-    if (msg.includes('quota') || msg.includes('429') || msg.includes('403')) {
-      const poolVideos = await loadKeywordRelevantPoolVideos(campaignId, keywordText, 50)
-      if (poolVideos.length > 0) {
-        hits = poolVideos.map((v, i) => ({
-          position: i + 1,
-          youtube_id: v.youtube_id,
-          title: v.title,
-          channel_name: v.channel_name,
-          channel_id: v.channel_id,
-          published_at: v.published_at,
-          thumbnail_url: v.thumbnail_url,
-        }))
-        quotaCost = 0
-      } else {
-        throw err
-      }
-    } else {
-      throw err
-    }
-  }
-
-  // If OAuth search yielded no results, fall back to API key search (Supabase-based)
-  if (hits.length === 0) {
-    try {
-      const orders: SearchOrder[] = ['relevance', 'viewCount', 'date']
-      const seenIds = new Set<string>()
-
-      for (const order of orders) {
-        try {
-          const { hits: kwHits, quota_cost: kwCost } = await searchYouTubeViaApiKey(keywordText, 20, 'IN', order)
-          for (const h of kwHits) {
-            if (!seenIds.has(h.youtube_id)) {
-              seenIds.add(h.youtube_id)
-              hits.push({ ...h, position: hits.length + 1 })
-            }
-          }
-          quotaCost += kwCost
-        } catch {
-          break
-        }
-      }
-    } catch {
-      const poolVideos = await loadKeywordRelevantPoolVideos(campaignId, keywordText, 50)
-      hits = poolVideos.map((v, i) => ({
-        position: i + 1,
-        youtube_id: v.youtube_id,
-        title: v.title,
-        channel_name: v.channel_name,
-        channel_id: v.channel_id,
-        published_at: v.published_at,
-        thumbnail_url: v.thumbnail_url,
-      }))
-    }
-  }
-
-  // Final fallback: if still no hits, use pool videos
-  if (hits.length === 0) {
-    const poolVideos = await loadKeywordRelevantPoolVideos(campaignId, keywordText, 50)
-    hits = poolVideos.map((v, i) => ({
-      position: i + 1,
-      youtube_id: v.youtube_id,
-      title: v.title,
-      channel_name: v.channel_name,
-      channel_id: v.channel_id,
-      published_at: v.published_at,
-      thumbnail_url: v.thumbnail_url,
-    }))
-  }
-
   const brandNames = await queryAll<{ name: string }>(
     `SELECT name FROM campaign_brands WHERE campaign_id = $1`, [campaignId]
-  ).then(rows => rows.map(r => r.name))
+  ).then(rows => rows.map(r => r.name)).catch(() => [] as string[])
 
-  const filteredHits = hits.filter(hit => {
-    const channelLower = hit.channel_name.toLowerCase().trim()
-    for (const bName of brandNames) {
-      const bLower = bName.toLowerCase().trim()
-      if (bLower.length < 2) continue
-      if (channelLower === bLower) return false
+  const poolIdsBefore = await getCampaignPoolIds(campaignId)
 
-      const suffixes = ['india', 'global', 'electronics', 'official', 'support', 'care', 'hq']
-      for (const s of suffixes) {
-        if (channelLower === `${bLower} ${s}` || channelLower === `${s} ${bLower}`) {
-          return false
+  const longForm: Array<{ hit: RankedHit; video: YouTubeVideo }> = []
+  const shortForm: Array<{ hit: RankedHit; video: YouTubeVideo }> = []
+  const poolVideos = new Map<string, YouTubeVideo>()
+  const seenIds = new Set<string>()
+
+  let quotaCost = 0
+  let pageToken: string | undefined
+  let offset = 0
+  let pagesFetched = 0
+  let rejectedForeign = 0
+  let rejectedBrand = 0
+  let usedFallback = false
+
+  const pageLimit = maxSearchPages()
+
+  // Walk relevance-ordered pages until both formats have their 10, keeping the
+  // true YouTube position of every video. When a channel is skipped (foreign or
+  // brand-owned), the next eligible video moves up to take the slot.
+  while (pagesFetched < pageLimit) {
+    let page: SearchPage
+    try {
+      page = await fetchSearchPage(keywordText, offset, pageToken)
+    } catch (err) {
+      console.error(`Search failed for "${keywordText}" at offset ${offset}:`, err)
+      if (pagesFetched === 0 && !isQuotaError(err)) throw err
+      break
+    }
+
+    pagesFetched++
+    quotaCost += page.quotaCost
+    offset += page.hits.length
+
+    const fresh = page.hits.filter(h => h.youtube_id && !seenIds.has(h.youtube_id))
+    for (const h of fresh) seenIds.add(h.youtube_id)
+
+    if (fresh.length > 0) {
+      // 1. Drop videos already known to be irrelevant.
+      const excluded = await loadExcludedVideoIds(fresh.map(h => h.youtube_id))
+      const notExcluded = fresh.filter(h => !excluded.has(h.youtube_id))
+
+      // 2. Drop foreign and brand-owned channels (input order preserved).
+      const { eligible, rejected, quotaCost: channelQuota } =
+        await filterEligibleChannels(notExcluded, brandNames)
+      quotaCost += channelQuota
+      for (const r of rejected) {
+        if (r.reason === 'foreign_channel') rejectedForeign++
+        else rejectedBrand++
+      }
+
+      // 3. Duration decides format, so details are required for every survivor.
+      const { videos: details, quotaCost: detailQuota } =
+        await fetchDetailsForAll(eligible.map(h => h.youtube_id))
+      quotaCost += detailQuota
+
+      for (const hit of eligible) {
+        const video = details.get(hit.youtube_id)
+        if (!video) continue // details unavailable — cannot classify the format
+        poolVideos.set(video.youtube_id, video)
+
+        if (video.duration_sec <= 0) continue
+        if (video.duration_sec <= SHORT_MAX_SEC) {
+          if (shortForm.length < TARGET_PER_FORMAT) shortForm.push({ hit, video })
+        } else if (longForm.length < TARGET_PER_FORMAT) {
+          longForm.push({ hit, video })
         }
       }
-
-      if (channelLower.includes(bLower) && (
-        channelLower.includes('official') ||
-        channelLower.includes('electronics') ||
-        channelLower.endsWith(' india') ||
-        channelLower.endsWith(' global')
-      )) {
-        return false
-      }
     }
-    return true
-  })
 
-  const poolIds = await getCampaignPoolIds(campaignId)
-  const unknownIds = filteredHits.map(h => h.youtube_id).filter(id => !poolIds.has(id))
+    const filled = longForm.length >= TARGET_PER_FORMAT && shortForm.length >= TARGET_PER_FORMAT
+    if (filled || !page.nextPageToken) break
+    pageToken = page.nextPageToken
+  }
 
-  let fetchedVideos: YouTubeVideo[] = []
-  if (unknownIds.length > 0) {
-    try {
-      const detailsRes = await getVideoDetailsOAuth(unknownIds.slice(0, 50))
-      fetchedVideos = (detailsRes.items || []).map(item => ({
-        youtube_id: item.id,
-        title: item.snippet?.title || '',
-        description: item.snippet?.description || '',
-        channel_name: item.snippet?.channelTitle || '',
-        channel_id: item.snippet?.channelId || '',
-        view_count: parseInt(item.statistics?.viewCount || '0', 10),
-        published_at: item.snippet?.publishedAt || '',
-        thumbnail_url: item.snippet?.thumbnails?.medium?.url || '',
-        duration: item.contentDetails?.duration || '',
-        duration_sec: parseDurationSec(item.contentDetails?.duration),
-        tags: [],
-      }))
-      quotaCost += 1
-    } catch (err) {
-      console.error('OAuth video details failed, trying API key fallback:', err)
-      try {
-        const { videos: kwVideos, quota_cost: detailCost } = await fetchVideoDetailsViaApiKey(unknownIds.slice(0, 50))
-        fetchedVideos = kwVideos
-        quotaCost += detailCost
-      } catch (err2) {
-        console.error('API key video details also failed:', err2)
+  // Nothing usable from the API (quota exhausted, outage) — fall back to the
+  // campaign pool so the keyword keeps a ranking instead of going blank.
+  if (longForm.length === 0 && shortForm.length === 0) {
+    usedFallback = true
+    const fallback = await loadKeywordRelevantPoolVideos(campaignId, keywordText, 50)
+    let position = 0
+    for (const video of fallback) {
+      position++
+      const hit: RankedHit = {
+        position,
+        serp_position: position,
+        youtube_id: video.youtube_id,
+        title: video.title,
+        channel_name: video.channel_name,
+        channel_id: video.channel_id,
+        published_at: video.published_at,
+        thumbnail_url: video.thumbnail_url,
+      }
+      poolVideos.set(video.youtube_id, video)
+      if (video.duration_sec > 0 && video.duration_sec <= SHORT_MAX_SEC) {
+        if (shortForm.length < TARGET_PER_FORMAT) shortForm.push({ hit, video })
+      } else if (video.duration_sec > SHORT_MAX_SEC && longForm.length < TARGET_PER_FORMAT) {
+        longForm.push({ hit, video })
       }
     }
   }
-
-  const fetchedMap = new Map(fetchedVideos.map(v => [v.youtube_id, v]))
-  const dbMap = await loadVideosFromDb(
-    filteredHits.map(h => h.youtube_id).filter(id => poolIds.has(id) && !fetchedMap.has(id))
-  )
-
-  const orderedVideos: YouTubeVideo[] = filteredHits.map(hit => {
-    return fetchedMap.get(hit.youtube_id)
-      ?? dbMap.get(hit.youtube_id)
-      ?? hitToPartialVideo(hit)
-  })
 
   if (options.archiveBefore) {
     await archiveKeywordRanks(keywordId, campaignId)
   }
 
+  // Replace the previous ranking only once new data is in hand.
   await queryAll(`DELETE FROM keyword_videos WHERE keyword_id = $1`, [keywordId])
   await queryAll(`DELETE FROM keyword_shorts WHERE keyword_id = $1`, [keywordId])
 
-  const ranked = await saveScrapeResults(campaignId, keywordId, orderedVideos, filteredHits)
+  const ranked = await persistRankedVideos(
+    campaignId,
+    keywordId,
+    longForm,
+    shortForm,
+    Array.from(poolVideos.values())
+  )
 
   const now = new Date().toISOString()
+  await queryAll(`UPDATE keywords SET last_scraped_at = $1 WHERE id = $2`, [now, keywordId])
   await queryAll(
-    `UPDATE keywords SET last_scraped_at = $1 WHERE id = $2`,
-    [now, keywordId]
+    `INSERT INTO system_metadata (key, value, updated_at) VALUES ('last_ranking_refresh', $1, $2)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at`,
+    [now, now]
   )
 
-  await queryAll(
-    `INSERT INTO system_metadata (key, value, updated_at) VALUES ('last_ranking_refresh', '${now}', '${now}')
-     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at`
-  )
+  const newlyFetched = Array.from(poolVideos.keys()).filter(id => !poolIdsBefore.has(id)).length
 
   return {
-    saved: orderedVideos.length,
+    saved: poolVideos.size,
     ranked: ranked.ranked,
     pool_added: ranked.pool_added,
     quota_cost: quotaCost,
-    new_videos_fetched: unknownIds.length,
-    reused_from_pool: filteredHits.length - unknownIds.length,
+    new_videos_fetched: newlyFetched,
+    reused_from_pool: poolVideos.size - newlyFetched,
+    long_form: longForm.length,
+    short_form: shortForm.length,
+    pages_fetched: pagesFetched,
+    rejected_foreign: rejectedForeign,
+    rejected_brand: rejectedBrand,
+    used_pool_fallback: usedFallback,
   }
 }
 
-export async function saveScrapeResults(
+/**
+ * Persist a keyword's ranking.
+ *
+ * `rank` is the 1..10 slot inside the format; `serp_position` is the video's real
+ * position in YouTube's results, so a slot-3 video that actually sat at position 17
+ * is still recorded honestly.
+ */
+async function persistRankedVideos(
   campaignId: string,
   keywordId: string,
-  videos: YouTubeVideo[],
-  hits?: SearchHit[]
+  longForm: Array<{ hit: RankedHit; video: YouTubeVideo }>,
+  shortForm: Array<{ hit: RankedHit; video: YouTubeVideo }>,
+  allVideos: YouTubeVideo[]
 ): Promise<{ ranked: number; pool_added: number }> {
   const today = new Date().toISOString().split('T')[0]
   const now = new Date().toISOString()
 
-  // 1. Get brand names — 1 query
+  if (allVideos.length === 0) return { ranked: 0, pool_added: 0 }
+
   const brandNames = await queryAll<{ name: string }>(
     `SELECT name FROM campaign_brands WHERE campaign_id = $1`, [campaignId]
-  ).then(rows => rows.map(r => r.name))
+  ).then(rows => rows.map(r => r.name)).catch(() => [] as string[])
 
-  // 2. Split into long/short form (top 10 each)
-  // Only videos with known duration (duration_sec > 0) are format-classified.
-  // Videos with duration_sec=0 (unknown, detail fetch failed) are added to the
-  // campaign pool but NOT ranked in either format table.
-  const longForm: YouTubeVideo[] = []
-  const shortForm: YouTubeVideo[] = []
-  for (const v of videos) {
-    if (v.duration_sec === 0) continue  // unknown duration — skip format ranking
-    if (isShortForm(v.duration_sec)) {
-      if (shortForm.length < 10) shortForm.push(v)
-    } else if (longForm.length < 10) {
-      longForm.push(v)
-    }
-  }
-
-  // 3. Compute matched brands for each video (in-memory, no DB)
+  // Brand tags from the video's own metadata (transcript analysis refines these later).
   const videoBrandMap = new Map<string, string[]>()
-  for (const v of videos) {
-    const matched = brandNames.filter(b =>
-      v.title.toLowerCase().includes(b.toLowerCase()) ||
-      v.channel_name.toLowerCase().includes(b.toLowerCase()) ||
-      (v.description && v.description.toLowerCase().includes(b.toLowerCase()))
-    )
-    videoBrandMap.set(v.youtube_id, matched)
+  for (const v of allVideos) {
+    const haystack = `${v.title} ${v.channel_name} ${v.description || ''}`.toLowerCase()
+    videoBrandMap.set(v.youtube_id, brandNames.filter(b => haystack.includes(b.toLowerCase())))
   }
 
-  // 4. Batch: Check which videos already exist — 1 query
-  const allYoutubeIds = videos.map(v => v.youtube_id)
+  const allYoutubeIds = allVideos.map(v => v.youtube_id)
   const existingRows = await queryAll<{ id: string; youtube_id: string }>(
     `SELECT id, youtube_id FROM videos WHERE youtube_id = ANY($1)`,
     [allYoutubeIds]
   )
   const existingMap = new Map(existingRows.map(r => [r.youtube_id, r.id]))
 
-  // 5. Batch: Insert new videos — 1 query
-  const newVideos = videos.filter(v => !existingMap.has(v.youtube_id))
-  if (newVideos.length > 0) {
-    const valueRows = newVideos.map(v => {
-      const tags = videoBrandMap.get(v.youtube_id) || []
-      const tagsArr = tags.length > 0
-        ? `ARRAY[${tags.map(t => `'${t.replace(/'/g, "''")}'`).join(',')}]`
-        : `'{}'::text[]`
-      return `('${v.youtube_id}','${v.title.replace(/'/g,"''")}','${(v.description || '').replace(/'/g,"''")}','${v.channel_name.replace(/'/g,"''")}','${v.channel_id}',${v.view_count || 0},'${v.published_at}','${v.duration || ''}',${v.duration_sec || 0},'${(v.thumbnail_url || '').replace(/'/g,"''")}',${tagsArr})`
-    })
-    const inserted = await queryAll<{ id: string; youtube_id: string }>(
-      `INSERT INTO videos (youtube_id, title, description, channel_name, channel_id, view_count, published_at, duration, duration_sec, thumbnail_url, tags)
-       VALUES ${valueRows.join(',')}
-       ON CONFLICT (youtube_id) DO UPDATE SET
-         view_count = EXCLUDED.view_count, title = EXCLUDED.title, channel_name = EXCLUDED.channel_name,
-         duration = EXCLUDED.duration, duration_sec = EXCLUDED.duration_sec, thumbnail_url = EXCLUDED.thumbnail_url, tags = EXCLUDED.tags
-       RETURNING id, youtube_id`
-    )
-    for (const r of inserted) existingMap.set(r.youtube_id, r.id)
-  }
-
-  // 6. Batch: Update existing videos — 1 query (only if there are existing)
-  if (newVideos.length < videos.length) {
-    const existingToUpdate = videos.filter(v => existingMap.has(v.youtube_id))
-    const cases = existingToUpdate.map(v => {
-      const id = existingMap.get(v.youtube_id)!
-      return `WHEN youtube_id = '${v.youtube_id}' THEN ${v.view_count || 0}`
-    }).join(' ')
-    const titleCases = existingToUpdate.map(v => {
-      return `WHEN youtube_id = '${v.youtube_id}' THEN '${v.title.replace(/'/g,"''")}'`
-    }).join(' ')
-    const tagsCases = existingToUpdate.map(v => {
-      const tags = videoBrandMap.get(v.youtube_id) || []
-      const tagsArr = tags.length > 0
-        ? `ARRAY[${tags.map(t => `'${t.replace(/'/g, "''")}'`).join(',')}]`
-        : `'{}'::text[]`
-      return `WHEN youtube_id = '${v.youtube_id}' THEN ${tagsArr}`
-    }).join(' ')
-    if (cases) {
-      await queryAll(`UPDATE videos SET view_count = CASE ${cases} ELSE view_count END WHERE youtube_id = ANY($1)`, [existingToUpdate.map(v => v.youtube_id)])
+  // Upsert every video we saw, new or not — one statement per video keeps the
+  // id mapping exact and survives partial failures.
+  for (const v of allVideos) {
+    const tags = videoBrandMap.get(v.youtube_id) || []
+    try {
+      const inserted = await queryAll<{ id: string; youtube_id: string }>(
+        `INSERT INTO videos (youtube_id, title, description, channel_name, channel_id, view_count, published_at, duration, duration_sec, thumbnail_url, tags)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         ON CONFLICT (youtube_id) DO UPDATE SET
+           view_count = EXCLUDED.view_count, title = EXCLUDED.title, channel_name = EXCLUDED.channel_name,
+           duration = EXCLUDED.duration, duration_sec = EXCLUDED.duration_sec,
+           thumbnail_url = EXCLUDED.thumbnail_url, tags = EXCLUDED.tags
+         RETURNING id, youtube_id`,
+        [v.youtube_id, v.title, v.description || '', v.channel_name, v.channel_id,
+         v.view_count || 0, v.published_at || null, v.duration || '', v.duration_sec || 0,
+         v.thumbnail_url || '', tags]
+      )
+      for (const r of inserted) existingMap.set(r.youtube_id, r.id)
+    } catch (err) {
+      console.error(`Failed to upsert video ${v.youtube_id}:`, err)
     }
   }
 
-  // 7. Batch: Upsert campaign_videos — 1 query
-  const cvRows = videos.map(v => ({ campaign_id: campaignId, video_id: existingMap.get(v.youtube_id)! })).filter(r => r.video_id)
+  const cvRows = allVideos
+    .map(v => ({ campaign_id: campaignId, video_id: existingMap.get(v.youtube_id)! }))
+    .filter(r => r.video_id)
   if (cvRows.length > 0) {
     await batchUpsert('campaign_videos', cvRows, 'campaign_id,video_id')
   }
 
-  // 8. Batch: Upsert brand_tags — 1 query
   const btRows: Record<string, any>[] = []
-  for (const v of videos) {
+  for (const v of allVideos) {
     const vid = existingMap.get(v.youtube_id)
     if (!vid) continue
     for (const bName of (videoBrandMap.get(v.youtube_id) || [])) {
@@ -667,179 +672,292 @@ export async function saveScrapeResults(
     await batchUpsert('brand_tags', btRows, 'video_id,brand_name,campaign_id')
   }
 
-  // 9. Batch: Upsert keyword_videos + keyword_shorts + view_snapshots — up to 3 queries
   const kvRows: Record<string, any>[] = []
   const ksRows: Record<string, any>[] = []
   const vsRows: Record<string, any>[] = []
 
-  for (let i = 0; i < longForm.length; i++) {
-    const v = longForm[i]
-    const vid = existingMap.get(v.youtube_id)
-    if (!vid) continue
-    const rank = Math.max(1, Math.min(10, i + 1))
-    kvRows.push({ keyword_id: keywordId, campaign_id: campaignId, video_id: vid, rank, discovered_at: now, last_seen_at: now })
-    vsRows.push({ video_id: vid, campaign_id: campaignId, view_count: v.view_count || 0, snapshot_date: today })
+  const buildRows = (
+    entries: Array<{ hit: RankedHit; video: YouTubeVideo }>,
+    target: Record<string, any>[]
+  ) => {
+    entries.forEach((entry, i) => {
+      const vid = existingMap.get(entry.video.youtube_id)
+      if (!vid) return
+      target.push({
+        keyword_id: keywordId,
+        campaign_id: campaignId,
+        video_id: vid,
+        rank: i + 1,
+        serp_position: entry.hit.serp_position,
+        discovered_at: now,
+        last_seen_at: now,
+      })
+      vsRows.push({
+        video_id: vid,
+        campaign_id: campaignId,
+        view_count: entry.video.view_count || 0,
+        snapshot_date: today,
+      })
+    })
   }
 
-  for (let i = 0; i < shortForm.length; i++) {
-    const v = shortForm[i]
-    const vid = existingMap.get(v.youtube_id)
-    if (!vid) continue
-    const rank = Math.max(1, Math.min(10, i + 1))
-    ksRows.push({ keyword_id: keywordId, campaign_id: campaignId, video_id: vid, rank, discovered_at: now, last_seen_at: now })
-    vsRows.push({ video_id: vid, campaign_id: campaignId, view_count: v.view_count || 0, snapshot_date: today })
+  buildRows(longForm, kvRows)
+  buildRows(shortForm, ksRows)
+
+  // serp_position is a newer column; retry without it so an un-migrated database
+  // still records the ranking.
+  const upsertRanks = async (table: string, rows: Record<string, any>[]) => {
+    if (rows.length === 0) return
+    try {
+      await batchUpsert(table, rows, 'keyword_id,video_id')
+    } catch (err) {
+      console.error(`${table} upsert with serp_position failed, retrying without it:`, err)
+      const stripped = rows.map(({ serp_position, ...rest }) => rest)
+      await batchUpsert(table, stripped, 'keyword_id,video_id')
+    }
   }
 
-  // Run all three batch upserts in parallel — 1 HTTP request each
   await Promise.all([
-    kvRows.length > 0 ? batchUpsert('keyword_videos', kvRows, 'keyword_id,video_id') : Promise.resolve(),
-    ksRows.length > 0 ? batchUpsert('keyword_shorts', ksRows, 'keyword_id,video_id') : Promise.resolve(),
-    vsRows.length > 0 ? batchUpsert('view_snapshots', vsRows, 'video_id,campaign_id,snapshot_date') : Promise.resolve(),
+    upsertRanks('keyword_videos', kvRows),
+    upsertRanks('keyword_shorts', ksRows),
+    vsRows.length > 0
+      ? batchUpsert('view_snapshots', vsRows, 'video_id,campaign_id,snapshot_date')
+      : Promise.resolve(),
   ])
 
   return { ranked: kvRows.length + ksRows.length, pool_added: cvRows.length }
 }
 
-export async function runDailyViewUpdatePg(campaignId?: string): Promise<{
+export interface DailyViewUpdateResult {
   updated: number
   deleted: number
   quota_cost: number
   batches: number
-}> {
-  // 1. Get all videos to update — 1 query (batch SELECT)
-  let rows: { youtube_id: string; video_id: string; campaign_id: string }[]
+  /** Distinct YouTube videos polled — one API call slot each. */
+  unique_videos: number
+  /** (video, campaign) pairs snapshotted — the "total" count. */
+  total_entries: number
+  failed_batches: number
+}
 
-  if (campaignId) {
-    rows = await queryAll<{ youtube_id: string; video_id: string; campaign_id: string }>(
-      `SELECT v.youtube_id, v.id as video_id, cv.campaign_id
-       FROM campaign_videos cv
-       INNER JOIN videos v ON v.id = cv.video_id
-       WHERE cv.campaign_id = $1 AND v.is_deleted = FALSE`,
-      [campaignId]
-    )
-  } else {
-    rows = await queryAll<{ youtube_id: string; video_id: string; campaign_id: string }>(
-      `SELECT v.youtube_id, v.id as video_id, cv.campaign_id
-       FROM campaign_videos cv
-       INNER JOIN videos v ON v.id = cv.video_id
-       WHERE v.is_deleted = FALSE`
-    )
+/**
+ * Daily view refresh.
+ *
+ * A video that ranks on 40 keywords, or that belongs to three campaigns, is still
+ * ONE video on YouTube: it is polled once (unique) and its view count is then
+ * written to every campaign it belongs to (total). Batches are isolated — one bad
+ * batch never aborts the run.
+ */
+export async function runDailyViewUpdatePg(campaignId?: string): Promise<DailyViewUpdateResult> {
+  const rows = campaignId
+    ? await queryAll<{ youtube_id: string; video_id: string; campaign_id: string }>(
+        `SELECT v.youtube_id, v.id as video_id, cv.campaign_id
+         FROM campaign_videos cv
+         INNER JOIN videos v ON v.id = cv.video_id
+         WHERE cv.campaign_id = $1 AND v.is_deleted = FALSE AND v.youtube_id IS NOT NULL`,
+        [campaignId]
+      )
+    : await queryAll<{ youtube_id: string; video_id: string; campaign_id: string }>(
+        `SELECT v.youtube_id, v.id as video_id, cv.campaign_id
+         FROM campaign_videos cv
+         INNER JOIN videos v ON v.id = cv.video_id
+         WHERE v.is_deleted = FALSE AND v.youtube_id IS NOT NULL`
+      )
+
+  // youtube_id → every (video, campaign) pair that needs the resulting count.
+  const byYoutubeId = new Map<string, Array<{ video_id: string; campaign_id: string }>>()
+  for (const r of rows) {
+    if (!r.youtube_id) continue
+    const entries = byYoutubeId.get(r.youtube_id)
+    if (entries) entries.push({ video_id: r.video_id, campaign_id: r.campaign_id })
+    else byYoutubeId.set(r.youtube_id, [{ video_id: r.video_id, campaign_id: r.campaign_id }])
   }
 
+  const uniqueIds = Array.from(byYoutubeId.keys())
+  const totalEntries = rows.length
   const today = new Date().toISOString().split('T')[0]
+
   let quotaCost = 0
   let updated = 0
   let deleted = 0
   let batches = 0
+  let failedBatches = 0
 
-  // 2. Batch YouTube API calls in groups of 50 (YouTube max)
-  for (let i = 0; i < rows.length; i += 50) {
-    const batch = rows.slice(i, i + 50)
-    const ids = batch.map(r => r.youtube_id).filter(Boolean)
+  for (let i = 0; i < uniqueIds.length; i += 50) {
+    const batchIds = uniqueIds.slice(i, i + 50)
+    try {
+      const stats = await getViewCountsOAuth(batchIds)
+      quotaCost += 1
+      batches++
 
-    if (ids.length === 0) continue
-
-    const stats = await getViewCountsOAuth(ids)
-    quotaCost += 1
-    batches++
-
-    // 3. Batch UPDATE videos — 1 query per batch
-    const viewMap = new Map<string, number>()
-    const deletedIds: string[] = []
-    for (const stat of stats) {
-      if (stat.is_deleted) {
-        deletedIds.push(stat.youtube_id)
-      } else {
-        viewMap.set(stat.youtube_id, stat.view_count)
+      const viewMap = new Map<string, number>()
+      const deletedIds: string[] = []
+      for (const stat of stats) {
+        if (stat.is_deleted) deletedIds.push(stat.youtube_id)
+        else viewMap.set(stat.youtube_id, stat.view_count)
       }
-    }
 
-    // Batch mark deleted videos
-    if (deletedIds.length > 0) {
-      await queryAll(
-        `UPDATE videos SET is_deleted = TRUE WHERE youtube_id = ANY($1)`,
-        [deletedIds]
+      if (deletedIds.length > 0) {
+        await queryAll(`UPDATE videos SET is_deleted = TRUE WHERE youtube_id = ANY($1)`, [deletedIds])
+        deleted += deletedIds.length
+      }
+
+      if (viewMap.size > 0) {
+        const entries = Array.from(viewMap.entries())
+        const params: (string | number)[] = []
+        const cases = entries.map(([id, count], idx) => {
+          params.push(id, count)
+          return `WHEN youtube_id = $${idx * 2 + 1} THEN $${idx * 2 + 2}`
+        }).join(' ')
+        await queryAll(
+          `UPDATE videos SET view_count = CASE ${cases} ELSE view_count END WHERE youtube_id = ANY($${params.length + 1})`,
+          [...params, entries.map(e => e[0])]
+        )
+        updated += viewMap.size
+      }
+
+      // One snapshot row per (video, campaign) — the same count fans out to
+      // every campaign that tracks the video.
+      const vsRows: Record<string, any>[] = []
+      for (const ytId of batchIds) {
+        const vc = viewMap.get(ytId)
+        if (vc === undefined) continue
+        for (const entry of byYoutubeId.get(ytId) ?? []) {
+          vsRows.push({
+            video_id: entry.video_id,
+            campaign_id: entry.campaign_id,
+            view_count: vc,
+            snapshot_date: today,
+          })
+        }
+      }
+      if (vsRows.length > 0) {
+        await batchUpsert('view_snapshots', vsRows, 'video_id,campaign_id,snapshot_date')
+      }
+    } catch (batchErr: any) {
+      failedBatches++
+      console.error(
+        `View update batch ${i}-${i + batchIds.length} failed:`,
+        batchErr?.message || batchErr
       )
-      deleted += deletedIds.length
+      // Continue — a single failed batch must not cost the whole day's data.
     }
-
-    // Batch update view counts
-    if (viewMap.size > 0) {
-      const ids = Array.from(viewMap.keys())
-      const cases = ids.map(id =>
-        `WHEN youtube_id = '${id}' THEN ${viewMap.get(id)}`
-      ).join(' ')
-      await queryAll(
-        `UPDATE videos SET view_count = CASE ${cases} ELSE view_count END WHERE youtube_id = ANY($1)`,
-        [ids]
-      )
-    }
-
-    // 4. Batch UPSERT view_snapshots — 1 query per batch
-    const vsRows = batch
-      .filter(r => viewMap.has(r.youtube_id))
-      .map(r => ({
-        video_id: r.video_id,
-        campaign_id: r.campaign_id,
-        view_count: viewMap.get(r.youtube_id)!,
-        snapshot_date: today,
-      }))
-    if (vsRows.length > 0) {
-      await batchUpsert('view_snapshots', vsRows, 'video_id,campaign_id,snapshot_date')
-    }
-
-    updated += viewMap.size
   }
 
-  // 5. Update system metadata — 1 query
   const now = new Date().toISOString()
   await queryAll(
-    `INSERT INTO system_metadata (key, value, updated_at) VALUES ('last_views_refresh', $1, $1)
+    `INSERT INTO system_metadata (key, value, updated_at) VALUES ('last_views_refresh', $1, $2)
      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at`,
-    [now]
-  )
+    [now, now]
+  ).catch(err => console.error('Failed to record last_views_refresh:', err))
 
-  return { updated, deleted, quota_cost: quotaCost, batches }
+  return {
+    updated,
+    deleted,
+    quota_cost: quotaCost,
+    batches,
+    unique_videos: uniqueIds.length,
+    total_entries: totalEntries,
+    failed_batches: failedBatches,
+  }
 }
 
-export async function runWeeklyKeywordRefreshPg(campaignId?: string): Promise<{
+export interface WeeklyRefreshResult {
   keywords_processed: number
   failed: number
   total_quota: number
-}> {
-  let keywords: { id: string; text: string; campaign_id: string }[]
+  /** Keywords still waiting after this chunk — drives the caller's resume loop. */
+  remaining: number
+  total: number
+  offset: number
+  next_offset: number
+  completed: boolean
+  errors: Array<{ keyword: string; error: string }>
+}
 
-  if (campaignId) {
-    keywords = await queryAll<{ id: string; text: string; campaign_id: string }>(
-      `SELECT id, text, campaign_id FROM keywords WHERE status = 'active' AND campaign_id = $1 ORDER BY last_scraped_at ASC NULLS FIRST`,
-      [campaignId]
-    )
-  } else {
-    keywords = await queryAll<{ id: string; text: string; campaign_id: string }>(
-      `SELECT id, text, campaign_id FROM keywords WHERE status = 'active' ORDER BY last_scraped_at ASC NULLS FIRST`
-    )
-  }
+/**
+ * Weekly ranking refresh — re-runs the full keyword fetch so week-over-week rank
+ * movement can be measured.
+ *
+ * Every active keyword of every campaign is re-scraped (no campaign filter means
+ * the whole system). The previous ranking is archived to keyword_rank_history
+ * first, so last week's positions survive the overwrite.
+ *
+ * Runs in chunks: serverless functions have a hard wall-clock limit and a full
+ * pass over hundreds of keywords cannot finish inside it. The caller repeats with
+ * `next_offset` until `completed` is true.
+ */
+export async function runWeeklyKeywordRefreshPg(
+  campaignId?: string,
+  options: { offset?: number; limit?: number; timeBudgetMs?: number } = {}
+): Promise<WeeklyRefreshResult> {
+  const offset = Math.max(0, options.offset ?? 0)
+  const limit = options.limit && options.limit > 0 ? options.limit : Number.MAX_SAFE_INTEGER
+  const timeBudgetMs = options.timeBudgetMs ?? 0
+  const startedAt = Date.now()
+
+  // Deterministic order so chunked runs never skip or repeat a keyword.
+  const keywords = campaignId
+    ? await queryAll<{ id: string; text: string; campaign_id: string }>(
+        `SELECT id, text, campaign_id FROM keywords
+         WHERE status = 'active' AND campaign_id = $1
+         ORDER BY campaign_id, id`,
+        [campaignId]
+      )
+    : await queryAll<{ id: string; text: string; campaign_id: string }>(
+        `SELECT id, text, campaign_id FROM keywords
+         WHERE status = 'active'
+         ORDER BY campaign_id, id`
+      )
+
+  const chunkEnd = limit === Number.MAX_SAFE_INTEGER ? undefined : offset + limit
+  const chunk = keywords.slice(offset, chunkEnd)
 
   let totalQuota = 0
   let failed = 0
+  let processed = 0
+  const errors: Array<{ keyword: string; error: string }> = []
 
-  for (const kw of keywords) {
+  for (const kw of chunk) {
+    if (timeBudgetMs > 0 && Date.now() - startedAt > timeBudgetMs) break
+
     try {
       const result = await scrapeKeyword(kw.campaign_id, kw.id, kw.text, { archiveBefore: true })
       totalQuota += result.quota_cost
-    } catch {
+    } catch (err: any) {
       failed++
+      const msg = String(err?.message ?? err).slice(0, 200)
+      errors.push({ keyword: kw.text, error: msg })
+      console.error(`Weekly refresh failed for keyword "${kw.text}":`, msg)
+      // Quota exhaustion affects every remaining keyword — stop and resume later.
+      if (isQuotaError(err)) break
     }
+    processed++
   }
 
-  const now = new Date().toISOString()
-  await queryAll(
-    `INSERT INTO system_metadata (key, value, updated_at) VALUES ('last_weekly_refresh', $1, $1)
-     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at`,
-    [now]
-  )
+  const nextOffset = offset + processed
+  const completed = nextOffset >= keywords.length
 
-  return { keywords_processed: keywords.length - failed, failed, total_quota: totalQuota }
+  const now = new Date().toISOString()
+  if (completed) {
+    await queryAll(
+      `INSERT INTO system_metadata (key, value, updated_at) VALUES ('last_weekly_refresh', $1, $2)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at`,
+      [now, now]
+    ).catch(err => console.error('Failed to record last_weekly_refresh:', err))
+  }
+
+  return {
+    keywords_processed: processed - failed,
+    failed,
+    total_quota: totalQuota,
+    remaining: Math.max(0, keywords.length - nextOffset),
+    total: keywords.length,
+    offset,
+    next_offset: nextOffset,
+    completed,
+    errors,
+  }
 }
 
 export async function runBrandAnalysisPg(campaignId?: string, limit: number = 10): Promise<{
@@ -856,11 +974,11 @@ export async function runBrandAnalysisPg(campaignId?: string, limit: number = 10
     : []
 
   // 2. Get videos to analyze — 1 query (include channel_name + description for analyst prompt)
-  let videos: { id: string; youtube_id: string; title: string; channel_name: string; description: string }[]
+  let videos: { id: string; youtube_id: string; title: string; channel_name: string; description: string; is_irrelevant: boolean }[]
 
   if (campaignId) {
-    videos = await queryAll<{ id: string; youtube_id: string; title: string; channel_name: string; description: string }>(
-      `SELECT v.id, v.youtube_id, v.title, v.channel_name, v.description FROM videos v
+    videos = await queryAll<{ id: string; youtube_id: string; title: string; channel_name: string; description: string; is_irrelevant: boolean }>(
+      `SELECT v.id, v.youtube_id, v.title, v.channel_name, v.description, COALESCE(v.is_irrelevant, FALSE) as is_irrelevant FROM videos v
        WHERE v.is_deleted = FALSE AND v.id IN (SELECT video_id FROM campaign_videos WHERE campaign_id = $1)
        AND v.id NOT IN (SELECT video_id FROM brand_analysis)
        ORDER BY v.view_count DESC
@@ -868,8 +986,8 @@ export async function runBrandAnalysisPg(campaignId?: string, limit: number = 10
       [campaignId, limit]
     )
   } else {
-    videos = await queryAll<{ id: string; youtube_id: string; title: string; channel_name: string; description: string }>(
-      `SELECT v.id, v.youtube_id, v.title, v.channel_name, v.description FROM videos v
+    videos = await queryAll<{ id: string; youtube_id: string; title: string; channel_name: string; description: string; is_irrelevant: boolean }>(
+      `SELECT v.id, v.youtube_id, v.title, v.channel_name, v.description, COALESCE(v.is_irrelevant, FALSE) as is_irrelevant FROM videos v
        WHERE v.is_deleted = FALSE
        AND v.id NOT IN (SELECT video_id FROM brand_analysis)
        ORDER BY v.view_count DESC
@@ -884,10 +1002,42 @@ export async function runBrandAnalysisPg(campaignId?: string, limit: number = 10
 
   for (const video of videos) {
     try {
+      // 0. Check if already marked as irrelevant — skip immediately
+      if (video.is_irrelevant) {
+        continue
+      }
+
+      // 1. Detect irrelevance using heuristics + LLM (fast, ~200ms)
+      const relevance = await detectIrrelevantVideo(video.title, video.channel_name || '', video.description || '')
+      if (relevance.is_irrelevant && relevance.score >= 0.8) {
+        // Store irrelevance data for future scrapes
+        await queryAll(
+          `UPDATE videos SET is_irrelevant = TRUE, irrelevant_reason = $1, irrelevant_score = $2, irrelevant_category = $3, irrelevant_detected_at = NOW() WHERE id = $4`,
+          [relevance.reason, relevance.score, relevance.category, video.id]
+        ).catch(() => {
+          // Column may not exist yet — fallback to just is_irrelevant
+          return queryAll(
+            `UPDATE videos SET is_irrelevant = TRUE, irrelevant_reason = $1, irrelevant_detected_at = NOW() WHERE id = $2`,
+            [relevance.reason, video.id]
+          )
+        })
+
+        // Also add to permanent blacklist for future scrapes
+        await queryAll(
+          `INSERT INTO video_blacklist (youtube_id, reason, category, detected_by)
+           VALUES ($1, $2, $3, 'ai') ON CONFLICT (youtube_id) DO NOTHING`,
+          [video.youtube_id, relevance.reason, relevance.category]
+        ).catch(() => {
+          // Blacklist table may not exist yet — non-fatal
+        })
+
+        continue
+      }
+
       let transcriptText = ''
       let language = 'en'
 
-      // 3. Check for existing transcript — 1 query
+      // 2. Check for existing transcript — 1 query
       const existingTranscript = await queryOne<{ transcript_text: string; language: string }>(
         `SELECT transcript_text, language FROM video_transcripts WHERE video_id = $1`,
         [video.id]
@@ -970,9 +1120,9 @@ export async function runBrandAnalysisPg(campaignId?: string, limit: number = 10
   // 8. Update system metadata — 1 query
   const now = new Date().toISOString()
   await queryAll(
-    `INSERT INTO system_metadata (key, value, updated_at) VALUES ('last_brand_analysis', $1, $1)
+    `INSERT INTO system_metadata (key, value, updated_at) VALUES ('last_brand_analysis', $1, $2)
      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at`,
-    [now]
+    [now, now]
   )
 
   return { analyzed, skipped: videos.length - analyzed - noTranscript, no_transcript: noTranscript, brands_found: brandsFound }

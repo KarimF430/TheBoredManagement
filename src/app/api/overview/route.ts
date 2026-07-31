@@ -2,6 +2,35 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { getCached, cacheKey, CACHE_TTL } from '@/lib/cache'
 
+/**
+ * PostgREST returns at most 1000 rows per request. Every table read here can
+ * exceed that (200 keywords × 20 ranked videos = 4000 rows), so each one pages
+ * until the source is exhausted — otherwise the dashboard silently reports the
+ * first 1000 rows as if they were the whole campaign.
+ */
+const PAGE_SIZE = 1000
+
+async function selectAll<T = any>(
+  table: string,
+  columns: string,
+  apply: (q: any) => any
+): Promise<T[]> {
+  const all: T[] = []
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await apply(
+      supabase.from(table).select(columns).range(from, from + PAGE_SIZE - 1)
+    )
+    if (error) {
+      console.error(`Overview: failed to read ${table}:`, error.message)
+      break
+    }
+    if (!data || data.length === 0) break
+    all.push(...(data as T[]))
+    if (data.length < PAGE_SIZE) break
+  }
+  return all
+}
+
 export const runtime = 'nodejs'
 
 export async function GET(req: NextRequest) {
@@ -25,19 +54,21 @@ async function fetchOverview(cid: string) {
     const d7 = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]
     const d30 = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0]
 
-    const [kwRes, cvRes, kvRes, ksRes, btRes, cbRes, vsTodayRes, vs1dRes, vs7dRes, vs30dRes, sjRes, cvNewRes] = await Promise.all([
-      supabase.from('keywords').select('id').eq('campaign_id', cid).eq('status', 'active'),
-      supabase.from('campaign_videos').select('video_id').eq('campaign_id', cid),
-      supabase.from('keyword_videos').select('video_id, rank').eq('campaign_id', cid),
-      supabase.from('keyword_shorts').select('video_id, rank').eq('campaign_id', cid),
-      supabase.from('brand_tags').select('brand_name, video_id').eq('campaign_id', cid),
-      supabase.from('campaign_brands').select('name').eq('campaign_id', cid),
-      supabase.from('view_snapshots').select('view_count').eq('snapshot_date', today).eq('campaign_id', cid),
-      supabase.from('view_snapshots').select('view_count').eq('snapshot_date', d1).eq('campaign_id', cid),
-      supabase.from('view_snapshots').select('view_count').eq('snapshot_date', d7).eq('campaign_id', cid),
-      supabase.from('view_snapshots').select('view_count').eq('snapshot_date', d30).eq('campaign_id', cid),
+    const byCampaign = (q: any) => q.eq('campaign_id', cid)
+
+    const [kwRows, cvRows, kvRows, ksRows, btRows, vsTodayRows, vs1dRows, vs7dRows, vs30dRows, sjRes, cvNewRows] = await Promise.all([
+      selectAll<{ id: string }>('keywords', 'id', (q) => q.eq('campaign_id', cid).eq('status', 'active')),
+      selectAll<{ video_id: string }>('campaign_videos', 'video_id', byCampaign),
+      selectAll<{ video_id: string; rank: number }>('keyword_videos', 'video_id, rank', byCampaign),
+      selectAll<{ video_id: string; rank: number }>('keyword_shorts', 'video_id, rank', byCampaign),
+      selectAll<{ brand_name: string; video_id: string }>('brand_tags', 'brand_name, video_id', byCampaign),
+      selectAll<{ view_count: number }>('view_snapshots', 'view_count', (q) => q.eq('snapshot_date', today).eq('campaign_id', cid)),
+      selectAll<{ view_count: number }>('view_snapshots', 'view_count', (q) => q.eq('snapshot_date', d1).eq('campaign_id', cid)),
+      selectAll<{ view_count: number }>('view_snapshots', 'view_count', (q) => q.eq('snapshot_date', d7).eq('campaign_id', cid)),
+      selectAll<{ view_count: number }>('view_snapshots', 'view_count', (q) => q.eq('snapshot_date', d30).eq('campaign_id', cid)),
       supabase.from('scrape_jobs').select('id').in('status', ['running', 'pending']).limit(100),
-      supabase.from('campaign_videos').select('video_id').eq('campaign_id', cid).gte('first_seen_at', new Date(Date.now() - 7 * 86400000).toISOString()),
+      selectAll<{ video_id: string }>('campaign_videos', 'video_id', (q) =>
+        q.eq('campaign_id', cid).gte('first_seen_at', new Date(Date.now() - 7 * 86400000).toISOString())),
     ])
 
     let lastViews: any = null
@@ -51,24 +82,30 @@ async function fetchOverview(cid: string) {
       lastRanking = lr.data
     } catch {}
 
-    const totalKeywords = (kwRes.data || []).length
-    const allCvVideoIds = [...new Set((cvRes.data || []).map((r: any) => r.video_id))]
+    const totalKeywords = kwRows.length
+    const allCvVideoIds = [...new Set(cvRows.map((r) => r.video_id))]
     const totalVideos = allCvVideoIds.length
-    const rankedVideos = (kvRes.data || []).length + (ksRes.data || []).length
-    const brandTags = (btRes.data || [])
-    const newVidsLast7Days = (cvNewRes.data || []).length
+    const brandTags = btRows
+    const newVidsLast7Days = cvNewRows.length
 
-    const sumRows = (rows: any[] | null) => (rows || []).reduce((s: number, r: any) => s + (r.view_count || 0), 0)
-    const vsToday = sumRows(vsTodayRes.data)
-    const vs1d = sumRows(vs1dRes.data)
-    const vs7d = sumRows(vs7dRes.data)
-    const vs30d = sumRows(vs30dRes.data)
+    // Ranking appearances across every keyword. A video that ranks on 40 keywords
+    // contributes 40 appearances but is still ONE unique video.
+    const rankingRows = [...kvRows, ...ksRows]
+    const rankedVideos = rankingRows.length
+    const uniqueRankedIds = new Set(rankingRows.map((r) => r.video_id))
+
+    const sumRows = (rows: Array<{ view_count: number }>) =>
+      rows.reduce((s, r) => s + (r.view_count || 0), 0)
+    const vsToday = sumRows(vsTodayRows)
+    const vs1d = sumRows(vs1dRows)
+    const vs7d = sumRows(vs7dRows)
+    const vs30d = sumRows(vs30dRows)
 
     const taggedIds = new Set(brandTags.map((bt: any) => bt.video_id))
     const untaggedVideos = allCvVideoIds.filter(id => !taggedIds.has(id)).length
 
     let videoRows: any[] = []
-    const BATCH = 500
+    const BATCH = 200
     const videoBatchPromises = []
     for (let i = 0; i < allCvVideoIds.length; i += BATCH) {
       videoBatchPromises.push(
@@ -80,15 +117,31 @@ async function fetchOverview(cid: string) {
       videoRows.push(...(result.data || []))
     }
 
-    let totalViewership = 0
     const channelFreq = new Map<string, number>()
     const videoMap = new Map<string, any>()
     for (const v of videoRows) {
-      totalViewership += v.view_count || 0
       if (v.channel_name) channelFreq.set(v.channel_name, (channelFreq.get(v.channel_name) || 0) + 1)
       videoMap.set(v.id, v)
     }
     const uniqueChannels = channelFreq.size
+
+    // Unique viewership: each distinct ranked video counted exactly once.
+    let uniqueViewership = 0
+    for (const id of uniqueRankedIds) {
+      uniqueViewership += videoMap.get(id)?.view_count || 0
+    }
+
+    // Total viewership: summed per keyword appearance, so a video ranking on
+    // 40 keywords contributes its views 40 times. This is the number that
+    // "total" is supposed to mean — it was previously identical to unique.
+    let totalViewership = 0
+    for (const row of rankingRows) {
+      totalViewership += videoMap.get(row.video_id)?.view_count || 0
+    }
+
+    // Whole campaign pool (ranked or not) — kept for the pool-size KPI.
+    let poolViewership = 0
+    for (const v of videoRows) poolViewership += v.view_count || 0
 
     let topChannel = null
     let maxFreq = 0
@@ -141,8 +194,10 @@ async function fetchOverview(cid: string) {
       totalVideos,
       rankedVideos,
       totalViewership,
-      uniqueVideos: videoRows.length,
-      uniqueVideoViewership: totalViewership,
+      uniqueVideos: uniqueRankedIds.size,
+      uniqueVideoViewership: uniqueViewership,
+      poolVideos: videoRows.length,
+      poolViewership,
       uniqueChannels,
       mostRankingChannel: topChannel ? { name: topChannel, totalFrequency: maxFreq } : null,
       newVideosLast7Days: newVidsLast7Days,

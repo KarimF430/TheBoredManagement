@@ -138,19 +138,45 @@ export async function execSql(sql: string): Promise<void> {
   if (error) throw error
 }
 
-export async function refreshMaterializedViews(): Promise<void> {
-  const { error } = await supabase.rpc('exec_sql', {
-    sql: `
-      REFRESH MATERIALIZED VIEW CONCURRENTLY brand_sov_mv;
-      REFRESH MATERIALIZED VIEW CONCURRENTLY brand_freq_sov_mv;
-      REFRESH MATERIALIZED VIEW CONCURRENTLY channel_rank_mv;
-    `,
-  })
+const MATERIALIZED_VIEWS = ['brand_sov_mv', 'brand_freq_sov_mv', 'channel_rank_mv'] as const
 
-  if (error) {
-    console.error('Failed to refresh materialized views:', error)
-    throw error
+/**
+ * Refresh the dashboard's materialized views.
+ *
+ * Each view is refreshed independently so one failure (a view that has not been
+ * created yet, or a CONCURRENTLY refresh that needs a unique index) cannot stop
+ * the others — and never aborts the cron job that called this. Failures are
+ * returned rather than thrown so callers can report them.
+ */
+export async function refreshMaterializedViews(): Promise<{ refreshed: string[]; failed: Array<{ view: string; error: string }> }> {
+  const refreshed: string[] = []
+  const failed: Array<{ view: string; error: string }> = []
+
+  for (const view of MATERIALIZED_VIEWS) {
+    const { error } = await supabase.rpc('exec_sql', {
+      sql: `REFRESH MATERIALIZED VIEW CONCURRENTLY ${view};`,
+    })
+
+    if (!error) {
+      refreshed.push(view)
+      continue
+    }
+
+    // CONCURRENTLY needs a unique index and a populated view; fall back to a
+    // plain refresh before giving up on this view.
+    const { error: plainError } = await supabase.rpc('exec_sql', {
+      sql: `REFRESH MATERIALIZED VIEW ${view};`,
+    })
+
+    if (plainError) {
+      console.error(`Failed to refresh ${view}:`, plainError.message)
+      failed.push({ view, error: plainError.message })
+    } else {
+      refreshed.push(view)
+    }
   }
+
+  return { refreshed, failed }
 }
 
 export async function resetDailyQuotas(): Promise<void> {

@@ -95,20 +95,50 @@ export async function POST(req: NextRequest) {
     if (!campaignId) return NextResponse.json({ error: 'campaign_id required' }, { status: 400 })
 
     let added = 0
+    // Ids of the keywords that still need their first fetch — the client kicks
+    // off /api/scrape for these so a new keyword lands with its ranking.
+    const pendingScrape: Array<{ id: string; text: string }> = []
+    const failures: Array<{ text: string; error: string }> = []
+
     for (const kw of items) {
-      if (!kw.text?.trim()) continue
+      const text = kw.text?.trim()
+      if (!text) continue
+
       const { data, error } = await supabase
         .from('keywords')
         .upsert(
-          { campaign_id: campaignId, text: kw.text.trim(), language: kw.language ?? 'en', category: kw.type ?? 'generic' },
+          { campaign_id: campaignId, text, language: kw.language ?? 'en', category: kw.type ?? 'generic' },
           { onConflict: 'campaign_id,text', ignoreDuplicates: true }
         )
-        .select('id')
+        .select('id, last_scraped_at')
         .maybeSingle()
-      if (data && !error) added++
+
+      if (error) {
+        console.error(`Failed to add keyword "${text}":`, error.message)
+        failures.push({ text, error: error.message })
+        continue
+      }
+
+      if (data) {
+        added++
+        pendingScrape.push({ id: data.id, text })
+        continue
+      }
+
+      // Already existed (ignoreDuplicates returns no row) — still queue it for a
+      // fetch if it has never been scraped.
+      const { data: existing } = await supabase
+        .from('keywords')
+        .select('id, last_scraped_at')
+        .eq('campaign_id', campaignId)
+        .eq('text', text)
+        .maybeSingle()
+      if (existing && !existing.last_scraped_at) {
+        pendingScrape.push({ id: existing.id, text })
+      }
     }
 
-    return NextResponse.json({ added }, { status: 201 })
+    return NextResponse.json({ added, pending_scrape: pendingScrape, failures }, { status: 201 })
   } catch (e: any) {
     console.error('Keywords POST error:', e)
     return NextResponse.json({ error: e.message }, { status: 500 })

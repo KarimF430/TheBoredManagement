@@ -185,6 +185,7 @@ export interface YouTubeSearchResult {
     }
   }>
   pageInfo: { totalResults: number }
+  nextPageToken?: string
 }
 
 export interface YouTubeVideoResult {
@@ -215,16 +216,20 @@ export async function searchYouTubeOAuth(
   keyword: string,
   maxResults: number = 50,
   regionCode: string = 'IN',
-  order: SearchOrder = 'relevance'
+  order: SearchOrder = 'relevance',
+  pageToken?: string
 ): Promise<YouTubeSearchResult> {
-  return youtubeApiFetch<YouTubeSearchResult>('search', {
+  const params: Record<string, string> = {
     part: 'id,snippet',
     q: keyword,
     type: 'video',
     maxResults: String(Math.min(maxResults, 50)),
     regionCode,
     order,
-  }, { quotaCost: 100, keyId: 'oauth' })
+  }
+  if (pageToken) params.pageToken = pageToken
+
+  return youtubeApiFetch<YouTubeSearchResult>('search', params, { quotaCost: 100, keyId: 'oauth' })
 }
 
 export async function getVideoDetailsOAuth(
