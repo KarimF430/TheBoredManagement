@@ -8,6 +8,7 @@ import { useFilterStore } from '@/lib/filter-store'
 import SharedFilterBar from '@/components/SharedFilterBar'
 import { useQuery } from '@tanstack/react-query'
 import { PageSkeleton } from '@/components/PageSkeleton'
+import { EmptyState } from '@/components/StateViews'
 import Link from 'next/link'
 
 const COLORS = [
@@ -32,24 +33,24 @@ function fmt(n: number | null | undefined) {
 }
 
 function GrowthBadge({ val }: { val: number }) {
-  if (val > 0) return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#059669', fontWeight: 700, fontSize: 12, padding: '2px 8px', borderRadius: 20, background: '#ECFDF5', border: '1px solid #A7F3D0' }}><TrendingUp size={12} /> +{val.toFixed(1)}%</span>
-  if (val < 0) return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#DC2626', fontWeight: 700, fontSize: 12, padding: '2px 8px', borderRadius: 20, background: '#FEF2F2', border: '1px solid #FECACA' }}><TrendingDown size={12} /> {val.toFixed(1)}%</span>
-  return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#94A3B8', fontWeight: 600, fontSize: 12 }}><Minus size={11} /> 0%</span>
+  if (val > 0) return <span className="delta-pos"><TrendingUp size={12} /> +{val.toFixed(1)}%</span>
+  if (val < 0) return <span className="delta-neg"><TrendingDown size={12} /> {val.toFixed(1)}%</span>
+  return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: 'var(--text-muted)', fontWeight: 600, fontSize: 'var(--fs-sm)' }}><Minus size={11} /> 0%</span>
 }
 
 function RankBadge({ val }: { val: number }) {
-  if (val > 0) return <span style={{ display: 'flex', alignItems: 'center', gap: 2, color: '#10B981', fontWeight: 700, fontSize: 12 }}><TrendingUp size={12} /> +{val}</span>
-  if (val < 0) return <span style={{ display: 'flex', alignItems: 'center', gap: 2, color: '#EF4444', fontWeight: 700, fontSize: 12 }}><TrendingDown size={12} /> {val}</span>
-  return <span style={{ color: '#94A3B8', fontSize: 11 }}>—</span>
+  if (val > 0) return <span style={{ display: 'flex', alignItems: 'center', gap: 2, color: 'var(--success-text)', fontWeight: 700, fontSize: 'var(--fs-sm)' }}><TrendingUp size={12} /> +{val}</span>
+  if (val < 0) return <span style={{ display: 'flex', alignItems: 'center', gap: 2, color: 'var(--danger)', fontWeight: 700, fontSize: 'var(--fs-sm)' }}><TrendingDown size={12} /> {val}</span>
+  return <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-label)' }}>—</span>
 }
 
 function MiniSparkBar({ data, color }: { data: number[]; color: string }) {
-  if (!data || data.length === 0 || data.every(v => v === 0)) return <span style={{ fontSize: 10, color: '#CBD5E1' }}>—</span>
+  if (!data || data.length === 0 || data.every(v => v === 0)) return <span style={{ fontSize: 'var(--fs-micro)', color: 'var(--neutral-300)' }}>—</span>
   const max = Math.max(...data) || 1
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 24, width: 48 }}>
       {data.map((v, i) => (
-        <div key={i} style={{ flex: 1, height: `${Math.max(15, (v / max) * 100)}%`, borderRadius: 2, background: i === data.length - 1 ? color : `${color}30` }} />
+        <div key={i} style={{ flex: 1, height: `${Math.max(15, (v / max) * 100)}%`, borderRadius: 'var(--radius-xs)', background: i === data.length - 1 ? color : `${color}30` }} />
       ))}
     </div>
   )
@@ -109,11 +110,11 @@ export default function BrandGrowthPage() {
           <p className="page-subtitle">Velocity tracking and period comparison</p>
         </div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 300, gap: 12, background: '#fff', borderRadius: 14, border: '1px solid #F1F5F9' }}>
-        <AlertCircle size={36} style={{ color: '#CBD5E1' }} />
-        <div style={{ fontSize: 15, fontWeight: 700, color: '#1E293B' }}>Select a Campaign</div>
-        <div style={{ fontSize: 13, color: '#64748B' }}>Choose a campaign to view brand growth data</div>
-      </div>
+      <EmptyState
+        icon={<AlertCircle size={36} strokeWidth={1.5} style={{ color: 'var(--neutral-300)' }} />}
+        title="Select a Campaign"
+        body="Choose a campaign to view brand growth data"
+      />
     </div>
   )
 
@@ -123,11 +124,6 @@ export default function BrandGrowthPage() {
 
   return (
     <div className="anim-fade-up">
-      <style>{`
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      `}</style>
-
       <div className="page-header">
         <div>
           <h1 className="page-title">Brand <span className="accent">Growth</span></h1>
@@ -147,19 +143,17 @@ export default function BrandGrowthPage() {
       </SharedFilterBar>
 
       {data.length === 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 300, gap: 12, background: '#fff', borderRadius: 14, border: '1px solid #F1F5F9' }}>
-          <AlertCircle size={36} style={{ color: '#CBD5E1' }} />
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#1E293B' }}>No Brand Growth Data</div>
-          <div style={{ fontSize: 13, color: '#64748B', textAlign: 'center', maxWidth: 360 }}>
-            Tag brands and trigger a scrape from <Link href="/control" style={{ color: '#1A73E8', fontWeight: 600 }}>Campaign Control</Link> to generate growth metrics.
-          </div>
-        </div>
+        <EmptyState
+          icon={<AlertCircle size={36} strokeWidth={1.5} style={{ color: 'var(--neutral-300)' }} />}
+          title="No Brand Growth Data"
+          body={<>Tag brands and trigger a scrape from <Link href="/control" style={{ color: 'var(--accent)', fontWeight: 600 }}>Campaign Control</Link> to generate growth metrics.</>}
+        />
       ) : (
         <>
           {!hasScrapeData && (
-            <div className="card" style={{ padding: '14px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12, borderLeft: '3px solid #1A73E8' }}>
-              <RefreshCw size={18} style={{ color: '#1A73E8', flexShrink: 0, animation: 'spin 8s linear infinite' }} />
-              <div style={{ fontSize: 13, color: '#1E3A8A' }}>
+            <div className="card" style={{ padding: '14px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12, borderLeft: '3px solid var(--accent)' }}>
+              <RefreshCw size={18} style={{ color: 'var(--accent)', flexShrink: 0, animation: 'spin 8s linear infinite' }} />
+              <div style={{ fontSize: 'var(--fs-body)', color: 'var(--text-primary)' }}>
                 <strong>Partial data.</strong> Run a scrape to generate view snapshots for accurate growth tracking.
               </div>
             </div>
@@ -168,46 +162,46 @@ export default function BrandGrowthPage() {
           {/* KPI Strip */}
           {sorted.length >= 2 && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-              <div style={{ background: '#fff', borderRadius: 12, padding: '16px 20px', border: '1px solid #D1FAE5', display: 'flex', gap: 14, alignItems: 'center' }}>
-                <div style={{ width: 42, height: 42, borderRadius: 10, background: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <TrendingUp size={20} style={{ color: '#10B981' }} />
+              <div className="kpi-card" style={{ borderColor: 'var(--success-border)', display: 'flex', gap: 14, alignItems: 'center' }}>
+                <div style={{ width: 42, height: 42, borderRadius: 'var(--radius-md)', background: 'var(--success-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <TrendingUp size={20} style={{ color: 'var(--success-text)' }} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Top Gainer</div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#064E3B', marginTop: 1 }}>{topGainer?.brand_name}</div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#10B981', marginTop: 1 }}>+{topGainer?.growthPercent.toFixed(1)}%</div>
+                  <div style={{ fontSize: 'var(--fs-micro)', fontWeight: 700, color: 'var(--success-text)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Top Gainer</div>
+                  <div style={{ fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--text-primary)', marginTop: 1 }}>{topGainer?.brand_name}</div>
+                  <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--success-text)', marginTop: 1 }}>+{topGainer?.growthPercent.toFixed(1)}%</div>
                 </div>
               </div>
-              <div style={{ background: '#fff', borderRadius: 12, padding: '16px 20px', border: '1px solid #FECACA', display: 'flex', gap: 14, alignItems: 'center' }}>
-                <div style={{ width: 42, height: 42, borderRadius: 10, background: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <TrendingDown size={20} style={{ color: '#EF4444' }} />
+              <div className="kpi-card" style={{ borderColor: 'var(--danger-border)', display: 'flex', gap: 14, alignItems: 'center' }}>
+                <div style={{ width: 42, height: 42, borderRadius: 'var(--radius-md)', background: 'var(--danger-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <TrendingDown size={20} style={{ color: 'var(--danger)' }} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#DC2626', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Needs Attention</div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#7F1D1D', marginTop: 1 }}>{topLoser?.brand_name}</div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#EF4444', marginTop: 1 }}>{topLoser?.growthPercent.toFixed(1)}%</div>
+                  <div style={{ fontSize: 'var(--fs-micro)', fontWeight: 700, color: 'var(--danger-text)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Needs Attention</div>
+                  <div style={{ fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--text-primary)', marginTop: 1 }}>{topLoser?.brand_name}</div>
+                  <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--danger)', marginTop: 1 }}>{topLoser?.growthPercent.toFixed(1)}%</div>
                 </div>
               </div>
             </div>
           )}
 
           {/* Growth Velocity Bar Chart */}
-          <div className="card" style={{ padding: '20px 22px', marginBottom: 20 }}>
+          <div className="chart-container" style={{ marginBottom: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Growth Velocity</div>
-                <div style={{ fontSize: 11.5, color: '#94A3B8', marginTop: 2 }}>Growth rate (%) per brand over {period}</div>
+                <div className="t-h3">Growth Velocity</div>
+                <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', marginTop: 2 }}>Growth rate (%) per brand over {period}</div>
               </div>
-              <Zap size={16} style={{ color: '#F59E0B' }} />
+              <Zap size={16} style={{ color: 'var(--warning)' }} />
             </div>
             <div style={{ height: 260 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={sorted} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
-                  <XAxis dataKey="brand_name" tick={{ fontSize: 10, fill: '#64748B', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                  <YAxis unit="%" tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-                  <Tooltip formatter={(v: any) => [`${Number(v).toFixed(1)}%`, 'Growth']} contentStyle={{ background: '#1E293B', border: 'none', borderRadius: 8 }} labelStyle={{ color: '#94A3B8' }} itemStyle={{ color: '#FFF' }} />
-                  <ReferenceLine y={0} stroke="#CBD5E1" strokeDasharray="4 4" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
+                  <XAxis dataKey="brand_name" tick={{ fontSize: 10, fill: 'var(--text-secondary)', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                  <YAxis unit="%" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
+                  <Tooltip formatter={(v: any) => [`${Number(v).toFixed(1)}%`, 'Growth']} contentStyle={{ background: 'var(--tooltip-bg)', border: 'none', borderRadius: 'var(--radius-md)', fontSize: 11 }} labelStyle={{ color: 'var(--text-muted)' }} itemStyle={{ color: 'var(--tooltip-text)' }} />
+                  <ReferenceLine y={0} stroke="var(--neutral-300)" strokeDasharray="4 4" />
                   <Bar dataKey="growthPercent" name="Growth" radius={[6, 6, 0, 0]}>
                     {sorted.map((entry, index) => (
                       <Cell key={index} fill={brandColor(entry.brand_name, index)} />
@@ -220,9 +214,9 @@ export default function BrandGrowthPage() {
 
           {/* Performance Table */}
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '16px 22px', borderBottom: '1px solid #F1F5F9' }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Brand Performance</div>
-              <div style={{ fontSize: 11.5, color: '#94A3B8', marginTop: 2 }}>All brands ranked by {metric === 'views' ? 'view' : 'frequency'} growth</div>
+            <div style={{ padding: '16px 22px', borderBottom: '1px solid var(--border-light)' }}>
+              <div className="t-h3">Brand Performance</div>
+              <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', marginTop: 2 }}>All brands ranked by {metric === 'views' ? 'view' : 'frequency'} growth</div>
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table className="data-table">
@@ -242,15 +236,15 @@ export default function BrandGrowthPage() {
                     const color = brandColor(row.brand_name, i)
                     return (
                       <tr key={`${row.brand_name}_${i}`}>
-                        <td style={{ textAlign: 'center', fontWeight: 800, color: '#94A3B8' }}>{i + 1}</td>
+                        <td style={{ textAlign: 'center', fontWeight: 800, color: 'var(--text-muted)' }}>{i + 1}</td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <div style={{ width: 8, height: 8, borderRadius: '50%', background: color }} />
-                            <span style={{ fontWeight: 700, color: '#1E293B' }}>{row.brand_name}</span>
+                            <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{row.brand_name}</span>
                           </div>
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(row.currentValue)}</td>
-                        <td style={{ textAlign: 'right', color: '#64748B' }}>{fmt(row.previousValue)}</td>
+                        <td style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>{fmt(row.previousValue)}</td>
                         <td style={{ textAlign: 'right' }}><GrowthBadge val={row.growthPercent} /></td>
                         <td style={{ textAlign: 'center' }}><RankBadge val={row.rankMovement} /></td>
                         <td><MiniSparkBar data={row.sparklineData || []} color={color} /></td>

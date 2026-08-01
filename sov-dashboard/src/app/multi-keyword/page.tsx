@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Layers, Loader2, AlertCircle, Hash, ChevronDown, ChevronUp, Search } from 'lucide-react'
 import { useCampaignStore } from '@/lib/store'
+import { EmptyState } from '@/components/StateViews'
 
 interface MultiVideo {
   youtube_id: string
@@ -31,13 +32,13 @@ const COLORS = ['#1A73E8', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444', '#06B6D4'
 
 function BrandPills({ brands }: { brands: string[] }) {
   if (!brands || brands.length === 0) {
-    return <span style={{ color: '#CBD5E1', fontSize: 11 }}>—</span>
+    return <span style={{ color: 'var(--neutral-300)', fontSize: 'var(--fs-label)' }}>—</span>
   }
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
       {brands.map((b, i) => (
         <span key={b} style={{
-          fontSize: 10, padding: '2px 7px', borderRadius: 5, fontWeight: 700,
+          fontSize: 'var(--fs-micro)', padding: '2px 7px', borderRadius: 'var(--radius-sm)', fontWeight: 700,
           background: `${COLORS[i % COLORS.length]}15`,
           border: `1px solid ${COLORS[i % COLORS.length]}40`,
           color: COLORS[i % COLORS.length],
@@ -55,14 +56,14 @@ function KeywordPills({ keywords, max = 5 }: { keywords: string[], max?: number 
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, maxWidth: 320, alignItems: 'center' }}>
       {show.map(k => (
         <span key={k} style={{
-          fontSize: 9.5, padding: '2px 6px', borderRadius: 4,
-          background: '#F1F5F9', border: '1px solid #E2E8F0', color: '#475569', fontWeight: 500,
+          fontSize: 'var(--fs-micro)', padding: '2px 6px', borderRadius: 'var(--radius-sm)',
+          background: 'var(--bg-hover)', border: '1px solid var(--border-2)', color: 'var(--text-secondary)', fontWeight: 500,
         }}>{k}</span>
       ))}
       {!expanded && more > 0 && (
         <button
           onClick={() => setExpanded(true)}
-          style={{ fontSize: 9, color: '#1A73E8', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, padding: '2px 4px', display: 'flex', alignItems: 'center', gap: 2 }}
+          style={{ fontSize: 'var(--fs-micro)', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, padding: '2px 4px', display: 'flex', alignItems: 'center', gap: 2 }}
         >
           +{more} more <ChevronDown size={10} />
         </button>
@@ -70,7 +71,7 @@ function KeywordPills({ keywords, max = 5 }: { keywords: string[], max?: number 
       {expanded && (
         <button
           onClick={() => setExpanded(false)}
-          style={{ fontSize: 9, color: '#64748B', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, padding: '2px 4px', display: 'flex', alignItems: 'center', gap: 2 }}
+          style={{ fontSize: 'var(--fs-micro)', color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, padding: '2px 4px', display: 'flex', alignItems: 'center', gap: 2 }}
         >
           Less <ChevronUp size={10} />
         </button>
@@ -142,23 +143,20 @@ export default function MultiKeywordPage() {
 
   if (multiQuery.isLoading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', flexDirection: 'column', gap: 12 }}>
-      <Loader2 size={32} style={{ color: '#1A73E8', animation: 'spin 1s linear infinite' }} />
-      <div style={{ fontSize: 13.5, color: '#64748B', fontWeight: 600 }}>Loading multi-keyword data…</div>
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      <Loader2 size={32} style={{ color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
+      <div style={{ fontSize: 'var(--fs-body)', color: 'var(--text-secondary)', fontWeight: 600 }}>Loading multi-keyword data…</div>
     </div>
   )
 
   return (
     <div className="anim-fade-up">
-      <style>{`@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } } @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-
       <div className="page-header">
         <div>
           <h1 className="page-title">Multi-Keyword <span className="accent">Appearances</span></h1>
           <p className="page-subtitle">Videos ranking across many keywords — common phrasing explains broad authority</p>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <label style={{ fontSize: 12, fontWeight: 700, color: '#64748B' }}>Min Keywords:</label>
+          <label style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--text-secondary)' }}>Min Keywords:</label>
           <select className="input" style={{ width: 90, padding: '6px 12px' }} value={minKeywords} onChange={e => setMinKeywords(Number(e.target.value))}>
             {THRESHOLDS.map(n => <option key={n} value={n}>{n}+</option>)}
           </select>
@@ -233,7 +231,7 @@ export default function MultiKeywordPage() {
               setSelectedChannel('')
               setSearch('')
             }}
-            style={{ color: '#EF4444' }}
+            style={{ color: 'var(--danger)' }}
           >
             Reset Filters
           </button>
@@ -242,23 +240,23 @@ export default function MultiKeywordPage() {
 
       {commonTerms.length > 0 && (
         <div className="card" style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6, color: '#0F172A' }}>
+          <div className="t-h3" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
             <Hash size={14} /> Common Terminology Across Multi-Ranking Videos
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {commonTerms.map((term: string) => (
-              <span key={term} className="badge badge-blue" style={{ fontSize: 11 }}>{term}</span>
+              <span key={term} className="badge badge-blue" style={{ fontSize: 'var(--fs-label)' }}>{term}</span>
             ))}
           </div>
         </div>
       )}
 
       {data.length === 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 280, gap: 14, background: '#FFFFFF', borderRadius: 14, border: '1px solid #F1F5F9' }}>
-          <AlertCircle size={36} style={{ color: '#CBD5E1' }} />
-          <div style={{ fontSize: 14, fontWeight: 700 }}>No Cross-ranking Videos Found</div>
-          <div style={{ fontSize: 12, color: '#64748B' }}>Try lowering the threshold or check your search filters.</div>
-        </div>
+        <EmptyState
+          icon={<AlertCircle size={36} strokeWidth={1.5} style={{ color: 'var(--neutral-300)' }} />}
+          title="No Cross-ranking Videos Found"
+          body="Try lowering the threshold or check your search filters."
+        />
       ) : (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
@@ -280,10 +278,10 @@ export default function MultiKeywordPage() {
                   <tr key={video.youtube_id}>
                     <td style={{ textAlign: 'center' }}>
                       <div style={{
-                        width: 30, height: 30, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: i < 3 ? 'rgba(26,115,232,0.1)' : '#F8FAFC',
-                        color: i < 3 ? '#1A73E8' : '#64748B',
-                        fontWeight: 800, fontSize: 13, margin: '0 auto',
+                        width: 30, height: 30, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: i < 3 ? 'rgba(26,115,232,0.1)' : 'var(--bg-base)',
+                        color: i < 3 ? 'var(--accent)' : 'var(--text-secondary)',
+                        fontWeight: 800, fontSize: 'var(--fs-body)', margin: '0 auto',
                       }}>
                         #{i + 1}
                       </div>
@@ -295,7 +293,7 @@ export default function MultiKeywordPage() {
                           href={`https://youtube.com/watch?v=${video.youtube_id}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{ flexShrink: 0, display: 'block', width: 80, height: 46, borderRadius: 6, overflow: 'hidden', background: '#F1F5F9' }}
+                          style={{ flexShrink: 0, display: 'block', width: 80, height: 46, borderRadius: 'var(--radius-sm)', overflow: 'hidden', background: 'var(--bg-hover)' }}
                         >
                           <img
                             src={video.thumbnail_url || `https://img.youtube.com/vi/${video.youtube_id}/mqdefault.jpg`}
@@ -310,7 +308,7 @@ export default function MultiKeywordPage() {
                             target="_blank"
                             rel="noopener noreferrer"
                             style={{
-                              fontSize: 12, fontWeight: 600, color: 'var(--text-primary)',
+                              fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-primary)',
                               textDecoration: 'none', lineHeight: 1.4,
                               display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
                             } as React.CSSProperties}
@@ -318,7 +316,7 @@ export default function MultiKeywordPage() {
                             {video.title}
                           </a>
                           {video.description && (
-                            <div style={{ fontSize: 10.5, color: '#94A3B8', marginTop: 3, lineHeight: 1.3,
+                            <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', marginTop: 3, lineHeight: 1.3,
                               display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden',
                             } as React.CSSProperties}>
                               {video.description}
@@ -327,20 +325,20 @@ export default function MultiKeywordPage() {
                         </div>
                       </div>
                     </td>
-                    <td style={{ whiteSpace: 'nowrap', fontSize: 12, fontWeight: 500, color: '#334155' }}>
+                    <td style={{ whiteSpace: 'nowrap', fontSize: 'var(--fs-sm)', fontWeight: 500, color: 'var(--text-secondary)' }}>
                       {video.channel_name}
                     </td>
                     <td style={{ minWidth: 120 }}>
                       <BrandPills brands={video.brands ?? []} />
                     </td>
-                    <td style={{ textAlign: 'right', fontWeight: 700, fontSize: 13, fontVariantNumeric: 'tabular-nums' } as React.CSSProperties}>
+                    <td style={{ textAlign: 'right', fontWeight: 700, fontSize: 'var(--fs-body)' }}>
                       {fmt(video.view_count)}
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <span style={{
                         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                        minWidth: 32, height: 26, borderRadius: 7, fontWeight: 800, fontSize: 13,
-                        background: 'rgba(26,115,232,0.08)', color: '#1A73E8',
+                        minWidth: 32, height: 26, borderRadius: 'var(--radius-sm)', fontWeight: 800, fontSize: 'var(--fs-body)',
+                        background: 'var(--accent-dim)', color: 'var(--accent)',
                       }}>
                         {video.keyword_count}
                       </span>

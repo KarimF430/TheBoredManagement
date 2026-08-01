@@ -9,6 +9,7 @@ import {
 import { useCampaignStore } from '@/lib/store'
 import { useQuery } from '@tanstack/react-query'
 import { PageSkeleton } from '@/components/PageSkeleton'
+import { EmptyState } from '@/components/StateViews'
 import Link from 'next/link'
 
 const BRAND_COLORS = [
@@ -131,11 +132,11 @@ export default function AnalyticCalendarPage() {
             <p className="page-subtitle">Historical data explorer with daily rankings and metrics</p>
           </div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 300, gap: 12, background: '#fff', borderRadius: 14, border: '1px solid #F1F5F9' }}>
-          <AlertCircle size={36} style={{ color: '#CBD5E1' }} />
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#1E293B' }}>Select a Campaign</div>
-          <div style={{ fontSize: 13, color: '#64748B' }}>Choose a campaign to view the analytics calendar</div>
-        </div>
+        <EmptyState
+          icon={<AlertCircle size={36} strokeWidth={1.5} style={{ color: 'var(--neutral-300)' }} />}
+          title="Select a Campaign"
+          body="Choose a campaign to view the analytics calendar"
+        />
       </div>
     )
   }
@@ -147,16 +148,16 @@ export default function AnalyticCalendarPage() {
         @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .cal-day { transition: all 0.15s ease; cursor: pointer; }
-        .cal-day:hover { border-color: #1A73E8 !important; box-shadow: 0 2px 12px rgba(26,115,232,0.1); transform: translateY(-1px); }
-        .cal-day.today { border-color: #1A73E8 !important; background: rgba(26,115,232,0.03) !important; }
-        .cal-day.selected { border-color: #1A73E8 !important; background: rgba(26,115,232,0.06) !important; box-shadow: 0 0 0 2px rgba(26,115,232,0.15); }
+        .cal-day:hover { border-color: var(--accent) !important; box-shadow: 0 2px 12px rgba(26,115,232,0.1); transform: translateY(-1px); }
+        .cal-day.today { border-color: var(--accent) !important; background: rgba(26,115,232,0.03) !important; }
+        .cal-day.selected { border-color: var(--accent) !important; background: rgba(26,115,232,0.06) !important; box-shadow: 0 0 0 2px rgba(26,115,232,0.15); }
         .cal-day.empty { background: transparent; border-color: transparent; cursor: default; }
         .cal-day.empty:hover { transform: none; box-shadow: none; }
         .detail-panel { animation: slideIn 0.25s ease; }
         .rank-mover { transition: all 0.15s ease; }
         .rank-mover:hover { background: rgba(26,115,232,0.03); }
-        .sov-bar-bg { background: #F1F5F9; border-radius: 3px; height: 5px; overflow: hidden; }
-        .sov-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
+        .sov-bar-bg { background: var(--bg-hover); border-radius: var(--radius-xs); height: 5px; overflow: hidden; }
+        .sov-bar-fill { height: 100%; border-radius: var(--radius-xs); transition: width 0.3s ease; }
       `}</style>
 
       {/* Page Header */}
@@ -179,14 +180,14 @@ export default function AnalyticCalendarPage() {
       {/* Month Navigation + KPIs */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => navigateMonth(-1)} style={{ width: 36, height: 36, borderRadius: 10, border: '1.5px solid rgba(26,115,232,0.12)', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s' }}>
-            <ChevronLeft size={16} style={{ color: '#475569' }} />
+          <button onClick={() => navigateMonth(-1)} style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', border: '1.5px solid rgba(26,115,232,0.12)', background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s' }}>
+            <ChevronLeft size={16} style={{ color: 'var(--text-secondary)' }} />
           </button>
           <div style={{ minWidth: 180, textAlign: 'center' }}>
-            <div style={{ fontSize: 17, fontWeight: 800, color: '#0F172A' }}>{monthLabel || 'Loading...'}</div>
+            <div style={{ fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--text-bright)' }}>{monthLabel || 'Loading...'}</div>
           </div>
-          <button onClick={() => navigateMonth(1)} style={{ width: 36, height: 36, borderRadius: 10, border: '1.5px solid rgba(26,115,232,0.12)', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s' }}>
-            <ChevronRight size={16} style={{ color: '#475569' }} />
+          <button onClick={() => navigateMonth(1)} style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', border: '1.5px solid rgba(26,115,232,0.12)', background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s' }}>
+            <ChevronRight size={16} style={{ color: 'var(--text-secondary)' }} />
           </button>
           <button className="btn btn-ghost btn-xs" onClick={() => {
             const now = new Date()
@@ -203,14 +204,14 @@ export default function AnalyticCalendarPage() {
               { label: 'Avg Daily Views', value: fmtIndian(summary.avgDailyViews), icon: BarChart2, color: '#E45756', sub: null },
               { label: 'Rank Changes', value: fmtFull(summary.totalRankingChanges), icon: TrendingUp, color: '#72B7B2', sub: null },
             ].map((kpi) => (
-              <div key={kpi.label} style={{ background: '#fff', borderRadius: 12, padding: '10px 16px', border: '1px solid #F1F5F9', display: 'flex', gap: 10, alignItems: 'center', minWidth: 150 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: `${kpi.color}10`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div key={kpi.label} style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', padding: '10px 16px', border: '1px solid var(--border-light)', display: 'flex', gap: 10, alignItems: 'center', minWidth: 150 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 'var(--radius-md)', background: `${kpi.color}10`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <kpi.icon size={14} style={{ color: kpi.color }} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 9.5, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{kpi.label}</div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: '#0F172A', fontFamily: "'JetBrains Mono', monospace", lineHeight: 1.2 }}>{kpi.value}</div>
-                  {kpi.sub && <div style={{ fontSize: 10, color: summary.viewsGrowth > 0 ? '#059669' : '#DC2626', fontWeight: 600 }}>{kpi.sub}</div>}
+                  <div style={{ fontSize: 'var(--fs-micro)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{kpi.label}</div>
+                  <div style={{ fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--text-bright)', fontFamily: 'var(--font-mono)', lineHeight: 1.2 }}>{kpi.value}</div>
+                  {kpi.sub && <div style={{ fontSize: 'var(--fs-micro)', color: summary.viewsGrowth > 0 ? 'var(--success-text)' : 'var(--danger-text)', fontWeight: 600 }}>{kpi.sub}</div>}
                 </div>
               </div>
             ))}
@@ -225,7 +226,7 @@ export default function AnalyticCalendarPage() {
             {/* Weekday Headers */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 6 }}>
               {WEEKDAYS.map(day => (
-                <div key={day} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.5px', padding: '6px 0' }}>
+                <div key={day} style={{ textAlign: 'center', fontSize: 'var(--fs-micro)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', padding: '6px 0' }}>
                   {day}
                 </div>
               ))}
@@ -235,7 +236,7 @@ export default function AnalyticCalendarPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
               {calendarQuery.isLoading ? (
                 Array.from({ length: 35 }).map((_, i) => (
-                  <div key={i} style={{ height: 100, borderRadius: 10, background: '#F8FAFC', border: '1px solid #F1F5F9', animation: 'fadeIn 0.3s ease', animationDelay: `${i * 20}ms` }} />
+                  <div key={i} style={{ height: 100, borderRadius: 'var(--radius-md)', background: 'var(--bg-base)', border: '1px solid var(--border-light)', animation: 'fadeIn 0.3s ease', animationDelay: `${i * 20}ms` }} />
                 ))
               ) : (
                 calendarGrid.map((day, i) => {
@@ -253,9 +254,9 @@ export default function AnalyticCalendarPage() {
                       onClick={() => { setSelectedDay(day); setShowDetail(true) }}
                       style={{
                         height: 100,
-                        borderRadius: 10,
-                        border: '1px solid #F1F5F9',
-                        background: hasData ? `rgba(76,120,168,${0.02 + viewIntensity * 0.06})` : '#FAFBFC',
+                        borderRadius: 'var(--radius-md)',
+                        border: '1px solid var(--border-light)',
+                        background: hasData ? `rgba(76,120,168,${0.02 + viewIntensity * 0.06})` : 'var(--bg-base)',
                         padding: '6px 8px',
                         display: 'flex',
                         flexDirection: 'column',
@@ -266,13 +267,13 @@ export default function AnalyticCalendarPage() {
                       {/* Date Number */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                         <span style={{
-                          fontSize: 12,
+                          fontSize: 'var(--fs-sm)',
                           fontWeight: isToday ? 800 : 600,
-                          color: isToday ? '#fff' : '#475569',
-                          background: isToday ? '#1A73E8' : 'transparent',
+                          color: isToday ? 'var(--on-accent)' : 'var(--text-secondary)',
+                          background: isToday ? 'var(--accent)' : 'transparent',
                           width: isToday ? 22 : 'auto',
                           height: isToday ? 22 : 'auto',
-                          borderRadius: isToday ? 6 : 0,
+                          borderRadius: isToday ? 'var(--radius-sm)' : 0,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -280,7 +281,7 @@ export default function AnalyticCalendarPage() {
                           {dateNum}
                         </span>
                         {day.scrapeJobs > 0 && (
-                          <Zap size={10} style={{ color: '#F59E0B' }} />
+                          <Zap size={10} style={{ color: 'var(--warning)' }} />
                         )}
                       </div>
 
@@ -289,20 +290,20 @@ export default function AnalyticCalendarPage() {
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, justifyContent: 'flex-end' }}>
                           {day.views > 0 && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                              <Eye size={8} style={{ color: '#94A3B8', flexShrink: 0 }} />
-                              <span style={{ fontSize: 9, color: '#64748B', fontWeight: 600, fontFamily: "'JetBrains Mono', monospace" }}>{fmt(day.views)}</span>
+                              <Eye size={8} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                              <span style={{ fontSize: 'var(--fs-micro)', color: 'var(--text-secondary)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{fmt(day.views)}</span>
                             </div>
                           )}
                           {day.newVideos > 0 && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                              <Video size={8} style={{ color: '#54A24B', flexShrink: 0 }} />
-                              <span style={{ fontSize: 9, color: '#54A24B', fontWeight: 600 }}>{day.newVideos} new</span>
+                              <Video size={8} style={{ color: 'var(--c2)', flexShrink: 0 }} />
+                              <span style={{ fontSize: 'var(--fs-micro)', color: 'var(--c2)', fontWeight: 600 }}>{day.newVideos} new</span>
                             </div>
                           )}
                           {day.rankings.length > 0 && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                              <TrendingUp size={8} style={{ color: '#72B7B2', flexShrink: 0 }} />
-                              <span style={{ fontSize: 9, color: '#72B7B2', fontWeight: 600 }}>{day.rankings.length} moves</span>
+                              <TrendingUp size={8} style={{ color: 'var(--c4)', flexShrink: 0 }} />
+                              <span style={{ fontSize: 'var(--fs-micro)', color: 'var(--c4)', fontWeight: 600 }}>{day.rankings.length} moves</span>
                             </div>
                           )}
                         </div>
@@ -326,14 +327,14 @@ export default function AnalyticCalendarPage() {
           {/* Legend */}
           <div style={{ display: 'flex', gap: 16, marginTop: 12, paddingLeft: 4, flexWrap: 'wrap' }}>
             {[
-              { icon: Eye, color: '#94A3B8', label: 'Views' },
-              { icon: Video, color: '#54A24B', label: 'New Videos' },
-              { icon: TrendingUp, color: '#72B7B2', label: 'Rank Changes' },
-              { icon: Zap, color: '#F59E0B', label: 'Scrape Jobs' },
+              { icon: Eye, color: 'var(--text-muted)', label: 'Views' },
+              { icon: Video, color: 'var(--c2)', label: 'New Videos' },
+              { icon: TrendingUp, color: 'var(--c4)', label: 'Rank Changes' },
+              { icon: Zap, color: 'var(--warning)', label: 'Scrape Jobs' },
             ].map(l => (
               <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <l.icon size={10} style={{ color: l.color }} />
-                <span style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600 }}>{l.label}</span>
+                <span style={{ fontSize: 'var(--fs-micro)', color: 'var(--text-muted)', fontWeight: 600 }}>{l.label}</span>
               </div>
             ))}
           </div>
@@ -344,32 +345,32 @@ export default function AnalyticCalendarPage() {
           <div className="detail-panel" style={{ width: 380, flexShrink: 0 }}>
             <div className="card" style={{ padding: 0, overflow: 'hidden', position: 'sticky', top: 20 }}>
               {/* Panel Header */}
-              <div style={{ padding: '16px 20px', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#0F172A' }}>
+                  <div style={{ fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--text-bright)' }}>
                     {new Date(selectedDay.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                   </div>
-                  <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>{selectedDay.date}</div>
+                  <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', marginTop: 2 }}>{selectedDay.date}</div>
                 </div>
-                <button onClick={() => setShowDetail(false)} style={{ width: 28, height: 28, borderRadius: 8, border: 'none', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                  <X size={14} style={{ color: '#64748B' }} />
+                <button onClick={() => setShowDetail(false)} style={{ width: 28, height: 28, borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                  <X size={14} style={{ color: 'var(--text-secondary)' }} />
                 </button>
               </div>
 
               {/* Day Metrics */}
               <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 {[
-                  { label: 'Views', value: fmtIndian(selectedDay.views), color: '#4C78A8', icon: Eye },
-                  { label: 'New Videos', value: String(selectedDay.newVideos), color: '#54A24B', icon: Video },
-                  { label: 'Keywords Added', value: String(selectedDay.keywordsAdded), color: '#B279A2', icon: Hash },
-                  { label: 'Scrape Jobs', value: String(selectedDay.scrapeJobs), color: '#F59E0B', icon: Zap },
+                  { label: 'Views', value: fmtIndian(selectedDay.views), color: 'var(--c1)', icon: Eye },
+                  { label: 'New Videos', value: String(selectedDay.newVideos), color: 'var(--c2)', icon: Video },
+                  { label: 'Keywords Added', value: String(selectedDay.keywordsAdded), color: 'var(--c6)', icon: Hash },
+                  { label: 'Scrape Jobs', value: String(selectedDay.scrapeJobs), color: 'var(--warning)', icon: Zap },
                 ].map(m => (
-                  <div key={m.label} style={{ background: '#F8FAFC', borderRadius: 10, padding: '10px 12px' }}>
+                  <div key={m.label} style={{ background: 'var(--bg-base)', borderRadius: 'var(--radius-md)', padding: '10px 12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
                       <m.icon size={11} style={{ color: m.color }} />
-                      <span style={{ fontSize: 9.5, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{m.label}</span>
+                      <span style={{ fontSize: 'var(--fs-micro)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{m.label}</span>
                     </div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A', fontFamily: "'JetBrains Mono', monospace" }}>{m.value}</div>
+                    <div style={{ fontSize: 'var(--fs-h1)', fontWeight: 800, color: 'var(--text-bright)', fontFamily: 'var(--font-mono)' }}>{m.value}</div>
                   </div>
                 ))}
               </div>
@@ -377,16 +378,16 @@ export default function AnalyticCalendarPage() {
               {/* Brand SOV */}
               {selectedDay.topBrands.length > 0 && (
                 <div style={{ padding: '0 20px 16px' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>Brand SOV</div>
+                  <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--text-bright)', marginBottom: 8 }}>Brand SOV</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {selectedDay.topBrands.map((b, i) => (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div style={{ width: 6, height: 6, borderRadius: '50%', background: brandColor(b.brand), flexShrink: 0 }} />
-                        <span style={{ fontSize: 11, fontWeight: 600, color: '#475569', minWidth: 70, flexShrink: 0 }}>{b.brand.length > 10 ? b.brand.slice(0, 10) + '…' : b.brand}</span>
+                        <span style={{ fontSize: 'var(--fs-label)', fontWeight: 600, color: 'var(--text-secondary)', minWidth: 70, flexShrink: 0 }}>{b.brand.length > 10 ? b.brand.slice(0, 10) + '…' : b.brand}</span>
                         <div className="sov-bar-bg" style={{ flex: 1 }}>
                           <div className="sov-bar-fill" style={{ width: `${b.sov}%`, background: brandColor(b.brand) }} />
                         </div>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: '#64748B', minWidth: 35, textAlign: 'right', fontFamily: "'JetBrains Mono', monospace" }}>{b.sov}%</span>
+                        <span style={{ fontSize: 'var(--fs-micro)', fontWeight: 700, color: 'var(--text-secondary)', minWidth: 35, textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{b.sov}%</span>
                       </div>
                     ))}
                   </div>
@@ -396,31 +397,31 @@ export default function AnalyticCalendarPage() {
               {/* Ranking Changes */}
               {selectedDay.rankings.length > 0 && (
                 <div style={{ padding: '0 20px 20px' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>Ranking Changes</div>
+                  <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--text-bright)', marginBottom: 8 }}>Ranking Changes</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 240, overflowY: 'auto' }}>
                     {selectedDay.rankings.map((r, i) => (
-                      <div key={i} className="rank-mover" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8, background: '#FAFBFC', border: '1px solid #F1F5F9' }}>
+                      <div key={i} className="rank-mover" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 'var(--radius-md)', background: 'var(--bg-base)', border: '1px solid var(--border-light)' }}>
                         <div style={{
-                          width: 24, height: 24, borderRadius: 6,
-                          background: r.movement > 0 ? '#ECFDF5' : r.movement < 0 ? '#FEF2F2' : '#F1F5F9',
+                          width: 24, height: 24, borderRadius: 'var(--radius-sm)',
+                          background: r.movement > 0 ? 'var(--success-dim)' : r.movement < 0 ? 'var(--danger-dim)' : 'var(--bg-hover)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
                         }}>
                           {r.movement > 0
-                            ? <ArrowUpRight size={12} style={{ color: '#059669' }} />
+                            ? <ArrowUpRight size={12} style={{ color: 'var(--success-text)' }} />
                             : r.movement < 0
-                              ? <ArrowDownRight size={12} style={{ color: '#DC2626' }} />
-                              : <Minus size={12} style={{ color: '#94A3B8' }} />
+                              ? <ArrowDownRight size={12} style={{ color: 'var(--danger-text)' }} />
+                              : <Minus size={12} style={{ color: 'var(--text-muted)' }} />
                           }
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 11, fontWeight: 600, color: '#1E293B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.keyword}</div>
-                          <div style={{ fontSize: 9.5, color: '#94A3B8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.channel}</div>
+                          <div style={{ fontSize: 'var(--fs-label)', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.keyword}</div>
+                          <div style={{ fontSize: 'var(--fs-micro)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.channel}</div>
                         </div>
                         <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: '#475569', fontFamily: "'JetBrains Mono', monospace" }}>
+                          <div style={{ fontSize: 'var(--fs-micro)', fontWeight: 700, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
                             #{r.oldRank} → #{r.newRank}
                           </div>
-                          <div style={{ fontSize: 9, color: r.movement > 0 ? '#059669' : '#DC2626', fontWeight: 600 }}>
+                          <div style={{ fontSize: 'var(--fs-micro)', color: r.movement > 0 ? 'var(--success-text)' : 'var(--danger-text)', fontWeight: 600 }}>
                             {r.movement > 0 ? `↑${r.movement}` : `↓${Math.abs(r.movement)}`}
                           </div>
                         </div>
@@ -433,8 +434,8 @@ export default function AnalyticCalendarPage() {
               {/* Empty State */}
               {selectedDay.views === 0 && selectedDay.newVideos === 0 && selectedDay.rankings.length === 0 && (
                 <div style={{ padding: '24px 20px', textAlign: 'center' }}>
-                  <Calendar size={28} style={{ color: '#CBD5E1', marginBottom: 8 }} />
-                  <div style={{ fontSize: 12, color: '#94A3B8', fontWeight: 600 }}>No data recorded for this day</div>
+                  <Calendar size={28} style={{ color: 'var(--neutral-300)', marginBottom: 8 }} />
+                  <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', fontWeight: 600 }}>No data recorded for this day</div>
                 </div>
               )}
             </div>
