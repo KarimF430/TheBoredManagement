@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
+import AnalysisProgress, { type AnalysisState } from '@/components/AnalysisProgress'
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink, Download, ChevronUp, ChevronDown, Search, AlertCircle, Plus, X, Tag, Brain, Loader2 } from 'lucide-react'
 import { useCampaignStore } from '@/lib/store'
@@ -25,7 +26,14 @@ interface VideoRow {
   is_new: boolean
   is_ours: boolean
   keywords_appeared: string[]
+  /** YouTube's own tags, plus any brand merged in by AI analysis. */
   tags: string[]
+  /**
+   * Brands from the `brand_tags` table — what the brand filter matches on, so
+   * it is authoritative. The scrape pipeline writes here without touching
+   * `tags`, which is why the two disagree and chips went missing.
+   */
+  brands?: string[]
   keyword_ranks?: KeywordRank[]
 }
 
@@ -98,6 +106,8 @@ function LeaderboardContent() {
   const [customTagInput, setCustomTagInput] = useState('')
   const [analyzingId, setAnalyzingId] = useState<string | null>(null)
   const [batchAnalyzing, setBatchAnalyzing] = useState(false)
+  const [analysis, setAnalysis] = useState<AnalysisState | null>(null)
+  const cancelRef = useRef(false)
   const [expandedKeywords, setExpandedKeywords] = useState<Set<string>>(new Set())
 
   useEffect(() => {
@@ -203,21 +213,106 @@ function LeaderboardContent() {
     }
   }
 
+  /**
+   * Analyse every unanalysed video in the campaign, in small batches.
+   *
+   * Previously this posted the 20 rows on the current page in one request and
+   * reported nothing until it returned — so "AI Analyze All" neither covered
+   * all videos nor showed progress. Batching also keeps each request well
+   * inside the serverless timeout.
+   */
   const handleBatchAnalyze = async () => {
-    if (!activeCampaignId || videos.length === 0) return
+    if (!activeCampaignId) return
+    cancelRef.current = false
     setBatchAnalyzing(true)
+
+    const base: AnalysisState = {
+      total: 0, totalUnique: 0, alreadyAnalyzed: 0,
+      processed: 0, success: 0, skipped: 0, failed: 0,
+      currentVideo: '', phase: 'starting', errors: [],
+    }
+    setAnalysis({ ...base, message: 'Counting videos that still need analysis…' })
+
     try {
-      const ids = videos.map(v => v.youtube_id)
-      const res = await fetch('/api/brands/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ video_ids: ids, campaign_id: activeCampaignId, force: false }),
+      const idsRes = await fetch(`/api/videos/ids?campaign_id=${activeCampaignId}&format=${format}`)
+      const idsData = await idsRes.json()
+
+      if (idsData.error) {
+        setAnalysis({ ...base, phase: 'error', message: idsData.error })
+        return
+      }
+
+      const queue = (idsData.videos || []) as { youtube_id: string; title: string }[]
+      const totalUnique = idsData.totalUnique ?? queue.length
+      const alreadyAnalyzed = idsData.alreadyAnalyzed ?? 0
+
+      if (queue.length === 0) {
+        setAnalysis({
+          ...base, phase: 'complete', totalUnique, alreadyAnalyzed,
+          message: `All ${totalUnique.toLocaleString()} videos in this campaign are already analysed.`,
+        })
+        return
+      }
+
+      let processed = 0, success = 0, skipped = 0, failed = 0
+      const errors: AnalysisState['errors'] = []
+      const BATCH = 5
+
+      const snapshot = (over: Partial<AnalysisState>): AnalysisState => ({
+        ...base, total: queue.length, totalUnique, alreadyAnalyzed,
+        processed, success, skipped, failed, errors: [...errors],
+        phase: 'analyzing', currentVideo: '', ...over,
       })
-      const result = await res.json()
-      // Refresh video list to get updated tags
+
+      for (let i = 0; i < queue.length; i += BATCH) {
+        if (cancelRef.current) break
+        const batch = queue.slice(i, i + BATCH)
+
+        setAnalysis(snapshot({ currentVideo: batch.map(v => v.title).join(' · ') }))
+
+        try {
+          const res = await fetch('/api/brands/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ video_ids: batch.map(v => v.youtube_id), campaign_id: activeCampaignId, force: false }),
+          })
+          const result = await res.json()
+
+          for (const r of (result.results || [])) {
+            processed++
+            if (r.status === 'analyzed') {
+              const brands = r.high_confidence_brands?.length || r.brands_detected || 0
+              if (brands > 0) success++; else skipped++
+            } else if (r.status === 'error') {
+              failed++
+              const v = batch.find(bv => bv.youtube_id === r.youtube_id)
+              errors.push({ youtube_id: r.youtube_id, title: v?.title || r.youtube_id, error: r.error || 'Failed' })
+            } else {
+              skipped++
+            }
+          }
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : 'Network error'
+          processed += batch.length
+          failed += batch.length
+          for (const v of batch) errors.push({ youtube_id: v.youtube_id, title: v.title, error: msg })
+        }
+
+        setAnalysis(snapshot({}))
+        // Newly detected brands land in the table as the run proceeds.
+        if (success > 0) leaderboardQuery.refetch()
+      }
+
+      const stopped = cancelRef.current
+      setAnalysis(snapshot({
+        phase: stopped ? 'cancelled' : 'complete',
+        message: stopped
+          ? `Stopped after ${processed.toLocaleString()} of ${queue.length.toLocaleString()} videos.`
+          : `Found brands in ${success.toLocaleString()} of ${processed.toLocaleString()} videos analysed.`,
+      }))
       leaderboardQuery.refetch()
-    } catch (e) {
-      console.error('Batch analysis failed:', e)
+    } catch (e: unknown) {
+      setAnalysis({ ...base, phase: 'error', message: e instanceof Error ? e.message : 'Analysis failed' })
     } finally {
       setBatchAnalyzing(false)
     }
@@ -284,17 +379,25 @@ function LeaderboardContent() {
             onClick={handleBatchAnalyze}
             disabled={batchAnalyzing}
             style={{
-              background: batchAnalyzing ? '#F1F5F9' : 'rgba(124,58,237,0.08)',
-              border: `1px solid ${batchAnalyzing ? '#E2E8F0' : 'rgba(124,58,237,0.25)'}`,
-              color: '#7C3AED',
+              background: batchAnalyzing ? 'var(--bg-hover)' : 'var(--violet-dim)',
+              border: `1px solid ${batchAnalyzing ? 'var(--border-2)' : 'rgba(124,58,237,0.25)'}`,
+              color: 'var(--violet)',
               fontWeight: 700,
             }}
           >
             {batchAnalyzing ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Brain size={13} />}
-            {batchAnalyzing ? 'Analyzing...' : 'AI Analyze All'}
+            {batchAnalyzing ? 'Analyzing…' : 'AI Analyze All'}
           </button>
         </div>
       </div>
+
+      {analysis && (
+        <AnalysisProgress
+          state={analysis}
+          onCancel={() => { cancelRef.current = true }}
+          onDismiss={() => setAnalysis(null)}
+        />
+      )}
 
       {/* Page-specific filters: Brand, Keyword, Channel */}
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', padding: '0 24px', marginBottom: 16 }}>
@@ -369,6 +472,8 @@ function LeaderboardContent() {
                 {videos.map((video, i) => {
                   const globalRank = (page - 1) * PER_PAGE + i + 1
                   const isEditing = editingVideoId === video.youtube_id
+                  // brand_tags first — the authoritative source the filter uses.
+                  const allBrandChips = Array.from(new Set([...(video.brands || []), ...(video.tags || [])]))
 
                   return (
                     <tr key={video.youtube_id}>
@@ -471,7 +576,7 @@ function LeaderboardContent() {
                       </td>
                       <td style={{ minWidth: 200, position: 'relative' }}>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
-                          {video.tags && video.tags.map(tag => (
+                          {allBrandChips.map(tag => (
                             <span
                               key={tag}
                               style={{
@@ -489,7 +594,7 @@ function LeaderboardContent() {
                             >
                               {tag}
                               <button
-                                onClick={() => handleUpdateTags(video.youtube_id, video.tags.filter(t => t !== tag))}
+                                onClick={() => handleUpdateTags(video.youtube_id, allBrandChips.filter(t => t !== tag))}
                                 style={{ background: 'none', border: 'none', color: '#1A73E8', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
                               >
                                 <X size={10} />
@@ -580,7 +685,7 @@ function LeaderboardContent() {
                                 <span style={{ fontSize: 11, color: '#94A3B8', fontStyle: 'italic' }}>No campaign brands defined. Add them in Control tab.</span>
                               ) : (
                                 campaignBrands.map(brand => {
-                                  const hasTag = video.tags && video.tags.includes(brand)
+                                  const hasTag = allBrandChips.includes(brand)
                                   return (
                                     <label key={brand} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, cursor: 'pointer', color: '#334155' }}>
                                       <input
@@ -588,8 +693,8 @@ function LeaderboardContent() {
                                         checked={hasTag}
                                         onChange={() => {
                                           const next = hasTag
-                                            ? video.tags.filter(t => t !== brand)
-                                            : [...(video.tags || []), brand]
+                                            ? allBrandChips.filter(t => t !== brand)
+                                            : [...allBrandChips, brand]
                                           handleUpdateTags(video.youtube_id, next)
                                         }}
                                       />
@@ -611,8 +716,8 @@ function LeaderboardContent() {
                                 onKeyDown={e => {
                                   if (e.key === 'Enter' && customTagInput.trim()) {
                                     const val = customTagInput.trim()
-                                    if (!video.tags.includes(val)) {
-                                      handleUpdateTags(video.youtube_id, [...video.tags, val])
+                                    if (!allBrandChips.includes(val)) {
+                                      handleUpdateTags(video.youtube_id, [...allBrandChips, val])
                                     }
                                     setCustomTagInput('')
                                   }
@@ -622,8 +727,8 @@ function LeaderboardContent() {
                                 onClick={() => {
                                   if (customTagInput.trim()) {
                                     const val = customTagInput.trim()
-                                    if (!video.tags.includes(val)) {
-                                      handleUpdateTags(video.youtube_id, [...video.tags, val])
+                                    if (!allBrandChips.includes(val)) {
+                                      handleUpdateTags(video.youtube_id, [...allBrandChips, val])
                                     }
                                     setCustomTagInput('')
                                   }

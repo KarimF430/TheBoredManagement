@@ -54,8 +54,12 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
     : ''
 
   // Build language filter for video_id-level queries (campaign_videos, view_snapshots)
-  const langVideoIdFilter = language && language !== 'all'
-    ? `AND video_id IN (
+  // Takes the column explicitly. It used to hardcode a bare `video_id`, which
+  // is ambiguous wherever the query joins two tables that both have one — the
+  // transcript-coverage query joins video_transcripts to campaign_videos, so
+  // picking ANY language returned 500 and blanked the whole Overview page.
+  const langVideoIdFilter = (col: string) => language && language !== 'all'
+    ? `AND ${col} IN (
         SELECT kv.video_id FROM keyword_videos kv
         JOIN keywords k ON k.id = kv.keyword_id
         WHERE kv.campaign_id = $1 AND k.language = '${language}'
@@ -103,7 +107,7 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
           JOIN videos v ON v.id = cv.video_id
           WHERE cv.campaign_id = $1
             AND ((v.duration_sec IS NULL OR v.duration_sec > 60) OR cv.video_id IN (SELECT video_id FROM keyword_videos WHERE campaign_id = $1))
-            ${langVideoIdFilter}
+            ${langVideoIdFilter('cv.video_id')}
         `, [cid])
       : format === 'short'
       ? queryAll<{ cnt: number }>(`
@@ -112,13 +116,13 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
           JOIN videos v ON v.id = cv.video_id
           WHERE cv.campaign_id = $1
             AND ((v.duration_sec IS NOT NULL AND v.duration_sec <= 60) OR cv.video_id IN (SELECT video_id FROM keyword_shorts WHERE campaign_id = $1))
-            ${langVideoIdFilter}
+            ${langVideoIdFilter('cv.video_id')}
         `, [cid])
       : queryAll<{ cnt: number }>(`
           SELECT COUNT(DISTINCT video_id)::INT as cnt
           FROM campaign_videos
           WHERE campaign_id = $1
-            ${langVideoIdFilter}
+            ${langVideoIdFilter('video_id')}
         `, [cid]),
 
     // New videos count (last 7 days) — filtered by format
@@ -129,7 +133,7 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
           JOIN videos v ON v.id = cv.video_id
           WHERE cv.campaign_id = $1 AND cv.first_seen_at >= $2
             AND ((v.duration_sec IS NULL OR v.duration_sec > 60) OR cv.video_id IN (SELECT video_id FROM keyword_videos WHERE campaign_id = $1))
-            ${langVideoIdFilter}
+            ${langVideoIdFilter('cv.video_id')}
         `, [cid, new Date(Date.now() - 7 * 86400000).toISOString()])
       : format === 'short'
       ? queryAll<{ cnt: number }>(`
@@ -138,7 +142,7 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
           JOIN videos v ON v.id = cv.video_id
           WHERE cv.campaign_id = $1 AND cv.first_seen_at >= $2
             AND ((v.duration_sec IS NOT NULL AND v.duration_sec <= 60) OR cv.video_id IN (SELECT video_id FROM keyword_shorts WHERE campaign_id = $1))
-            ${langVideoIdFilter}
+            ${langVideoIdFilter('cv.video_id')}
         `, [cid, new Date(Date.now() - 7 * 86400000).toISOString()])
       : supabase.from('campaign_videos').select('video_id', { count: 'exact', head: true })
         .eq('campaign_id', cid).gte('first_seen_at', new Date(Date.now() - 7 * 86400000).toISOString()),
@@ -297,7 +301,7 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
         AND first_seen_at >= $2
         ${format === 'long' ? 'AND cv.video_id IN (SELECT DISTINCT video_id FROM keyword_videos WHERE campaign_id = $1)' : ''}
         ${format === 'short' ? 'AND cv.video_id IN (SELECT DISTINCT video_id FROM keyword_shorts WHERE campaign_id = $1)' : ''}
-        ${langVideoIdFilter}
+        ${langVideoIdFilter('cv.video_id')}
       GROUP BY DATE(first_seen_at)
       ORDER BY DATE(first_seen_at) ASC
     `, [cid, thirtyDaysAgo]),
@@ -323,7 +327,7 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
         AND vt.fetch_status = 'success'
         ${format === 'long' ? 'AND cv.video_id IN (SELECT DISTINCT video_id FROM keyword_videos WHERE campaign_id = $1)' : ''}
         ${format === 'short' ? 'AND cv.video_id IN (SELECT DISTINCT video_id FROM keyword_shorts WHERE campaign_id = $1)' : ''}
-        ${langVideoIdFilter}
+        ${langVideoIdFilter('cv.video_id')}
     `, [cid]),
   ])
 

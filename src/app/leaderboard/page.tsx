@@ -25,7 +25,14 @@ interface VideoRow {
   is_new: boolean
   is_ours: boolean
   keywords_appeared: string[]
+  /** YouTube's own tags on the video, plus any brand merged in by AI analysis. */
   tags: string[]
+  /**
+   * Brands from the `brand_tags` table — this is what the brand filter matches
+   * on, so it is the authoritative list. The scrape pipeline writes here without
+   * touching `tags`, which is why the two can disagree.
+   */
+  brands?: string[]
   keyword_ranks?: KeywordRank[]
 }
 
@@ -519,6 +526,8 @@ function LeaderboardContent() {
                 {videos.map((video, i) => {
                   const globalRank = (page - 1) * PER_PAGE + i + 1
                   const isEditing = editingVideoId === video.youtube_id
+                  // brand_tags first — it is the authoritative source the filter uses.
+                  const allBrandChips = Array.from(new Set([...(video.brands || []), ...(video.tags || [])]))
 
                   return (
                     <tr key={video.youtube_id}>
@@ -621,7 +630,14 @@ function LeaderboardContent() {
                       </td>
                       <td style={{ minWidth: 200, position: 'relative' }}>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
-                          {video.tags && video.tags.map(tag => (
+                          {/*
+                            Render the union of both brand sources. `brands` comes from
+                            brand_tags (what the brand filter matches on); `tags` is the
+                            video's own tag list. The scrape pipeline writes only the
+                            former, so rendering `tags` alone made filtered rows appear
+                            to have no brand at all.
+                          */}
+                          {allBrandChips.map(tag => (
                             <span
                               key={tag}
                               style={{
@@ -639,7 +655,7 @@ function LeaderboardContent() {
                             >
                               {tag}
                               <button
-                                onClick={() => handleUpdateTags(video.youtube_id, video.tags.filter(t => t !== tag))}
+                                onClick={() => handleUpdateTags(video.youtube_id, allBrandChips.filter(t => t !== tag))}
                                 style={{ background: 'none', border: 'none', color: '#1A73E8', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
                               >
                                 <X size={10} />
@@ -730,7 +746,7 @@ function LeaderboardContent() {
                                 <span style={{ fontSize: 11, color: '#94A3B8', fontStyle: 'italic' }}>No campaign brands defined. Add them in Control tab.</span>
                               ) : (
                                 campaignBrands.map(brand => {
-                                  const hasTag = video.tags && video.tags.includes(brand)
+                                  const hasTag = allBrandChips.includes(brand)
                                   return (
                                     <label key={brand} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, cursor: 'pointer', color: '#334155' }}>
                                       <input
@@ -738,8 +754,8 @@ function LeaderboardContent() {
                                         checked={hasTag}
                                         onChange={() => {
                                           const next = hasTag
-                                            ? video.tags.filter(t => t !== brand)
-                                            : [...(video.tags || []), brand]
+                                            ? allBrandChips.filter(t => t !== brand)
+                                            : [...allBrandChips, brand]
                                           handleUpdateTags(video.youtube_id, next)
                                         }}
                                       />
@@ -761,8 +777,8 @@ function LeaderboardContent() {
                                 onKeyDown={e => {
                                   if (e.key === 'Enter' && customTagInput.trim()) {
                                     const val = customTagInput.trim()
-                                    if (!video.tags.includes(val)) {
-                                      handleUpdateTags(video.youtube_id, [...video.tags, val])
+                                    if (!allBrandChips.includes(val)) {
+                                      handleUpdateTags(video.youtube_id, [...allBrandChips, val])
                                     }
                                     setCustomTagInput('')
                                   }
@@ -772,8 +788,8 @@ function LeaderboardContent() {
                                 onClick={() => {
                                   if (customTagInput.trim()) {
                                     const val = customTagInput.trim()
-                                    if (!video.tags.includes(val)) {
-                                      handleUpdateTags(video.youtube_id, [...video.tags, val])
+                                    if (!allBrandChips.includes(val)) {
+                                      handleUpdateTags(video.youtube_id, [...allBrandChips, val])
                                     }
                                     setCustomTagInput('')
                                   }

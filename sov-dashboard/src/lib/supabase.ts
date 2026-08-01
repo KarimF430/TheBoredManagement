@@ -100,7 +100,16 @@ export async function queryAll<T = any>(sql: string, params: any[] = []): Promis
     } catch (e: any) {
       // Surface real SQL errors; only fall back when the pooler itself is
       // unreachable, so a broken query doesn't silently take the slow path.
-      if (!isConnectionError(e)) throw new Error(`SQL error: ${e.message}`)
+      //
+      // The failing statement is attached because these routes fire ~20
+      // queries in one Promise.all — without it, "there is no parameter $3"
+      // names no file, no line and no query, and is effectively unactionable.
+      if (!isConnectionError(e)) {
+        const compact = sql.replace(/\s+/g, ' ').trim()
+        throw new Error(
+          `SQL error: ${e.message}\n  params: ${params.length}\n  sql: ${compact.slice(0, 400)}${compact.length > 400 ? '…' : ''}`
+        )
+      }
       reportPgConnectionFailure()
       console.warn('pg pool unreachable, falling back to exec_sql RPC:', e.message)
     }

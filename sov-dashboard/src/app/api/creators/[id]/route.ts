@@ -12,10 +12,15 @@ export async function GET(
 
     const decodedId = decodeURIComponent(creatorId)
 
+    // The filter reuses $1 rather than introducing a $2. Previously it used $2
+    // and the caller always passed three parameters — so on format=all, where
+    // this string is empty, $2 appeared nowhere in the SQL and Postgres failed
+    // with "could not determine data type of parameter $2". That made the
+    // creator deep-dive return 500 for the default format, every time.
     const formatFilter = format === 'long'
-      ? `AND v.id IN (SELECT video_id FROM keyword_videos WHERE campaign_id = $2)`
+      ? `AND v.id IN (SELECT video_id FROM keyword_videos WHERE campaign_id = $1)`
       : format === 'short'
-      ? `AND v.id IN (SELECT video_id FROM keyword_shorts WHERE campaign_id = $2)`
+      ? `AND v.id IN (SELECT video_id FROM keyword_shorts WHERE campaign_id = $1)`
       : ''
 
     const videosRows = await queryAll<any>(`
@@ -28,9 +33,9 @@ export async function GET(
         SELECT video_id FROM keyword_shorts WHERE campaign_id = $1
       ) cv
       JOIN videos v ON v.id = cv.video_id
-      WHERE (v.channel_id = $3 OR v.channel_name = $3)
-      ${formatFilter.replace('cv.', '')}
-    `, campaignId ? [campaignId, campaignId, decodedId] : [campaignId, decodedId, decodedId])
+      WHERE (v.channel_id = $2 OR v.channel_name = $2)
+      ${formatFilter}
+    `, [campaignId, decodedId])
 
     if (videosRows.length === 0) {
       return NextResponse.json({ error: 'Creator not found' }, { status: 404 })

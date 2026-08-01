@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCampaignStore } from '@/lib/store'
 import { CATEGORIES } from '@/lib/categories'
-import { Plus, Search, HelpCircle, Globe, Tag, X, Check, Loader2, Sparkles } from 'lucide-react'
+import { Plus, Search, HelpCircle, Globe, Tag, X, Check, Loader2, Sparkles, Menu } from 'lucide-react'
 
-export default function Header() {
+export default function Header({ onMenuToggle, navOpen }: { onMenuToggle?: () => void; navOpen?: boolean } = {}) {
   const router = useRouter()
   const { campaigns, activeCampaignId, setActiveCampaignId, fetchCampaigns } = useCampaignStore()
 
@@ -141,20 +141,17 @@ export default function Header() {
   ]
 
   return (
-    <header style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '16px 32px',
-      background: '#FFFFFF',
-      borderBottom: '1px solid var(--border-1)',
-      position: 'sticky',
-      top: 0,
-      zIndex: 999,
-      boxShadow: '0 4px 20px rgba(0,0,0,0.01)',
-      flexWrap: 'wrap',
-      gap: 12,
-    }}>
+    <header className="app-header">
+      <button
+        type="button"
+        className="nav-toggle"
+        onClick={onMenuToggle}
+        aria-label={navOpen ? 'Close navigation menu' : 'Open navigation menu'}
+        aria-expanded={!!navOpen}
+        aria-controls="primary-navigation"
+      >
+        <Menu size={18} />
+      </button>
       {/* Left side: Branding / Title context */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div>

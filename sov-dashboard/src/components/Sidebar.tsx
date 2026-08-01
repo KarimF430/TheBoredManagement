@@ -55,7 +55,7 @@ const DOT_COLORS: Record<string, string> = {
 
 
 
-export default function Sidebar() {
+export default function Sidebar({ open = false, onNavigate }: { open?: boolean; onNavigate?: () => void } = {}) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
   const [quota, setQuota] = useState<{ used: number; total: number } | null>(null)
@@ -81,19 +81,13 @@ export default function Sidebar() {
   const activeCampaign = campaigns.find(c => c.id === activeCampaignId)
 
   return (
-    <aside style={{
-      position: 'fixed',
-      top: 0, left: 0, height: '100%',
-      width: collapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-w)',
-      background: 'rgba(255,255,255,0.96)',
-      borderRight: '1.5px solid rgba(26,115,232,0.05)',
-      display: 'flex',
-      flexDirection: 'column',
-      zIndex: 50,
-      transition: 'width 0.22s cubic-bezier(0.4,0,0.2,1)',
-      overflow: 'hidden',
-      boxShadow: '2px 0 20px rgba(0,0,0,0.02)',
-    }}>
+    <aside
+      id="primary-navigation"
+      className="sidebar"
+      data-collapsed={collapsed}
+      data-open={open}
+      aria-label="Primary"
+    >
 
       {/* ── Active Project (Top) ── */}
       <div style={{

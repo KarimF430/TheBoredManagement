@@ -9,6 +9,12 @@ const nextConfig: NextConfig = {
 
   // Add response headers for API routes
   async headers() {
+    // Production only. In dev this pins every chunk as immutable for a year,
+    // so edited CSS/JS is served from browser cache and changes never appear —
+    // it is the "Custom Cache-Control headers detected" warning Next.js prints
+    // on boot, and the reason edits look like they aren't taking effect.
+    if (process.env.NODE_ENV !== 'production') return []
+
     return [
       {
         // Cache static assets aggressively

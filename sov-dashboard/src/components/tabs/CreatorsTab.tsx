@@ -8,7 +8,7 @@ import {
   ScatterChart, Scatter, ZAxis
 } from 'recharts'
 import {
-  Users, Star, Layers, Zap, Info, ExternalLink, Video, Eye, ChevronRight, ChevronDown, Search, ArrowUp, ArrowDown, Download, Hash, Award, TrendingUp, Loader2, X
+  Users, Star, Layers, Zap, Info, ExternalLink, Video, Eye, ChevronRight, ChevronDown, Search, ArrowUp, ArrowDown, Download, Hash, Award, TrendingUp, Loader2, X, AlertCircle
 } from 'lucide-react'
 import { useFilterStore } from '@/lib/filter-store'
 import { useRouter } from 'next/navigation'
@@ -93,6 +93,8 @@ export default function CreatorsTab() {
   const [expandedCreatorId, setExpandedCreatorId] = useState<string | null>(null)
   const [creatorDetail, setCreatorDetail] = useState<any>(null)
   const [creatorDetailLoading, setCreatorDetailLoading] = useState(false)
+  const [creatorDetailError, setCreatorDetailError] = useState<string | null>(null)
+  const [expandedCreatorName, setExpandedCreatorName] = useState<string | null>(null)
   const [kwTab, setKwTab] = useState<'top5' | 'top10' | 'all'>('all')
   const [expandedKws, setExpandedKws] = useState<Set<string>>(new Set())
   const [kwSortMode, setKwSortMode] = useState<'views' | 'frequency'>('views')
@@ -156,24 +158,38 @@ export default function CreatorsTab() {
     return { channels, scatterData, brandAlignmentData, allBrands: Array.from(allBrandsSet), maxDailyGrowth }
   }, [rawCreators, creatorMinVideos, sortConfig])
 
-  const fetchCreatorDetail = async (creatorId: string) => {
+  const fetchCreatorDetail = async (creatorId: string, creatorName?: string) => {
     if (expandedCreatorId === creatorId) {
       setExpandedCreatorId(null)
       setCreatorDetail(null)
       return
     }
     setExpandedCreatorId(creatorId)
+    if (creatorName) setExpandedCreatorName(creatorName)
     setCreatorDetailLoading(true)
     setCreatorDetail(null)
     setKwTab('all')
     setExpandedKws(new Set())
     setKwSortMode('views')
     setKwFormatFilter('all')
+    setCreatorDetailError(null)
     try {
       const res = await fetch(`/api/creators/${encodeURIComponent(creatorId)}?campaign_id=${activeCampaignId}&format=${format}`)
       const d = await res.json()
-      if (!d.error) setCreatorDetail(d)
-    } catch {}
+      // Failures used to be discarded here, which left the panel showing
+      // "Loading..." forever with no spinner and no explanation.
+      if (d?.error) {
+        setCreatorDetailError(
+          res.status === 404
+            ? 'No indexed videos for this creator in the current campaign and format.'
+            : d.error
+        )
+      } else {
+        setCreatorDetail(d)
+      }
+    } catch (err: any) {
+      setCreatorDetailError(err?.message || 'Could not reach the server.')
+    }
     setCreatorDetailLoading(false)
   }
 
@@ -268,7 +284,7 @@ export default function CreatorsTab() {
           {topSortedChannels.slice(0, 10).map((c: any, i: number) => (
             <div
               key={c.id}
-              onClick={() => fetchCreatorDetail(c.id)}
+              onClick={() => fetchCreatorDetail(c.id, c.name)}
               style={{ background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)', borderRadius: 16, border: expandedCreatorId === c.id ? '1.5px solid #1A73E8' : '1px solid #E2E8F0', padding: 20, boxShadow: expandedCreatorId === c.id ? '0 4px 16px rgba(26,115,232,0.12)' : '0 2px 4px rgba(0,0,0,0.02)', position: 'relative', overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s' }}
               onMouseEnter={e => { if (expandedCreatorId !== c.id) { e.currentTarget.style.borderColor = '#CBD5E1'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.06)' } }}
               onMouseLeave={e => { if (expandedCreatorId !== c.id) { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.02)' } }}
@@ -313,10 +329,12 @@ export default function CreatorsTab() {
           <div style={{ padding: '12px 20px', borderBottom: '1px solid rgba(26,115,232,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(26,115,232,0.02)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ width: 36, height: 36, borderRadius: 9, background: 'var(--blue-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: '#FFF', flexShrink: 0, boxShadow: '0 4px 12px var(--blue-glow)' }}>
-                {creatorDetail?.name?.charAt(0).toUpperCase() || '?'}
+                {creatorDetail?.name?.charAt(0).toUpperCase() || expandedCreatorName?.charAt(0).toUpperCase() || '?'}
               </div>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-bright)' }}>{creatorDetail?.name || 'Loading...'}</div>
+                {/* Name comes from the row that was clicked, so the header is
+                    correct immediately instead of claiming to be loading. */}
+                <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-bright)' }}>{creatorDetail?.name || expandedCreatorName || 'Creator'}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Creator Intelligence Deep Dive</div>
               </div>
             </div>
@@ -326,13 +344,24 @@ export default function CreatorsTab() {
                   YouTube <ExternalLink size={11} />
                 </a>
               )}
-              <button onClick={() => { setExpandedCreatorId(null); setCreatorDetail(null) }} style={{ width: 28, height: 28, borderRadius: 6, border: '1px solid var(--border-1)', background: '#FFF', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+              <button onClick={() => { setExpandedCreatorId(null); setCreatorDetail(null); setCreatorDetailError(null) }} style={{ width: 28, height: 28, borderRadius: 6, border: '1px solid var(--border-1)', background: '#FFF', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                 <X size={14} />
               </button>
             </div>
           </div>
 
-          {creatorDetailLoading ? (
+          {creatorDetailError ? (
+            <div style={{ padding: '32px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--red-dim)', color: 'var(--red)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <AlertCircle size={20} />
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-bright)' }}>Couldn&apos;t load this creator</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 420, lineHeight: 1.5 }}>{creatorDetailError}</div>
+              <button className="btn btn-ghost btn-xs" style={{ marginTop: 4 }} onClick={() => fetchCreatorDetail(expandedCreatorId!, expandedCreatorName ?? undefined)}>
+                Try again
+              </button>
+            </div>
+          ) : creatorDetailLoading ? (
             <div style={{ padding: '32px 20px', textAlign: 'center' }}>
               <Loader2 size={24} style={{ color: 'var(--blue)', animation: 'spin 1s linear infinite', marginBottom: 8 }} />
               <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Loading…</div>
@@ -604,7 +633,7 @@ export default function CreatorsTab() {
                   <React.Fragment key={c.id || c.name}>
                     <tr
                       style={{ borderBottom: '1px solid #F1F5F9', cursor: 'pointer', background: isExpanded ? '#F8FAFC' : 'transparent' }}
-                      onClick={() => { if (expandedRowId === c.id) { setExpandedRowId(null); setExpandedCreatorId(null); setCreatorDetail(null) } else { setExpandedRowId(c.id); fetchCreatorDetail(c.id) } }}
+                      onClick={() => { if (expandedRowId === c.id) { setExpandedRowId(null); setExpandedCreatorId(null); setCreatorDetail(null) } else { setExpandedRowId(c.id); fetchCreatorDetail(c.id, c.name) } }}
                       onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.background = '#F8FAFC' }}
                       onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.background = 'transparent' }}
                     >
@@ -641,7 +670,7 @@ export default function CreatorsTab() {
                       </td>
                       <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                         <button
-                          onClick={(e) => { e.stopPropagation(); fetchCreatorDetail(c.id) }}
+                          onClick={(e) => { e.stopPropagation(); fetchCreatorDetail(c.id, c.name) }}
                           style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #E2E8F0', background: '#FFF', color: '#1A73E8', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                         >
                           Analyze <ChevronRight size={12} />
