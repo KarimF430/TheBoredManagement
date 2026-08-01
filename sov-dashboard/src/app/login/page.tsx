@@ -1,296 +1,373 @@
 'use client'
 
-import { useId, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Lock, Mail, Loader2, AlertCircle, ArrowRight, Eye, EyeOff, BarChart3, Zap, Shield } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  AlertCircle, Loader2, ArrowRight, Check, Eye, EyeOff,
+} from 'lucide-react'
 
-const BRANDS = [
-  { text: 'atomberg', top: '8%',  left: '5%',  rotate: -12, size: 40, dur: 22, delay: 0 },
-  { text: 'boAt',     top: '22%', left: '70%', rotate: 8,   size: 31, dur: 25, delay: 2,   underline: '#E53935' },
-  { text: 'wakefit',  top: '35%', left: '10%', rotate: -5,  size: 36, dur: 20, delay: 4,   underline: '#F58220' },
-  { text: 'Belong',   top: '65%', left: '60%', rotate: 12,  size: 33, dur: 28, delay: 1 },
-  { text: 'Shoonya',  top: '45%', left: '80%', rotate: -8,  size: 38, dur: 24, delay: 3 },
-  { text: 'GoPlanet', top: '80%', left: '8%',  rotate: 6,   size: 40, dur: 26, delay: 5 },
-  { text: 'Lotte',    top: '5%',  left: '50%', rotate: -3,  size: 29, dur: 21, delay: 2.5, underline: '#E53935' },
-  { text: 'Noise',    top: '58%', left: '5%',  rotate: 10,  size: 29, dur: 23, delay: 1.5, underline: '#F58220' },
-  { text: 'Setu',     top: '30%', left: '45%', rotate: 4,   size: 24, dur: 19, delay: 3.5 },
-  { text: 'PhonePe',  top: '15%', left: '30%', rotate: -6,  size: 40, dur: 30, delay: 4.5, underline: '#5F259F' },
-  { text: 'Zepto',    top: '72%', left: '78%', rotate: 7,   size: 29, dur: 22, delay: 2 },
-  { text: 'AJIO',     top: '88%', left: '68%', rotate: -4,  size: 24, dur: 25, delay: 7 },
-]
+/* ════════════════════════════════════════════════════════════
+   SOV PANEL · LOGIN — clean, minimal, centered (Jira-style)
+   ════════════════════════════════════════════════════════════ */
 
-const FEATURES = [
-  { icon: BarChart3, text: 'Track brand visibility across platforms' },
-  { icon: Zap,       text: 'Real-time SOV analytics & alerts' },
-  { icon: Shield,    text: 'Competitive intelligence dashboard' },
-]
-
-const container = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.07, delayChildren: 0.08 } },
+const C = {
+  orange:    '#F58220',
+  orangeHov: '#E6781C',
+  blue:      '#0052CC',
+  text:      '#172B4D',
+  textSec:   '#42526E',
+  muted:     '#6B778C',
+  faint:     '#97A0AF',
+  border:    '#DFE1E6',
+  borderFoc: '#4C9AFF',
+  bg:        '#F4F5F7',
+  red:       '#DE350B',
+  redDim:    'rgba(222,53,11,0.06)',
+  green:     '#00875A',
 }
 
-const item = {
-  hidden: { opacity: 0, y: 12 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] } },
-}
-
-function FloatingBrands() {
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      {BRANDS.map((b) => (
-        <div
-          key={b.text}
-          className="brand-watermark absolute opacity-[0.07]"
-          style={{
-            top: b.top,
-            left: b.left,
-            transform: `rotate(${b.rotate}deg)`,
-            animationDuration: `${b.dur}s`,
-            animationDelay: `${b.delay}s`,
-          }}
-        >
-          <div
-            className="whitespace-nowrap font-black leading-none tracking-tight text-white"
-            style={{ fontSize: b.size, fontFamily: '"Arial Black", Arial, Helvetica, sans-serif' }}
-          >
-            {b.text}
-          </div>
-          {b.underline && (
-            <div className="mt-0.5 h-[3px] w-3/5 rounded-sm opacity-70" style={{ background: b.underline }} />
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function LoginPage() {
   const router = useRouter()
-  const emailId = useId()
-  const passwordId = useId()
-  const errorId = useId()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [rememberMe, setRememberMe] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [capsLock, setCapsLock] = useState(false)
+  const [remember, setRemember] = useState(false)
+
+  const [fieldError, setFieldError] = useState<{ email?: string; password?: string }>({})
+  const [serverError, setServerError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      try {
+        const saved = localStorage.getItem('sov_remember_email')
+        if (saved) { setEmail(saved); setRemember(true) }
+      } catch {}
+    }, 0)
+    return () => window.clearTimeout(t)
+  }, [])
+
+  const validate = () => {
+    const errs: { email?: string; password?: string } = {}
+    if (!email.trim()) errs.email = 'Enter your email address'
+    else if (!EMAIL_RE.test(email.trim())) errs.email = 'Enter a valid email address'
+    if (!password) errs.password = 'Enter your password'
+    setFieldError(errs)
+    return Object.keys(errs).length === 0
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
+    setServerError(null)
+    if (!validate()) return
+
     setLoading(true)
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, rememberMe }),
+        body: JSON.stringify({ email: email.trim(), password }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to authenticate')
-      router.push('/workspace')
-      router.refresh()
-    } catch (err: any) {
-      setError(err.message)
+
+      if (remember) {
+        try { localStorage.setItem('sov_remember_email', email.trim()) } catch {}
+      } else {
+        try { localStorage.removeItem('sov_remember_email') } catch {}
+      }
+
+      setSuccess(true)
+      setTimeout(() => {
+        router.push('/workspace')
+        router.refresh()
+      }, 800)
+    } catch (err: unknown) {
+      setServerError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
-  const fieldBase =
-    'w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-11 text-sm text-slate-900 ' +
-    'placeholder:text-slate-400 transition-colors duration-200 ' +
-    'hover:border-slate-300 ' +
-    'focus:border-[#F58220] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#F58220]/12 ' +
-    'disabled:cursor-not-allowed disabled:opacity-60'
+  const inputStyle = (hasError: boolean) => ({
+    width: '100%',
+    height: 40,
+    padding: '0 12px',
+    fontSize: 14,
+    fontFamily: 'inherit',
+    color: C.text,
+    background: '#FFFFFF',
+    border: `2px solid ${hasError ? C.red : C.border}`,
+    borderRadius: 4,
+    outline: 'none',
+    transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+    boxSizing: 'border-box' as const,
+  })
 
   return (
-    <div className="fixed inset-0 flex overflow-y-auto bg-white">
-      <style>{`
-        @keyframes watermarkFloat {
-          0%, 100% { transform: translateY(0) }
-          50%      { transform: translateY(-14px) }
-        }
-        .brand-watermark { animation-name: watermarkFloat; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
-        @media (prefers-reduced-motion: reduce) {
-          .brand-watermark { animation: none !important }
-        }
-      `}</style>
-
-      {/* ── Brand panel ───────────────────────────────────────────────── */}
-      <aside className="relative hidden flex-1 flex-col justify-center overflow-hidden bg-slate-900 px-14 lg:flex">
-        {/* one soft, static glow instead of several drifting orbs */}
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{ background: 'radial-gradient(120% 80% at 20% 0%, rgba(245,130,32,0.16) 0%, transparent 60%)' }}
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: C.bg,
+      fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+      padding: '24px 16px',
+    }}>
+      {/* logo */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4 }}
+        style={{ marginBottom: 28, display: 'flex', justifyContent: 'center' }}
+      >
+        <img
+          src="/tbm-logo.png"
+          alt="TheBoredMonkey"
+          style={{ height: 36, width: 'auto', display: 'block' }}
         />
-        <div
-          aria-hidden
-          className="absolute inset-0 opacity-[0.18]"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px)',
-            backgroundSize: '56px 56px',
-          }}
-        />
-        <FloatingBrands />
+      </motion.div>
 
-        <motion.div initial="hidden" animate="visible" variants={container} className="relative z-10 max-w-lg">
-          <motion.div variants={item} className="inline-flex rounded-2xl bg-white/95 px-7 py-4 shadow-lg shadow-black/20">
-            <img src="/tbm-logo.png" alt="TheBoredMonkey" className="h-14 w-auto" />
-          </motion.div>
+      {/* card */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
+        style={{
+          width: '100%',
+          maxWidth: 400,
+          background: '#FFFFFF',
+          border: `1px solid ${C.border}`,
+          borderRadius: 4,
+          boxShadow: '0 1px 1px rgba(9,30,66,0.08), 0 0 1px 1px rgba(9,30,66,0.04)',
+          padding: '32px 32px 20px',
+        }}
+      >
+        {/* heading */}
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <h1 style={{
+            fontSize: 20, fontWeight: 600, color: C.text,
+            margin: 0, letterSpacing: '-0.2px',
+          }}>
+            Log in to your account
+          </h1>
+          <p style={{ fontSize: 13, color: C.muted, margin: '6px 0 0', fontWeight: 400 }}>
+            SOV Panel · Share of Voice analytics
+          </p>
+        </div>
 
-          <motion.h1 variants={item} className="mt-9 text-3xl font-semibold leading-snug tracking-tight text-white">
-            Your command center for brand intelligence
-          </motion.h1>
-
-          <motion.ul variants={item} className="mt-10 space-y-3">
-            {FEATURES.map(({ icon: Icon, text }) => (
-              <li
-                key={text}
-                className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3.5"
-              >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#F58220]/15 text-[#F58220]">
-                  <Icon size={17} strokeWidth={2.2} />
-                </span>
-                <span className="text-sm font-medium text-slate-200">{text}</span>
-              </li>
-            ))}
-          </motion.ul>
-        </motion.div>
-      </aside>
-
-      {/* ── Form panel ────────────────────────────────────────────────── */}
-      <main className="flex flex-1 items-center justify-center bg-slate-50 px-6 py-12">
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={container}
-          className="w-full max-w-[400px] rounded-2xl border border-slate-200/80 bg-white p-8 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-12px_rgba(15,23,42,0.12)] sm:p-10"
-        >
-          {/* logo repeats here for the mobile layout, where the brand panel is hidden */}
-          <motion.div variants={item} className="mb-9 flex justify-center lg:hidden">
-            <img src="/tbm-logo.png" alt="TheBoredMonkey" className="h-11 w-auto" />
-          </motion.div>
-
-          <motion.div variants={item}>
-            <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Welcome back</h2>
-            <p className="mt-1.5 text-sm text-slate-500">Sign in to your analytics workspace</p>
-          </motion.div>
-
-          <motion.form variants={item} onSubmit={handleSubmit} className="mt-8 space-y-5" noValidate>
-            <div>
-              <label htmlFor={emailId} className="mb-1.5 block text-sm font-medium text-slate-700">
-                Email address
-              </label>
-              <div className="relative">
-                <Mail
-                  size={16}
-                  aria-hidden
-                  className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-                <input
-                  id={emailId}
-                  type="email"
-                  name="email"
-                  autoComplete="email"
-                  required
-                  disabled={loading}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@company.com"
-                  aria-invalid={!!error}
-                  aria-describedby={error ? errorId : undefined}
-                  className={fieldBase}
-                />
+        {/* server error */}
+        <AnimatePresence>
+          {serverError && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              role="alert"
+              style={{
+                display: 'flex', alignItems: 'flex-start', gap: 8,
+                padding: '10px 12px', marginBottom: 16,
+                background: C.redDim, border: `2px solid ${C.red}`,
+                borderRadius: 4, overflow: 'hidden',
+              }}
+            >
+              <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1, color: C.red }} />
+              <div style={{ fontSize: 13, color: C.text, fontWeight: 500, lineHeight: 1.5 }}>
+                {serverError}
               </div>
-            </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-            <div>
-              <label htmlFor={passwordId} className="mb-1.5 block text-sm font-medium text-slate-700">
-                Password
-              </label>
-              <div className="relative">
-                <Lock
-                  size={16}
-                  aria-hidden
-                  className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-                <input
-                  id={passwordId}
-                  type={showPassword ? 'text' : 'password'}
-                  name="password"
-                  autoComplete="current-password"
-                  required
-                  disabled={loading}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  aria-invalid={!!error}
-                  aria-describedby={error ? errorId : undefined}
-                  className={`${fieldBase} pr-11`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  aria-pressed={showPassword}
-                  className="absolute right-1.5 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F58220]"
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
-
-            {error && (
-              <div
-                id={errorId}
-                role="alert"
-                className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3"
-              >
-                <AlertCircle size={16} className="mt-px shrink-0 text-red-500" aria-hidden />
-                <p className="text-sm font-medium text-red-700">{error}</p>
+        <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* email */}
+          <div>
+            <label htmlFor="login-email" style={{
+              display: 'block', fontSize: 13, fontWeight: 600, color: C.textSec, marginBottom: 6,
+            }}>
+              Email address
+            </label>
+            <input
+              id="login-email"
+              type="email"
+              autoComplete="email"
+              autoFocus
+              value={email}
+              onChange={e => {
+                setEmail(e.target.value)
+                if (fieldError.email) setFieldError(f => ({ ...f, email: undefined }))
+              }}
+              placeholder="you@company.com"
+              aria-invalid={!!fieldError.email}
+              style={inputStyle(!!fieldError.email)}
+              onFocus={e => { e.currentTarget.style.borderColor = fieldError.email ? C.red : C.borderFoc }}
+              onBlur={e => { e.currentTarget.style.borderColor = fieldError.email ? C.red : C.border }}
+            />
+            {fieldError.email && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: C.red, fontWeight: 500 }}>
+                <AlertCircle size={12} /> {fieldError.email}
               </div>
             )}
+          </div>
 
-            <label className="flex w-fit cursor-pointer items-center gap-2.5 text-sm text-slate-600">
+          {/* password */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <label htmlFor="login-password" style={{ fontSize: 13, fontWeight: 600, color: C.textSec }}>
+                Password
+              </label>
+              <a
+                href="mailto:Haji.karim@theboredmonkey.com?subject=SOV%20Panel%20—%20Sign-in%20issue"
+                style={{ fontSize: 12.5, color: C.blue, fontWeight: 500, textDecoration: 'none' }}
+                onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline' }}
+                onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none' }}
+              >
+                Forgot password?
+              </a>
+            </div>
+            <div style={{ position: 'relative' }}>
               <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="size-4 cursor-pointer rounded border-slate-300 accent-[#F58220] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F58220] focus-visible:ring-offset-2"
+                id="login-password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                value={password}
+                onChange={e => {
+                  setPassword(e.target.value)
+                  const mod = (e.nativeEvent as unknown as { getModifierState?: (k: string) => boolean })
+                  if (mod.getModifierState) setCapsLock(mod.getModifierState('CapsLock'))
+                  if (fieldError.password) setFieldError(f => ({ ...f, password: undefined }))
+                }}
+                onFocus={e => {
+                  e.currentTarget.style.borderColor = fieldError.password ? C.red : C.borderFoc
+                  e.currentTarget.style.boxShadow = fieldError.password ? '0 0 0 1px rgba(222,53,11,0.35)' : '0 0 0 1px rgba(76,154,255,0.35)'
+                }}
+                onBlur={e => {
+                  e.currentTarget.style.borderColor = fieldError.password ? C.red : C.border
+                  e.currentTarget.style.boxShadow = 'none'
+                  setCapsLock(false)
+                }}
+                onKeyDown={e => { if (e.getModifierState) setCapsLock(e.getModifierState('CapsLock')) }}
+                placeholder="Enter your password"
+                aria-invalid={!!fieldError.password}
+                style={{ ...inputStyle(!!fieldError.password), paddingRight: 40 }}
               />
-              Keep me signed in
-            </label>
+              <button
+                type="button"
+                onClick={() => setShowPassword(s => !s)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                tabIndex={-1}
+                style={{
+                  position: 'absolute', right: 8, top: '50%',
+                  transform: 'translateY(-50%)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 26, height: 26, borderRadius: 3,
+                  border: 'none', background: 'transparent', cursor: 'pointer',
+                  color: C.faint, transition: 'color 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = C.textSec }}
+                onMouseLeave={e => { e.currentTarget.style.color = C.faint }}
+              >
+                {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </div>
+            <div style={{ minHeight: 18, marginTop: 6 }}>
+              {fieldError.password ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.red, fontWeight: 500 }}>
+                  <AlertCircle size={12} /> {fieldError.password}
+                </div>
+              ) : capsLock ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#974F0C', fontWeight: 500 }}>
+                  <AlertCircle size={12} /> Caps Lock is on
+                </div>
+              ) : null}
+            </div>
+          </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="group flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#F58220] text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#E0741A] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#F58220]/30 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {loading ? (
-                <>
-                  <Loader2 size={17} className="animate-spin" aria-hidden />
-                  Signing in…
-                </>
-              ) : (
-                <>
-                  Sign in
-                  <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" aria-hidden />
-                </>
-              )}
-            </button>
-          </motion.form>
+          {/* remember me */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={e => setRemember(e.target.checked)}
+              style={{ width: 15, height: 15, margin: 0, cursor: 'pointer', accentColor: C.orange }}
+            />
+            <span style={{ fontSize: 13, color: C.textSec, fontWeight: 500 }}>Remember me</span>
+          </label>
 
-          <motion.p variants={item} className="mt-8 text-center text-xs text-slate-400">
-            Powered by <span className="font-semibold text-slate-500">TheBoredMonkey</span>
-          </motion.p>
-        </motion.div>
-      </main>
+          {/* submit */}
+          <motion.button
+            type="submit"
+            disabled={loading || success}
+            whileHover={!loading && !success ? { backgroundColor: C.orangeHov } : {}}
+            whileTap={!loading && !success ? { scale: 0.99 } : {}}
+            style={{
+              width: '100%',
+              height: 40,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              fontFamily: 'inherit', fontSize: 14, fontWeight: 600,
+              color: '#FFFFFF', border: 'none', borderRadius: 4,
+              background: success ? C.green : C.orange,
+              cursor: loading || success ? 'default' : 'pointer',
+              transition: 'background-color 0.15s ease',
+              marginTop: 4,
+            }}
+          >
+            {success ? (
+              <>
+                <Check size={16} /> Logged in
+              </>
+            ) : loading ? (
+              <>
+                <Loader2 size={15} style={{ animation: 'spin 0.9s linear infinite' }} />
+                Logging in…
+              </>
+            ) : (
+              <>
+                Log in
+                <ArrowRight size={15} />
+              </>
+            )}
+          </motion.button>
+        </form>
+      </motion.div>
+
+      {/* footer */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4, delay: 0.2 }}
+        style={{
+          marginTop: 24,
+          display: 'flex', alignItems: 'center', gap: 18,
+          fontSize: 12.5, color: C.muted, fontWeight: 500,
+        }}
+      >
+        <a
+          href="/privacy-policy"
+          style={{ color: C.muted, textDecoration: 'none' }}
+          onMouseEnter={e => { e.currentTarget.style.color = C.blue }}
+          onMouseLeave={e => { e.currentTarget.style.color = C.muted }}
+        >
+          Privacy Policy
+        </a>
+        <span style={{ width: 1, height: 12, background: C.border }} />
+        <span>
+          Powered by{' '}
+          <span style={{ fontWeight: 700, color: C.textSec }}>TheBoredMonkey</span>
+        </span>
+      </motion.div>
+
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   )
 }
