@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCampaignStore } from '@/lib/store'
 import { CATEGORIES } from '@/lib/categories'
-import { Plus, Search, HelpCircle, Globe, Tag, X, Check, Loader2, Sparkles, Menu } from 'lucide-react'
+import { Plus, Search, X, Check, Loader2, Menu } from 'lucide-react'
 
 export default function Header({ onMenuToggle, navOpen }: { onMenuToggle?: () => void; navOpen?: boolean } = {}) {
   const router = useRouter()
@@ -155,7 +155,7 @@ export default function Header({ onMenuToggle, navOpen }: { onMenuToggle?: () =>
       {/* Left side: Branding / Title context */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div>
-          <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--text-muted)' }}>Workspace</span>
+          <span style={{ fontSize: 'var(--fs-label)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--text-muted)' }}>Workspace</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
             <img src="/tbm-logo.png" alt="TheBoredMonkey" style={{ height: 22, width: 'auto', display: 'block' }} />
             <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)' }}>Analytics</span>
@@ -181,13 +181,8 @@ export default function Header({ onMenuToggle, navOpen }: { onMenuToggle?: () =>
           <button
             onClick={() => setShowProjModal(true)}
             title="Create New Project"
-            style={{
-              height: 36, width: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: '1.5px dashed var(--blue)', color: 'var(--blue)', background: 'var(--blue-dim)',
-              borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s'
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,115,232,0.1)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'var(--blue-dim)'}
+            aria-label="Create New Project"
+            className="icon-btn icon-btn--dashed"
           >
             <Plus size={16} />
           </button>
@@ -208,24 +203,21 @@ export default function Header({ onMenuToggle, navOpen }: { onMenuToggle?: () =>
           MODAL: ADD KEYWORDS
       ══════════════════════════════════════════════════════════════════ */}
       {showKwModal && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000,
-          animation: 'fadeIn 0.2s ease',
-        }}>
-          <div className="card anim-fade-up" style={{ width: '100%', maxWidth: 500, padding: 24, border: '1px solid var(--border-2)', position: 'relative' }}>
+        <div className="modal-scrim" onClick={() => setShowKwModal(false)}>
+          <div className="modal-panel" onClick={e => e.stopPropagation()}>
             <button
               onClick={() => setShowKwModal(false)}
-              style={{ position: 'absolute', top: 18, right: 18, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+              className="modal-close"
+              aria-label="Close"
             >
               <X size={18} />
             </button>
-            <h3 style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-bright)', marginBottom: 4 }}>Add Keyword Target</h3>
-            <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 20 }}>Insert terms to scrape first 10 long-form and first 10 short-form YouTube videos</p>
+            <h3 className="modal-title">Add Keyword Target</h3>
+            <p className="modal-subtitle">Insert terms to scrape first 10 long-form and first 10 short-form YouTube videos</p>
 
             {/* Keyword Input */}
             <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+              <label className="field-label">
                 Keywords (One per line for bulk)
               </label>
               <textarea
@@ -234,13 +226,13 @@ export default function Header({ onMenuToggle, navOpen }: { onMenuToggle?: () =>
                 value={keywordText}
                 onChange={e => setKeywordText(e.target.value)}
                 placeholder="e.g. best smartphone under 30k&#10;samsung galaxy s24 ultra review"
-                style={{ resize: 'none', fontSize: 13, fontFamily: "'JetBrains Mono', monospace" }}
+                style={{ resize: 'none', fontSize: 13, fontFamily: 'var(--font-mono)' }}
               />
             </div>
 
             {/* Section 1: Language */}
             <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--text-muted)', display: 'block', marginBottom: 8 }}>
+              <label className="field-label" style={{ marginBottom: 8 }}>
                 Language
               </label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -249,14 +241,8 @@ export default function Header({ onMenuToggle, navOpen }: { onMenuToggle?: () =>
                   return (
                     <button
                       key={lang.code}
+                      className={`choice${active ? ' active' : ''}`}
                       onClick={() => setSelectedLang(lang.code)}
-                      style={{
-                        padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-                        border: '1.5px solid', cursor: 'pointer', transition: 'all 0.15s',
-                        borderColor: active ? '#0F172A' : 'var(--border-1)',
-                        background: active ? '#0F172A' : '#FFFFFF',
-                        color: active ? '#FFFFFF' : 'var(--text-secondary)',
-                      }}
                     >
                       {lang.label}
                     </button>
@@ -267,7 +253,7 @@ export default function Header({ onMenuToggle, navOpen }: { onMenuToggle?: () =>
 
             {/* Section 2: Keyword Type */}
             <div style={{ marginBottom: 24 }}>
-              <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--text-muted)', display: 'block', marginBottom: 8 }}>
+              <label className="field-label" style={{ marginBottom: 8 }}>
                 Keyword Classification Type
               </label>
               <div style={{ display: 'flex', gap: 6 }}>
@@ -276,14 +262,9 @@ export default function Header({ onMenuToggle, navOpen }: { onMenuToggle?: () =>
                   return (
                     <button
                       key={t.code}
+                      className={`choice${active ? ' active' : ''}`}
+                      style={{ flex: 1 }}
                       onClick={() => setSelectedType(t.code)}
-                      style={{
-                        flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-                        border: '1.5px solid', cursor: 'pointer', transition: 'all 0.15s',
-                        borderColor: active ? '#0F172A' : 'var(--border-1)',
-                        background: active ? '#0F172A' : '#FFFFFF',
-                        color: active ? '#FFFFFF' : 'var(--text-secondary)',
-                      }}
                     >
                       {t.label}
                     </button>
@@ -319,24 +300,21 @@ export default function Header({ onMenuToggle, navOpen }: { onMenuToggle?: () =>
           MODAL: CREATE CAMPAIGN/PROJECT
       ══════════════════════════════════════════════════════════════════ */}
       {showProjModal && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000,
-          animation: 'fadeIn 0.2s ease',
-        }}>
-          <div className="card anim-fade-up" style={{ width: '100%', maxWidth: 500, padding: 24, border: '1px solid var(--border-2)', position: 'relative' }}>
+        <div className="modal-scrim" onClick={() => setShowProjModal(false)}>
+          <div className="modal-panel" onClick={e => e.stopPropagation()}>
             <button
               onClick={() => setShowProjModal(false)}
-              style={{ position: 'absolute', top: 18, right: 18, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+              className="modal-close"
+              aria-label="Close"
             >
               <X size={18} />
             </button>
-            <h3 style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-bright)', marginBottom: 4 }}>Create Analytics Project</h3>
-            <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 20 }}>Categorize your target keywords to benchmark Share-of-Voice correctly</p>
+            <h3 className="modal-title">Create Analytics Project</h3>
+            <p className="modal-subtitle">Categorize your target keywords to benchmark Share-of-Voice correctly</p>
 
             {/* Project Name */}
             <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+              <label className="field-label">
                 Project Name *
               </label>
               <input
@@ -350,9 +328,9 @@ export default function Header({ onMenuToggle, navOpen }: { onMenuToggle?: () =>
             </div>
 
             {/* Category selection */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+            <div className="modal-grid-2" style={{ marginBottom: 16 }}>
               <div>
-                <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+                <label className="field-label">
                   Category *
                 </label>
                 <select
@@ -372,7 +350,7 @@ export default function Header({ onMenuToggle, navOpen }: { onMenuToggle?: () =>
               </div>
 
               <div>
-                <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+                <label className="field-label">
                   Sub-category
                 </label>
                 <select
@@ -392,7 +370,7 @@ export default function Header({ onMenuToggle, navOpen }: { onMenuToggle?: () =>
 
             {/* Project description */}
             <div style={{ marginBottom: 24 }}>
-              <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+              <label className="field-label">
                 Description / Benchmark Goal
               </label>
               <textarea
@@ -430,12 +408,7 @@ export default function Header({ onMenuToggle, navOpen }: { onMenuToggle?: () =>
 
       {/* ── Toast Message System ── */}
       {toast && (
-        <div style={{
-          position: 'fixed', bottom: 24, right: 24, zIndex: 10005,
-          padding: '12px 20px', borderRadius: 10, background: toast.type === 'success' ? '#00C853' : '#FF2D55',
-          color: '#FFFFFF', fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
-          boxShadow: '0 10px 25px rgba(0,0,0,0.15)', animation: 'fadeUp 0.25s ease'
-        }}>
+        <div className={`toast toast--${toast.type}`} role="status">
           {toast.msg}
         </div>
       )}

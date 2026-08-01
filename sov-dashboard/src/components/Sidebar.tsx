@@ -44,16 +44,14 @@ const NAV = [
   }
 ]
 
-const DOT_COLORS: Record<string, string> = {
-  blue:   '#1A73E8',
-  green:  '#00C853',
-  violet: '#7C3AED',
-  orange: '#FF6D00',
-  red:    '#FF2D55',
-  gray:   '#94A3B8',
+const DOT_COLORS: Record<string, { color: string; dim: string }> = {
+  blue:   { color: '#1A73E8', dim: 'rgba(26,115,232,0.08)' },
+  green:  { color: '#22C55E', dim: 'rgba(34,197,94,0.08)' },
+  violet: { color: '#8B5CF6', dim: 'rgba(139,92,246,0.08)' },
+  orange: { color: '#F59E0B', dim: 'rgba(245,158,11,0.08)' },
+  red:    { color: '#EF4444', dim: 'rgba(239,68,68,0.08)' },
+  gray:   { color: '#94A3B8', dim: 'rgba(148,163,184,0.12)' },
 }
-
-
 
 export default function Sidebar({ open = false, onNavigate }: { open?: boolean; onNavigate?: () => void } = {}) {
   const pathname = usePathname()
@@ -76,7 +74,7 @@ export default function Sidebar({ open = false, onNavigate }: { open?: boolean; 
   }, [])
 
   const quotaPct = quota ? Math.min(100, Math.round((quota.used / quota.total) * 100)) : 62
-  const quotaColor = quotaPct > 80 ? '#FF2D55' : quotaPct > 60 ? '#FF6D00' : '#1A73E8'
+  const quotaColor = quotaPct > 80 ? '#EF4444' : quotaPct > 60 ? '#F59E0B' : '#1A73E8'
 
   const activeCampaign = campaigns.find(c => c.id === activeCampaignId)
 
@@ -92,7 +90,7 @@ export default function Sidebar({ open = false, onNavigate }: { open?: boolean; 
       {/* ── Active Project (Top) ── */}
       <div style={{
         padding: collapsed ? '14px 10px' : '10px 12px',
-        borderBottom: '1.5px solid rgba(26,115,232,0.05)',
+        borderBottom: '1px solid var(--border-light)',
         display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start',
         minHeight: 52,
       }}>
@@ -114,25 +112,25 @@ export default function Sidebar({ open = false, onNavigate }: { open?: boolean; 
             {activeCampaign ? (
               <div style={{
                 padding: '8px 12px',
-                background: 'linear-gradient(135deg, rgba(245,130,32,0.04), rgba(255,159,67,0.02))',
-                border: '1.5px solid rgba(245,130,32,0.1)',
-                borderRadius: 8,
+                background: 'var(--accent-dim)',
+                border: '1px solid var(--accent-border)',
+                borderRadius: 'var(--radius-sm)',
                 cursor: 'default',
               }}>
-                <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px', color: '#94A3B8', marginBottom: 2 }}>
+                <div className="t-micro" style={{ marginBottom: 2 }}>
                   Active Project
                 </div>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#F58220', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {activeCampaign.name}
                 </div>
                 {activeCampaign.category && (
-                  <div style={{ fontSize: 10, color: '#64748B', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: 'var(--fs-caption)', color: 'var(--text-muted)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {activeCampaign.category}{activeCampaign.sub_category ? ` › ${activeCampaign.sub_category}` : ''}
                   </div>
                 )}
               </div>
             ) : (
-              <div style={{ padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#94A3B8' }}>
+              <div style={{ padding: '8px 12px', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--text-muted)' }}>
                 No Active Project
               </div>
             )}
@@ -150,72 +148,29 @@ export default function Sidebar({ open = false, onNavigate }: { open?: boolean; 
         {NAV.map(group => (
           <div key={group.section} style={{ marginBottom: 8 }}>
             {!collapsed && (
-              <div style={{
-                fontSize: 9.5, fontWeight: 700, letterSpacing: '1px',
-                color: '#94A3B8', padding: '8px 8px 4px',
-                textTransform: 'uppercase',
-              }}>
+              <div className="nav-section">
                 {group.section}
               </div>
             )}
             {group.items.map(item => {
               const active = pathname === item.href
-              const dotColor = DOT_COLORS[item.dot] || '#94A3B8'
+              const dot = DOT_COLORS[item.dot] || DOT_COLORS.gray
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   title={collapsed ? item.label : undefined}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: collapsed ? 0 : 9,
-                    padding: collapsed ? '10px' : '7px 10px',
-                    borderRadius: 7,
-                    marginBottom: 1,
-                    background: active
-                      ? `${dotColor}0D`
-                      : 'transparent',
-                    color: active ? dotColor : '#475569',
-                    textDecoration: 'none',
-                    transition: 'all 0.12s ease',
-                    justifyContent: collapsed ? 'center' : 'flex-start',
-                    position: 'relative',
-                    fontWeight: active ? 700 : 500,
-                  }}
-                  onMouseEnter={e => {
-                    if (!active) {
-                      (e.currentTarget as HTMLElement).style.background = '#F1F5F9'
-                      ;(e.currentTarget as HTMLElement).style.color = '#0F172A'
-                    }
-                  }}
-                  onMouseLeave={e => {
-                    if (!active) {
-                      (e.currentTarget as HTMLElement).style.background = 'transparent'
-                      ;(e.currentTarget as HTMLElement).style.color = '#475569'
-                    }
-                  }}
+                  className="nav-item"
+                  data-active={active}
+                  data-collapsed={collapsed}
+                  style={{ '--item-color': dot.color, '--item-color-dim': dot.dim } as React.CSSProperties}
                 >
-                  {active && !collapsed && (
-                    <div style={{
-                      position: 'absolute', left: 0, top: 4, bottom: 4,
-                      width: 3, borderRadius: '0 3px 3px 0',
-                      background: `linear-gradient(180deg, ${dotColor}, ${dotColor}88)`,
-                    }} />
-                  )}
+                  {active && !collapsed && <div className="nav-item__rail" />}
 
-                  <div style={{
-                    width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                    background: active ? dotColor : '#CBD5E1',
-                    transition: 'all 0.12s',
-                    boxShadow: active ? `0 0 6px ${dotColor}60` : 'none',
-                  }} />
+                  <div className="nav-item__dot" style={active ? { background: dot.color, boxShadow: `0 0 6px ${dot.color}60` } : undefined} />
 
                   {!collapsed && (
-                    <span style={{
-                      fontSize: 13, lineHeight: 1.3,
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
+                    <span className="nav-item__label">
                       {item.label}
                     </span>
                   )}
@@ -230,22 +185,18 @@ export default function Sidebar({ open = false, onNavigate }: { open?: boolean; 
       {!collapsed && (
         <div style={{
           padding: '10px 16px',
-          borderTop: '1.5px solid rgba(26,115,232,0.04)',
-          background: 'rgba(244,247,252,0.5)',
+          borderTop: '1px solid var(--border-light)',
+          background: 'var(--bg-base)',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-            <span style={{ fontSize: 10.5, color: '#64748B', fontWeight: 600 }}>API Quota Used</span>
-            <span style={{ fontSize: 10.5, fontWeight: 700, color: quotaColor }}>{quotaPct}%</span>
+            <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', fontWeight: 600 }}>API Quota Used</span>
+            <span className="mono" style={{ fontSize: 'var(--fs-label)', fontWeight: 700, color: quotaColor }}>{quotaPct}%</span>
           </div>
-          <div style={{ height: 4, borderRadius: 99, background: '#E2E8F0', overflow: 'hidden' }}>
-            <div style={{
-              width: `${quotaPct}%`, height: '100%', borderRadius: 99,
-              background: `linear-gradient(90deg, ${quotaColor}, ${quotaColor}88)`,
-              transition: 'width 0.5s ease',
-            }} />
+          <div className="sov-bar-track" style={{ background: 'var(--neutral-200)' }}>
+            <div className="sov-bar-fill" style={{ width: `${quotaPct}%`, background: `linear-gradient(90deg, ${quotaColor}, ${quotaColor}88)` }} />
           </div>
           {quota && (
-            <div style={{ fontSize: 9.5, color: '#94A3B8', marginTop: 3, fontFamily: "'JetBrains Mono', monospace" }}>
+            <div className="mono" style={{ fontSize: 'var(--fs-micro)', color: 'var(--text-muted)', marginTop: 3 }}>
               {quota.used.toLocaleString()} / {quota.total.toLocaleString()} units
             </div>
           )}
@@ -256,32 +207,24 @@ export default function Sidebar({ open = false, onNavigate }: { open?: boolean; 
       {!collapsed && (
         <div style={{
           padding: '10px 16px',
-          borderTop: '1.5px solid rgba(26,115,232,0.04)',
-          background: 'rgba(244,247,252,0.5)',
+          borderTop: '1px solid var(--border-light)',
+          background: 'var(--bg-base)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
         }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: 'var(--fs-label)', fontWeight: 700, color: 'var(--text-bright)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               Admin Panel
             </div>
-            <div style={{ fontSize: 9.5, color: '#94A3B8' }}>Logged in</div>
+            <div className="t-micro">Logged in</div>
           </div>
           <button
+            className="btn-danger btn-sm"
             onClick={async () => {
               await fetch('/api/auth/logout', { method: 'POST' })
               window.location.href = '/login'
             }}
-            style={{
-              background: 'none', border: '1.5px solid rgba(239,68,68,0.1)',
-              color: '#EF4444', borderRadius: 6,
-              fontSize: 10.5, fontWeight: 700, cursor: 'pointer',
-              padding: '4px 10px', fontFamily: 'inherit',
-              transition: 'all 0.12s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.06)' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
           >
             Logout
           </button>
@@ -291,18 +234,9 @@ export default function Sidebar({ open = false, onNavigate }: { open?: boolean; 
       {/* ── Replay Tutorial ── */}
       {!collapsed && (
         <button
+          className="btn btn-ghost btn-sm"
           onClick={() => (window as any).__replayTutorial?.()}
-          style={{
-            margin: '0 8px 4px', padding: '7px 10px',
-            borderRadius: 7, background: 'transparent',
-            border: '1.5px solid rgba(245,130,32,0.1)',
-            color: '#F58220', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: 7,
-            transition: 'all 0.12s', fontFamily: 'inherit',
-            fontSize: 11.5, fontWeight: 600,
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(245,130,32,0.04)' }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+          style={{ margin: '0 8px 4px', color: 'var(--text-secondary)' }}
         >
           <Play size={12} /> Replay Tutorial
         </button>
@@ -310,32 +244,9 @@ export default function Sidebar({ open = false, onNavigate }: { open?: boolean; 
 
       {/* ── Collapse toggle ── */}
       <button
+        className="sidebar-collapse-btn"
         onClick={() => setCollapsed(c => !c)}
-        style={{
-          margin: '8px',
-          padding: '8px',
-          borderRadius: 7,
-          background: 'transparent',
-          border: '1.5px solid rgba(26,115,232,0.06)',
-          color: '#94A3B8',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 5,
-          transition: 'all 0.12s',
-          fontFamily: 'inherit',
-          fontSize: 11,
-          fontWeight: 600,
-        }}
-        onMouseEnter={e => {
-          (e.currentTarget as HTMLElement).style.background = '#F1F5F9'
-          ;(e.currentTarget as HTMLElement).style.color = '#475569'
-        }}
-        onMouseLeave={e => {
-          (e.currentTarget as HTMLElement).style.background = 'transparent'
-          ;(e.currentTarget as HTMLElement).style.color = '#94A3B8'
-        }}
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           {collapsed

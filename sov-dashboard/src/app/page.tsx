@@ -306,7 +306,6 @@ export default function OverviewPage() {
         .tab-pill{padding:8px 16px;font-size:13px;font-weight:600;color:#64748B;background:transparent;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:all 0.15s;font-family:inherit;white-space:nowrap}
         .tab-pill:hover{color:#1E293B}
         .tab-pill.on{color:#1A73E8;border-bottom-color:#1A73E8}
-        .row-hover:hover{background:#F8FAFC}
         .mini-tab{padding:4px 10px;font-size:11.5px;font-weight:600;border:none;cursor:pointer;font-family:inherit;transition:all 0.12s;border-radius:6px}
         .select-filter{background:#FFF;border:1px solid #E2E8F0;font-size:11.5px;color:#475569;border-radius:6px;padding:3px 8px;font-weight:600;outline:none;font-family:inherit}
         .drawer-overlay{position:fixed;inset:0;background:rgba(15,23,42,0.4);backdrop-filter:blur(2px);z-index:999;display:flex;justify-content:flex-end}

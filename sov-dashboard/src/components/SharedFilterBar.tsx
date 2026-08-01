@@ -57,24 +57,14 @@ export default function SharedFilterBar({ children, hasActiveFilters, onReset, s
   }
 
   return (
-    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'nowrap', overflowX: 'auto', ...style }}>
+    <div className="filter-bar" style={style}>
       {/* Format Toggle */}
-      <div style={{ display: 'flex', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
+      <div className="toggle-group compact" style={{ flexShrink: 0 }}>
         {FORMAT_OPTIONS.map(opt => (
           <button
             key={opt.value}
+            className={`toggle-btn${format === opt.value ? ' active' : ''}`}
             onClick={() => setFormat(opt.value as any)}
-            style={{
-              padding: '6px 12px',
-              fontSize: 11.5,
-              fontWeight: 600,
-              background: format === opt.value ? '#1A73E8' : 'transparent',
-              color: format === opt.value ? '#FFF' : '#64748B',
-              border: 'none',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              transition: 'all 0.15s'
-            }}
           >
             {opt.label}
           </button>
@@ -84,10 +74,10 @@ export default function SharedFilterBar({ children, hasActiveFilters, onReset, s
       {/* Ownership */}
       <div style={{ minWidth: 140, flexShrink: 0 }}>
         <select
-          className="input"
+          className={`input${ownership !== 'all' ? ' is-filtered' : ''}`}
           value={ownership}
           onChange={e => setOwnership(e.target.value as any)}
-          style={{ cursor: 'pointer', padding: '6px 12px', borderColor: ownership !== 'all' ? '#EF4444' : undefined }}
+          style={{ cursor: 'pointer', padding: '6px 12px' }}
         >
           <option value="all">All Videos</option>
           <option value="ours">Our Videos</option>
@@ -96,22 +86,12 @@ export default function SharedFilterBar({ children, hasActiveFilters, onReset, s
       </div>
 
       {/* Date Range Toggle */}
-      <div style={{ display: 'flex', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
+      <div className="toggle-group compact" style={{ flexShrink: 0 }}>
         {DATE_RANGE_OPTIONS.map(opt => (
           <button
             key={opt.value}
+            className={`toggle-btn${dateRange === opt.value ? ' active' : ''}`}
             onClick={() => setDateRange(opt.value as any)}
-            style={{
-              padding: '6px 12px',
-              fontSize: 11.5,
-              fontWeight: 600,
-              background: dateRange === opt.value ? '#1A73E8' : 'transparent',
-              color: dateRange === opt.value ? '#FFF' : '#64748B',
-              border: 'none',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              transition: 'all 0.15s'
-            }}
           >
             {opt.label}
           </button>
@@ -122,21 +102,23 @@ export default function SharedFilterBar({ children, hasActiveFilters, onReset, s
       {dateRange === 'Custom' && (
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#64748B' }}>From</span>
+            <span style={{ fontSize: 'var(--fs-label)', fontWeight: 600, color: 'var(--text-muted)' }}>From</span>
             <input
               type="date"
               value={customDateFrom}
               onChange={e => setCustomDateFrom(e.target.value)}
-              style={{ padding: '6px 8px', fontSize: 11.5, border: '1px solid #E2E8F0', borderRadius: 6, background: '#FFF', color: '#475569', fontFamily: 'inherit' }}
+              className="input"
+              style={{ padding: '6px 8px', fontSize: 11.5 }}
             />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#64748B' }}>To</span>
+            <span style={{ fontSize: 'var(--fs-label)', fontWeight: 600, color: 'var(--text-muted)' }}>To</span>
             <input
               type="date"
               value={customDateTo}
               onChange={e => setCustomDateTo(e.target.value)}
-              style={{ padding: '6px 8px', fontSize: 11.5, border: '1px solid #E2E8F0', borderRadius: 6, background: '#FFF', color: '#475569', fontFamily: 'inherit' }}
+              className="input"
+              style={{ padding: '6px 8px', fontSize: 11.5 }}
             />
           </div>
         </>
@@ -146,10 +128,10 @@ export default function SharedFilterBar({ children, hasActiveFilters, onReset, s
       {!hideLanguageFilter && languages.length > 0 && (
         <div style={{ minWidth: 150, flexShrink: 0 }}>
           <select
-            className="input"
+            className={`input${language !== 'all' ? ' is-filtered' : ''}`}
             value={language}
             onChange={e => setLanguage(e.target.value)}
-            style={{ cursor: 'pointer', padding: '6px 12px', fontSize: 12, fontWeight: 600, borderColor: language !== 'all' ? '#E2E8F0' : undefined }}
+            style={{ cursor: 'pointer', padding: '6px 12px', fontSize: 12, fontWeight: 600 }}
           >
             <option value="all">🌐 All Languages</option>
             {languages.map(l => (
@@ -164,8 +146,8 @@ export default function SharedFilterBar({ children, hasActiveFilters, onReset, s
 
       {/* Views Update */}
       {showViewsUpdate && (
-        <button onClick={onViewsUpdate} disabled={isViewsUpdating} data-tutorial="views-update"
-          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: '1px solid #E2E8F0', background: '#FFF', color: '#475569', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, whiteSpace: 'nowrap' }}>
+        <button className="btn btn-ghost btn-sm" onClick={onViewsUpdate} disabled={isViewsUpdating} data-tutorial="views-update"
+          style={{ flexShrink: 0, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5 }}>
           <RefreshCw size={12} style={{ animation: isViewsUpdating ? 'spin 1s linear infinite' : 'none' }} />
           {isViewsUpdating ? 'Updating…' : 'Views Update'}
         </button>
@@ -173,7 +155,7 @@ export default function SharedFilterBar({ children, hasActiveFilters, onReset, s
 
       {/* Active filter highlight badge */}
       {globalActive && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, background: '#FEF2F2', border: '1px solid #FECACA', fontSize: 10, fontWeight: 700, color: '#DC2626', whiteSpace: 'nowrap', flexShrink: 0 }}>
+        <div className="filter-count">
           <Filter size={11} />
           {[ownership !== 'all' && 'ownership', format !== 'all' && 'format', dateRange !== 'All' && 'date', language !== 'all' && 'language'].filter(Boolean).length} active
         </div>
@@ -181,7 +163,7 @@ export default function SharedFilterBar({ children, hasActiveFilters, onReset, s
 
       {/* Reset */}
       {showReset && (
-        <button className="btn btn-ghost btn-sm" onClick={handleReset} style={{ color: '#EF4444', flexShrink: 0, whiteSpace: 'nowrap' }}>
+        <button className="btn btn-ghost btn-sm" onClick={handleReset} style={{ color: 'var(--danger)', flexShrink: 0, whiteSpace: 'nowrap' }}>
           Reset Filters
         </button>
       )}
