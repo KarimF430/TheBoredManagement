@@ -1,6 +1,7 @@
 import { YoutubeTranscript } from 'youtube-transcript'
 import { queryOne, queryAll } from './supabase'
 import { decryptApiKey } from './crypto'
+import { withRetry } from './retry'
 
 interface TranscriptSegment {
   text: string
@@ -169,12 +170,25 @@ async function fetchViaWhisper(youtubeId: string): Promise<{ text: string; langu
       return null
     }
 
-    // Step 2: Send to Groq Whisper API
+    // Step 2: Send to Groq Whisper API with brand seeds for better accuracy
     const audioBuffer = fs.readFileSync(outputPath)
     const formData = new FormData()
     formData.append('file', new Blob([audioBuffer], { type: 'audio/webm' }), `${youtubeId}.webm`)
     formData.append('model', 'whisper-large-v3')
     formData.append('response_format', 'json')
+
+    // Inject brand names as initial_prompt to improve transcription accuracy
+    // This biases Whisper's language model toward correct spelling of brand names
+    try {
+      const { getBrandsForWhisper } = await import('./brand-gazetteer')
+      const brandSeeds = getBrandsForWhisper()
+      if (brandSeeds.length > 0) {
+        const initialPrompt = `Brand names: ${brandSeeds.join(', ')}. Product names include brand names listed above. This is an Indian market review video.`
+        formData.append('initial_prompt', initialPrompt)
+      }
+    } catch {
+      // Gazetteer not available — proceed without brand seeds
+    }
 
     const whisperRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
       method: 'POST',
@@ -198,21 +212,29 @@ async function fetchViaWhisper(youtubeId: string): Promise<{ text: string; langu
   }
 }
 
-// ── Main: Try all methods in order ─────────────────────────────────
+// ── Main: Try all methods in order with retry ──────────────────────
 export async function fetchTranscript(youtubeId: string): Promise<{ text: string; language: string } | null> {
-  // Method 1: youtube-transcript library (fastest)
-  const libraryResult = await fetchViaLibrary(youtubeId)
-  if (libraryResult) return libraryResult
+  return withRetry(async () => {
+    // Method 1: youtube-transcript library (fastest)
+    const libraryResult = await fetchViaLibrary(youtubeId)
+    if (libraryResult) return libraryResult
 
-  // Method 2: YouTube Data API captions (OAuth)
-  const apiResult = await fetchViaYouTubeAPI(youtubeId)
-  if (apiResult) return apiResult
+    // Method 2: YouTube Data API captions (OAuth)
+    const apiResult = await fetchViaYouTubeAPI(youtubeId)
+    if (apiResult) return apiResult
 
-  // Method 3: Whisper Speech-to-Text (slowest, but works for ALL languages)
-  const whisperResult = await fetchViaWhisper(youtubeId)
-  if (whisperResult) return whisperResult
+    // Method 3: Whisper Speech-to-Text (slowest, but works for ALL languages)
+    const whisperResult = await fetchViaWhisper(youtubeId)
+    if (whisperResult) return whisperResult
 
-  return null
+    return null
+  }, {
+    maxRetries: 2,
+    baseDelayMs: 2000,
+    onRetry: (attempt, err, delay) => {
+      console.log(`Transcript fetch retry ${attempt} for ${youtubeId} after ${delay}ms: ${err.message}`)
+    },
+  })
 }
 
 export function chunkTranscript(text: string, maxChars: number = 8000): string[] {

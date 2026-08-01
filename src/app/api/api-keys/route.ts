@@ -37,7 +37,10 @@ export async function GET() {
         SUM(CASE WHEN is_active THEN 1 ELSE 0 END) as active,
         SUM(units_used) as total_used,
         SUM(units_limit) as total_capacity,
-        SUM(CASE WHEN (units_used + 100) > units_limit THEN 1 ELSE 0 END) as exhausted
+        -- 5-unit floor matches the real per-scrape cost under the current
+        -- search.list pricing (1 search call + a few detail/channel units),
+        -- not the old 100-unit assumption.
+        SUM(CASE WHEN (units_used + 5) > units_limit THEN 1 ELSE 0 END) as exhausted
       FROM api_keys
     `)
 

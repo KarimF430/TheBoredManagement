@@ -34,11 +34,14 @@ export async function POST(req: NextRequest) {
       try {
         console.log(`[BrandAnalyze] Processing video ${video.youtube_id} (${video.title?.slice(0, 50)})`)
 
-        // Check if already analyzed (unless force)
+        // Check if already analyzed (unless force). brand_analysis_checked_at
+        // is set even when zero brands are found — COUNT(*) on brand_analysis
+        // alone can't tell "never analyzed" from "analyzed, none found", which
+        // reprocessed (and re-billed) every zero-brand video on every call.
         if (!force) {
-          const existing = await queryOne('SELECT COUNT(*) as cnt FROM brand_analysis WHERE video_id = $1', [video.id])
-          if (existing?.cnt > 0) {
-            console.log(`[BrandAnalyze] ${video.youtube_id} already analyzed (${existing.cnt} rows), skipping`)
+          const existing = await queryOne('SELECT brand_analysis_checked_at FROM videos WHERE id = $1', [video.id])
+          if (existing?.brand_analysis_checked_at) {
+            console.log(`[BrandAnalyze] ${video.youtube_id} already analyzed, skipping`)
             results.push({ youtube_id: video.youtube_id, status: 'already_analyzed' })
             continue
           }
@@ -85,7 +88,7 @@ export async function POST(req: NextRequest) {
             const videoRow = await queryOne('SELECT tags FROM videos WHERE id = $1', [video.id])
             const currentTags = Array.isArray(videoRow?.tags) ? videoRow.tags : []
             const mergedTags = [...new Set([...currentTags, ...detectedBrands])]
-            await queryOne('UPDATE videos SET tags = $1 WHERE id = $2', [mergedTags, video.id])
+            await queryOne('UPDATE videos SET tags = $1, brand_analysis_checked_at = NOW() WHERE id = $2', [mergedTags, video.id])
 
             for (const brand of detectedBrands) {
               await queryOne(
@@ -93,6 +96,8 @@ export async function POST(req: NextRequest) {
                 [video.id, brand, campaign_id]
               )
             }
+          } else {
+            await queryOne('UPDATE videos SET brand_analysis_checked_at = NOW() WHERE id = $1', [video.id])
           }
 
           results.push({
@@ -134,7 +139,7 @@ export async function POST(req: NextRequest) {
           const videoRow = await queryOne('SELECT tags FROM videos WHERE id = $1', [video.id])
           const currentTags = Array.isArray(videoRow?.tags) ? videoRow.tags : []
           const mergedTags = [...new Set([...currentTags, ...detectedBrands])]
-          await queryOne('UPDATE videos SET tags = $1 WHERE id = $2', [mergedTags, video.id])
+          await queryOne('UPDATE videos SET tags = $1, brand_analysis_checked_at = NOW() WHERE id = $2', [mergedTags, video.id])
 
           for (const brand of detectedBrands) {
             await queryOne(
@@ -142,6 +147,8 @@ export async function POST(req: NextRequest) {
               [video.id, brand, campaign_id]
             )
           }
+        } else {
+          await queryOne('UPDATE videos SET brand_analysis_checked_at = NOW() WHERE id = $1', [video.id])
         }
 
         results.push({

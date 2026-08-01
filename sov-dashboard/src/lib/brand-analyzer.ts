@@ -344,7 +344,7 @@ async function extractBrandNotes(
   )
 
   const completion = await getOpenAI().chat.completions.create({
-    model: 'google/gemma-4-26b-a4b-it:free',
+    model: 'openai/gpt-4o-mini',
     messages: [{ role: 'user', content: prompt }],
     temperature: 0.1,
     max_tokens: 2000,
@@ -564,7 +564,7 @@ export async function detectIrrelevantVideo(
   // If heuristics don't catch it, use LLM
   try {
     const completion = await getOpenAI().chat.completions.create({
-      model: 'google/gemma-4-26b-a4b-it:free',
+      model: 'openai/gpt-4o-mini',
       messages: [{ role: 'user', content: buildIrrelevancePrompt(title, channelName, description) }],
       temperature: 0.1,
       max_tokens: 300,

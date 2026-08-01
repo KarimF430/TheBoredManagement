@@ -2,8 +2,131 @@ import { NextRequest, NextResponse } from 'next/server'
 import { queryAll, queryOne } from '@/lib/supabase'
 import { fetchTranscript } from '@/lib/transcript'
 import { analyzeBrandsFromTranscript, analyzeBrandsFromMetadata } from '@/lib/brand-analyzer'
+import { RateLimiter } from '@/lib/retry'
+
+export const runtime = 'nodejs'
+export const maxDuration = 60
+
+/** Videos analyzed concurrently within one request. */
+const CONCURRENCY = 5
+
+/**
+ * Stop starting new videos once this much of the request's time budget is
+ * used, and report the rest as `remaining` instead of racing the platform's
+ * hard timeout. This route already skips already-analyzed videos, so calling
+ * it again with the same video_ids resumes cleanly — same pattern as
+ * /api/scrape.
+ */
+const TIME_BUDGET_MS = 50_000
+
+type AnalyzeStatus = 'already_analyzed' | 'analyzed' | 'skipped'
+
+interface AnalyzeResult {
+  youtube_id: string
+  status: AnalyzeStatus
+  source?: 'transcript' | 'metadata'
+  language?: string
+  transcript_length?: number
+  brands_detected?: number
+  high_confidence_brands?: string[]
+}
+
+async function persistDetections(
+  videoId: string,
+  campaignId: string,
+  detections: Array<{ brand_name: string; confidence: number; mention_type: string; context_quotes?: string[] }>,
+  force: boolean
+): Promise<string[]> {
+  if (force) {
+    await queryOne('DELETE FROM brand_analysis WHERE video_id = $1', [videoId])
+  }
+
+  const detectedBrands: string[] = []
+  for (const d of detections) {
+    await queryOne(
+      `INSERT INTO brand_analysis (video_id, brand_name, confidence, mention_type, context_quotes)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [videoId, d.brand_name, d.confidence, d.mention_type, d.context_quotes || []]
+    )
+    if (d.confidence >= 0.6) detectedBrands.push(d.brand_name)
+  }
+
+  if (detectedBrands.length > 0) {
+    const videoRow = await queryOne('SELECT tags FROM videos WHERE id = $1', [videoId])
+    const currentTags = Array.isArray(videoRow?.tags) ? videoRow.tags : []
+    const mergedTags = [...new Set([...currentTags, ...detectedBrands])]
+    await queryOne('UPDATE videos SET tags = $1, brand_analysis_checked_at = NOW() WHERE id = $2', [mergedTags, videoId])
+
+    for (const brand of detectedBrands) {
+      await queryOne(
+        'INSERT INTO brand_tags (video_id, brand_name, campaign_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+        [videoId, brand, campaignId]
+      )
+    }
+  } else {
+    // Zero brands found is still a completed analysis — mark it so this
+    // video isn't mistaken for "never analyzed" and reprocessed (with a
+    // real LLM call) on every future call. See migration 009.
+    await queryOne('UPDATE videos SET brand_analysis_checked_at = NOW() WHERE id = $1', [videoId])
+  }
+
+  return detectedBrands
+}
+
+async function analyzeOneVideo(
+  video: { id: string; youtube_id: string; title: string; channel_name: string; description: string },
+  campaignId: string,
+  campaignBrands: string[],
+  force: boolean
+): Promise<AnalyzeResult> {
+  if (!force) {
+    const existing = await queryOne('SELECT brand_analysis_checked_at FROM videos WHERE id = $1', [video.id])
+    if (existing?.brand_analysis_checked_at) {
+      return { youtube_id: video.youtube_id, status: 'already_analyzed' }
+    }
+  }
+
+  let transcript: { text: string; language: string } | null = null
+  const existingTranscript = await queryOne(
+    'SELECT transcript_text, language FROM video_transcripts WHERE video_id = $1', [video.id]
+  )
+
+  if (existingTranscript) {
+    transcript = { text: existingTranscript.transcript_text, language: existingTranscript.language }
+  } else {
+    transcript = await fetchTranscript(video.youtube_id)
+    if (transcript) {
+      await queryOne(
+        'INSERT INTO video_transcripts (video_id, transcript_text, language) VALUES ($1, $2, $3) ON CONFLICT (video_id) DO NOTHING',
+        [video.id, transcript.text, transcript.language]
+      )
+    }
+  }
+
+  if (!transcript || !transcript.text) {
+    const detections = await analyzeBrandsFromMetadata(video.title, video.channel_name || '', video.description || '', campaignBrands)
+    const detectedBrands = await persistDetections(video.id, campaignId, detections, force)
+    return {
+      youtube_id: video.youtube_id, status: 'analyzed',
+      source: 'metadata', language: 'n/a',
+      brands_detected: detections.length, high_confidence_brands: detectedBrands,
+    }
+  }
+
+  const detections = await analyzeBrandsFromTranscript(
+    transcript.text, video.title, campaignBrands, video.channel_name || '', video.description || ''
+  )
+  const detectedBrands = await persistDetections(video.id, campaignId, detections, force)
+
+  return {
+    youtube_id: video.youtube_id, status: 'analyzed',
+    source: 'transcript', transcript_length: transcript.text.length, language: transcript.language,
+    brands_detected: detections.length, high_confidence_brands: detectedBrands,
+  }
+}
 
 export async function POST(req: NextRequest) {
+  const startedAt = Date.now()
   try {
     const body = await req.json()
     const { video_ids, campaign_id, force = false } = body
@@ -15,133 +138,54 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
     }
 
-    // Get known campaign brands
     const brandRows = await queryAll('SELECT name FROM campaign_brands WHERE campaign_id = $1', [campaign_id])
     const campaignBrands = brandRows.map((r: any) => r.name)
 
-    // Get video details (include description for metadata fallback)
-    const videos = await queryAll(
+    const videos = await queryAll<{ id: string; youtube_id: string; title: string; channel_name: string; description: string }>(
       `SELECT id, youtube_id, title, channel_name, description FROM videos WHERE youtube_id = ANY($1)`,
       [video_ids]
     )
 
-    const results: any[] = []
+    const results: AnalyzeResult[] = []
+    const limiter = new RateLimiter(CONCURRENCY)
+    let timeBudgetHit = false
+    let i = 0
 
-    for (const video of videos) {
-      // Check if already analyzed (unless force)
-      if (!force) {
-        const existing = await queryOne('SELECT COUNT(*) as cnt FROM brand_analysis WHERE video_id = $1', [video.id])
-        if (existing?.cnt > 0) {
-          results.push({ youtube_id: video.youtube_id, status: 'already_analyzed' })
-          continue
-        }
-      }
+    // Chunked, concurrency-bounded processing with a time-budget circuit
+    // breaker: start a batch, wait for it, then check elapsed time before
+    // starting the next. A whole batch may run slightly over budget (the
+    // check is between batches, not per-video), which is intentional —
+    // simpler than pre-empting in-flight LLM calls and still bounded.
+    while (i < videos.length && !timeBudgetHit) {
+      const batch = videos.slice(i, i + CONCURRENCY)
+      i += batch.length
 
-      // Fetch transcript
-      let transcript = null
-      const existingTranscript = await queryOne(
-        'SELECT transcript_text, language FROM video_transcripts WHERE video_id = $1', [video.id]
-      )
-
-      if (existingTranscript) {
-        transcript = { text: existingTranscript.transcript_text, language: existingTranscript.language }
-      } else {
-        transcript = await fetchTranscript(video.youtube_id)
-        if (transcript) {
-          await queryOne(
-            'INSERT INTO video_transcripts (video_id, transcript_text, language) VALUES ($1, $2, $3) ON CONFLICT (video_id) DO NOTHING',
-            [video.id, transcript.text, transcript.language]
-          )
-        }
-      }
-
-      if (!transcript || !transcript.text) {
-        // Fallback: analyze using video metadata (title, channel, description)
-        const detections = await analyzeBrandsFromMetadata(video.title, video.channel_name || '', video.description || '', campaignBrands)
-
-        if (force) {
-          await queryOne('DELETE FROM brand_analysis WHERE video_id = $1', [video.id])
-        }
-
-        const detectedBrands: string[] = []
-        for (const d of detections) {
-          await queryOne(
-            `INSERT INTO brand_analysis (video_id, brand_name, confidence, mention_type, context_quotes)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [video.id, d.brand_name, d.confidence, d.mention_type, d.context_quotes || []]
-          )
-          if (d.confidence >= 0.6) detectedBrands.push(d.brand_name)
-        }
-
-        if (detectedBrands.length > 0) {
-          const videoRow = await queryOne('SELECT tags FROM videos WHERE id = $1', [video.id])
-          const currentTags = Array.isArray(videoRow?.tags) ? videoRow.tags : []
-          const mergedTags = [...new Set([...currentTags, ...detectedBrands])]
-          await queryOne('UPDATE videos SET tags = $1 WHERE id = $2', [mergedTags, video.id])
-
-          for (const brand of detectedBrands) {
-            await queryOne(
-              'INSERT INTO brand_tags (video_id, brand_name, campaign_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
-              [video.id, brand, campaign_id]
-            )
-          }
-        }
-
-        results.push({
-          youtube_id: video.youtube_id, status: 'analyzed',
-          source: 'metadata', language: 'n/a',
-          brands_detected: detections.length, high_confidence_brands: detectedBrands,
-        })
-        continue
-      }
-
-      // Analyze with AI
-      const detections = await analyzeBrandsFromTranscript(
-        transcript.text,
-        video.title,
-        campaignBrands,
-        video.channel_name || '',
-        video.description || ''
-      )
-
-      // Store results
-      if (force) {
-        await queryOne('DELETE FROM brand_analysis WHERE video_id = $1', [video.id])
-      }
-
-      const detectedBrands: string[] = []
-      for (const d of detections) {
-        await queryOne(
-          `INSERT INTO brand_analysis (video_id, brand_name, confidence, mention_type, context_quotes)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [video.id, d.brand_name, d.confidence, d.mention_type, d.context_quotes || []]
+      const batchResults = await Promise.all(
+        batch.map(video =>
+          limiter.run(() => analyzeOneVideo(video, campaign_id, campaignBrands, force))
+            .catch((err): AnalyzeResult => {
+              console.error(`Brand analysis failed for video ${video.youtube_id}:`, err)
+              return { youtube_id: video.youtube_id, status: 'skipped' }
+            })
         )
-        if (d.confidence >= 0.6) detectedBrands.push(d.brand_name)
+      )
+      results.push(...batchResults)
+
+      if (Date.now() - startedAt > TIME_BUDGET_MS) {
+        timeBudgetHit = true
       }
-
-      // Merge high-confidence detections into video tags
-      if (detectedBrands.length > 0) {
-        const videoRow = await queryOne('SELECT tags FROM videos WHERE id = $1', [video.id])
-        const currentTags = Array.isArray(videoRow?.tags) ? videoRow.tags : []
-        const mergedTags = [...new Set([...currentTags, ...detectedBrands])]
-        await queryOne('UPDATE videos SET tags = $1 WHERE id = $2', [mergedTags, video.id])
-
-        for (const brand of detectedBrands) {
-          await queryOne(
-            'INSERT INTO brand_tags (video_id, brand_name, campaign_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
-            [video.id, brand, campaign_id]
-          )
-        }
-      }
-
-      results.push({
-        youtube_id: video.youtube_id, status: 'analyzed',
-        transcript_length: transcript.text.length, language: transcript.language,
-        brands_detected: detections.length, high_confidence_brands: detectedBrands,
-      })
     }
 
-    return NextResponse.json({ results })
+    const remaining = videos.length - i
+
+    return NextResponse.json({
+      results,
+      remaining,
+      total: videos.length,
+      message: remaining > 0
+        ? `Analyzed ${results.length} of ${videos.length} video(s). ${remaining} remaining — call again with the same video_ids to continue.`
+        : `Analyzed ${results.length} video(s).`,
+    })
   } catch (err: any) {
     console.error('Brand analysis error:', err)
     return NextResponse.json({ error: err.message || 'Internal error' }, { status: 500 })

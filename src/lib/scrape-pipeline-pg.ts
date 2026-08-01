@@ -4,6 +4,7 @@ import {
   getVideoDetailsOAuth,
   getViewCountsOAuth,
   type SearchOrder,
+  type SearchVideoDuration,
 } from './youtube-oauth'
 import { filterEligibleChannels } from './channel-filter'
 import { decryptApiKey } from './crypto'
@@ -97,9 +98,11 @@ async function getKeyFromSupabase(minUnits: number = 100): Promise<{ api_key: st
 
 async function searchYouTubeViaApiKey(
   keyword: string, maxResults: number = 50, regionCode: string = 'IN', order: SearchOrder = 'relevance',
-  pageToken?: string
+  pageToken?: string, videoDuration?: SearchVideoDuration
 ): Promise<{ hits: SearchHit[]; quota_cost: number; nextPageToken?: string }> {
-  const keyInfo = await getKeyFromSupabase(100)
+  // search.list is billed 1 call against the separate Search Queries bucket
+  // (not the shared units pool) since the June 2026 quota split.
+  const keyInfo = await getKeyFromSupabase(1)
   if (!keyInfo) throw new Error('NO_API_KEYS')
 
   const url = new URL('https://www.googleapis.com/youtube/v3/search')
@@ -110,6 +113,7 @@ async function searchYouTubeViaApiKey(
   url.searchParams.set('regionCode', regionCode)
   url.searchParams.set('order', order)
   if (pageToken) url.searchParams.set('pageToken', pageToken)
+  if (videoDuration && videoDuration !== 'any') url.searchParams.set('videoDuration', videoDuration)
   url.searchParams.set('key', keyInfo.api_key)
 
   const res = await fetch(url.toString())
@@ -134,7 +138,7 @@ async function searchYouTubeViaApiKey(
     }))
     .filter((h: SearchHit) => Boolean(h.youtube_id))
 
-  return { hits, quota_cost: 100, nextPageToken: data.nextPageToken }
+  return { hits, quota_cost: 1, nextPageToken: data.nextPageToken }
 }
 
 async function fetchVideoDetailsViaApiKey(youtubeIds: string[]): Promise<{ videos: YouTubeVideo[]; quota_cost: number }> {
@@ -298,12 +302,15 @@ const SHORT_MAX_SEC = 60
 const TARGET_PER_FORMAT = 10
 
 /**
- * How many 50-result search pages we are willing to walk to reach 10+10.
- * Each page costs 100 quota units, so this is the main cost lever.
+ * How many 50-result *unfiltered* search pages we are willing to walk to fill
+ * the long-form bucket. Long-form almost always fills from page 1 — this only
+ * needs to go higher for keywords saturated with foreign/brand channels.
+ * Each page costs 1 search call against the separate Search Queries bucket
+ * (default 100 calls/day/project), which is the real constraint — not units.
  */
 function maxSearchPages(): number {
-  const raw = parseInt(process.env.YOUTUBE_MAX_SEARCH_PAGES ?? '3', 10)
-  if (!Number.isFinite(raw)) return 3
+  const raw = parseInt(process.env.YOUTUBE_MAX_SEARCH_PAGES ?? '1', 10)
+  if (!Number.isFinite(raw)) return 1
   return Math.min(Math.max(raw, 1), 5)
 }
 
@@ -312,9 +319,15 @@ function isQuotaError(err: unknown): boolean {
   return msg.includes('quota') || msg.includes('429') || msg.includes('403') || msg.includes('NO_API_KEYS')
 }
 
-/** A search hit carrying its true position in YouTube's relevance-ordered results. */
+/** Whether serp_position is the video's true universal YouTube rank, a rank
+ *  within a videoDuration-filtered result set, or a cached-pool estimate used
+ *  when the API was unreachable (see migration 008). */
+type PositionType = 'true_serp' | 'shorts_filtered' | 'pool_fallback'
+
+/** A search hit carrying its position and what kind of position it is. */
 interface RankedHit extends SearchHit {
   serp_position: number
+  position_type: PositionType
 }
 
 interface SearchPage {
@@ -327,19 +340,27 @@ interface SearchPage {
  * One page of relevance-ordered Indian results.
  * Tries OAuth first, falls back to a stored API key, and preserves absolute
  * result positions across pages via `offset`.
+ *
+ * When `videoDuration` is set, the returned positions rank within that
+ * filtered result set, not the true unified SERP — callers must tag those
+ * hits `shorts_filtered`, never `true_serp`.
  */
 async function fetchSearchPage(
   keywordText: string,
   offset: number,
-  pageToken: string | undefined
+  pageToken: string | undefined,
+  videoDuration?: SearchVideoDuration
 ): Promise<SearchPage> {
+  const positionType: PositionType = videoDuration && videoDuration !== 'any' ? 'shorts_filtered' : 'true_serp'
+
   try {
-    const res = await searchYouTubeOAuth(keywordText, 50, 'IN', 'relevance', pageToken)
+    const res = await searchYouTubeOAuth(keywordText, 50, 'IN', 'relevance', pageToken, videoDuration)
     const hits = (res.items || [])
       .filter(item => item.id?.videoId)
       .map((item, index) => ({
         position: offset + index + 1,
         serp_position: offset + index + 1,
+        position_type: positionType,
         youtube_id: item.id.videoId,
         title: item.snippet?.title ?? '',
         channel_name: item.snippet?.channelTitle ?? '',
@@ -347,15 +368,16 @@ async function fetchSearchPage(
         published_at: item.snippet?.publishedAt ?? '',
         thumbnail_url: item.snippet?.thumbnails?.medium?.url ?? '',
       }))
-    return { hits, nextPageToken: res.nextPageToken, quotaCost: 100 }
+    return { hits, nextPageToken: res.nextPageToken, quotaCost: 1 }
   } catch (oauthErr) {
     console.error(`OAuth search failed for "${keywordText}" (offset ${offset}):`, oauthErr)
 
-    const res = await searchYouTubeViaApiKey(keywordText, 50, 'IN', 'relevance', pageToken)
+    const res = await searchYouTubeViaApiKey(keywordText, 50, 'IN', 'relevance', pageToken, videoDuration)
     const hits = res.hits.map((h, index) => ({
       ...h,
       position: offset + index + 1,
       serp_position: offset + index + 1,
+      position_type: positionType,
     }))
     return { hits, nextPageToken: res.nextPageToken, quotaCost: res.quota_cost }
   }
@@ -466,9 +488,54 @@ export async function scrapeKeyword(
 
   const pageLimit = maxSearchPages()
 
-  // Walk relevance-ordered pages until both formats have their 10, keeping the
-  // true YouTube position of every video. When a channel is skipped (foreign or
-  // brand-owned), the next eligible video moves up to take the slot.
+  // Shared per-page pipeline: dedupe, drop excluded/foreign/brand channels,
+  // fetch details, classify by duration. Mutates longForm/shortForm/poolVideos
+  // and returns the quota this page's follow-up calls consumed.
+  const processPage = async (hits: RankedHit[]): Promise<number> => {
+    let pageQuota = 0
+    const fresh = hits.filter(h => h.youtube_id && !seenIds.has(h.youtube_id))
+    for (const h of fresh) seenIds.add(h.youtube_id)
+    if (fresh.length === 0) return 0
+
+    // 1. Drop videos already known to be irrelevant.
+    const excluded = await loadExcludedVideoIds(fresh.map(h => h.youtube_id))
+    const notExcluded = fresh.filter(h => !excluded.has(h.youtube_id))
+
+    // 2. Drop foreign and brand-owned channels (input order preserved).
+    const { eligible, rejected, quotaCost: channelQuota } =
+      await filterEligibleChannels(notExcluded, brandNames)
+    pageQuota += channelQuota
+    for (const r of rejected) {
+      if (r.reason === 'foreign_channel') rejectedForeign++
+      else rejectedBrand++
+    }
+
+    // 3. Duration decides format, so details are required for every survivor.
+    const { videos: details, quotaCost: detailQuota } =
+      await fetchDetailsForAll(eligible.map(h => h.youtube_id))
+    pageQuota += detailQuota
+
+    for (const hit of eligible) {
+      const video = details.get(hit.youtube_id)
+      if (!video) continue // details unavailable — cannot classify the format
+      poolVideos.set(video.youtube_id, video)
+
+      if (video.duration_sec <= 0) continue
+      if (video.duration_sec <= SHORT_MAX_SEC) {
+        if (shortForm.length < TARGET_PER_FORMAT) shortForm.push({ hit, video })
+      } else if (hit.position_type === 'true_serp' && longForm.length < TARGET_PER_FORMAT) {
+        // Long-form only ever comes from the unfiltered phase — a
+        // shorts_filtered page should never contain anything long enough to
+        // qualify, but the guard keeps the true-SERP promise airtight.
+        longForm.push({ hit, video })
+      }
+    }
+    return pageQuota
+  }
+
+  // Phase A — walk unfiltered, relevance-ordered pages, keeping every video's
+  // true YouTube search position. This fills long-form almost every time and
+  // opportunistically catches true-position Shorts along the way.
   while (pagesFetched < pageLimit) {
     let page: SearchPage
     try {
@@ -482,46 +549,29 @@ export async function scrapeKeyword(
     pagesFetched++
     quotaCost += page.quotaCost
     offset += page.hits.length
-
-    const fresh = page.hits.filter(h => h.youtube_id && !seenIds.has(h.youtube_id))
-    for (const h of fresh) seenIds.add(h.youtube_id)
-
-    if (fresh.length > 0) {
-      // 1. Drop videos already known to be irrelevant.
-      const excluded = await loadExcludedVideoIds(fresh.map(h => h.youtube_id))
-      const notExcluded = fresh.filter(h => !excluded.has(h.youtube_id))
-
-      // 2. Drop foreign and brand-owned channels (input order preserved).
-      const { eligible, rejected, quotaCost: channelQuota } =
-        await filterEligibleChannels(notExcluded, brandNames)
-      quotaCost += channelQuota
-      for (const r of rejected) {
-        if (r.reason === 'foreign_channel') rejectedForeign++
-        else rejectedBrand++
-      }
-
-      // 3. Duration decides format, so details are required for every survivor.
-      const { videos: details, quotaCost: detailQuota } =
-        await fetchDetailsForAll(eligible.map(h => h.youtube_id))
-      quotaCost += detailQuota
-
-      for (const hit of eligible) {
-        const video = details.get(hit.youtube_id)
-        if (!video) continue // details unavailable — cannot classify the format
-        poolVideos.set(video.youtube_id, video)
-
-        if (video.duration_sec <= 0) continue
-        if (video.duration_sec <= SHORT_MAX_SEC) {
-          if (shortForm.length < TARGET_PER_FORMAT) shortForm.push({ hit, video })
-        } else if (longForm.length < TARGET_PER_FORMAT) {
-          longForm.push({ hit, video })
-        }
-      }
-    }
+    quotaCost += await processPage(page.hits)
 
     const filled = longForm.length >= TARGET_PER_FORMAT && shortForm.length >= TARGET_PER_FORMAT
     if (filled || !page.nextPageToken) break
     pageToken = page.nextPageToken
+  }
+
+  // Phase B — Shorts are the bucket page-walking fills worst (they're a
+  // minority of unfiltered results). Rather than pay another full unfiltered
+  // page hoping for more, spend exactly one videoDuration=short call: it's
+  // Shorts-dense, so it reliably tops up the remaining slots. Those hits rank
+  // within a Shorts-only result set, not the true SERP — tagged accordingly
+  // by fetchSearchPage and never written into keyword_videos.
+  if (shortForm.length < TARGET_PER_FORMAT) {
+    try {
+      const shortsPage = await fetchSearchPage(keywordText, 0, undefined, 'short')
+      pagesFetched++
+      quotaCost += shortsPage.quotaCost
+      quotaCost += await processPage(shortsPage.hits)
+    } catch (err) {
+      console.error(`Shorts top-up search failed for "${keywordText}":`, err)
+      if (!isQuotaError(err) && longForm.length === 0 && shortForm.length === 0) throw err
+    }
   }
 
   // Nothing usable from the API (quota exhausted, outage) — fall back to the
@@ -535,6 +585,7 @@ export async function scrapeKeyword(
       const hit: RankedHit = {
         position,
         serp_position: position,
+        position_type: 'pool_fallback',
         youtube_id: video.youtube_id,
         title: video.title,
         channel_name: video.channel_name,
@@ -689,6 +740,7 @@ async function persistRankedVideos(
         video_id: vid,
         rank: i + 1,
         serp_position: entry.hit.serp_position,
+        position_type: entry.hit.position_type,
         discovered_at: now,
         last_seen_at: now,
       })
@@ -704,15 +756,15 @@ async function persistRankedVideos(
   buildRows(longForm, kvRows)
   buildRows(shortForm, ksRows)
 
-  // serp_position is a newer column; retry without it so an un-migrated database
-  // still records the ranking.
+  // serp_position/position_type are newer columns; retry without them so an
+  // un-migrated database still records the ranking.
   const upsertRanks = async (table: string, rows: Record<string, any>[]) => {
     if (rows.length === 0) return
     try {
       await batchUpsert(table, rows, 'keyword_id,video_id')
     } catch (err) {
-      console.error(`${table} upsert with serp_position failed, retrying without it:`, err)
-      const stripped = rows.map(({ serp_position, ...rest }) => rest)
+      console.error(`${table} upsert with serp_position/position_type failed, retrying without them:`, err)
+      const stripped = rows.map(({ serp_position, position_type, ...rest }) => rest)
       await batchUpsert(table, stripped, 'keyword_id,video_id')
     }
   }

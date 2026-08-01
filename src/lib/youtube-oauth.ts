@@ -211,13 +211,15 @@ export interface YouTubeVideoResult {
 }
 
 export type SearchOrder = 'relevance' | 'viewCount' | 'date' | 'rating'
+export type SearchVideoDuration = 'any' | 'short' | 'medium' | 'long'
 
 export async function searchYouTubeOAuth(
   keyword: string,
   maxResults: number = 50,
   regionCode: string = 'IN',
   order: SearchOrder = 'relevance',
-  pageToken?: string
+  pageToken?: string,
+  videoDuration?: SearchVideoDuration
 ): Promise<YouTubeSearchResult> {
   const params: Record<string, string> = {
     part: 'id,snippet',
@@ -228,8 +230,11 @@ export async function searchYouTubeOAuth(
     order,
   }
   if (pageToken) params.pageToken = pageToken
+  if (videoDuration && videoDuration !== 'any') params.videoDuration = videoDuration
 
-  return youtubeApiFetch<YouTubeSearchResult>('search', params, { quotaCost: 100, keyId: 'oauth' })
+  // search.list is billed 1 call against the separate Search Queries bucket
+  // (not the shared 10,000-unit pool) since the June 2026 quota split.
+  return youtubeApiFetch<YouTubeSearchResult>('search', params, { quotaCost: 1, keyId: 'oauth' })
 }
 
 export async function getVideoDetailsOAuth(
