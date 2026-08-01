@@ -64,14 +64,14 @@ const TAB_ICONS: Record<string, React.ReactNode> = {
 
 function Toast({ msg, type, onClose }: { msg: string; type: 'success' | 'error' | 'info' | 'warning'; onClose: () => void }) {
   useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [onClose])
-  const bg = type === 'success' ? '#00C853' : type === 'error' ? '#FF2D55' : type === 'warning' ? '#F59E0B' : '#1A73E8'
+  const bg = type === 'success' ? 'var(--success)' : type === 'error' ? 'var(--danger)' : type === 'warning' ? 'var(--warning)' : 'var(--accent)'
   return (
     <div style={{
       position: 'fixed', bottom: 28, right: 28, zIndex: 9999,
       display: 'flex', alignItems: 'center', gap: 10,
-      padding: '14px 20px', borderRadius: 12, minWidth: 280,
-      background: bg, color: '#FFF', fontWeight: 600, fontSize: 13,
-      boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+      padding: '14px 20px', borderRadius: 'var(--radius-lg)', minWidth: 280,
+      background: bg, color: 'var(--surface)', fontWeight: 600, fontSize: 'var(--fs-body)',
+      boxShadow: 'var(--shadow-modal)',
       animation: 'fadeUp 0.25s ease',
     }}>
       {type === 'success' && <CheckCircle size={16} />}
@@ -79,7 +79,7 @@ function Toast({ msg, type, onClose }: { msg: string; type: 'success' | 'error' 
       {type === 'info' && <Zap size={16} />}
       {type === 'warning' && <AlertTriangle size={16} />}
       <span style={{ flex: 1 }}>{msg}</span>
-      <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FFF', padding: 2 }}><X size={14} /></button>
+      <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--surface)', padding: 2 }}><X size={14} /></button>
     </div>
   )
 }
@@ -303,19 +303,17 @@ export default function SettingsPage() {
   }
 
   const sectionTitle = (label: string) => (
-    <div style={{ fontSize: 15, fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>
+    <div style={{ fontSize: 'var(--fs-h2)', fontWeight: 700, color: 'var(--text-bright)', marginBottom: 4 }}>
       {TAB_ICONS[tab]} {label}
     </div>
   )
 
   const sectionDesc = (text: string) => (
-    <p style={{ fontSize: 12.5, color: '#64748B', marginBottom: 20, fontWeight: 500 }}>{text}</p>
+    <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', marginBottom: 20, fontWeight: 500 }}>{text}</p>
   )
 
-  const labelStyle = { display: 'block', fontSize: 10.5, fontWeight: 700, color: '#475569', textTransform: 'uppercase' as const, letterSpacing: '0.6px', marginBottom: 5 }
-
   return (
-    <div className="anim-fade-up" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+    <div className="anim-fade-up">
       {/* Page Header */}
       <div className="page-header">
         <div>
@@ -325,7 +323,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Main Layout: Sidebar + Content */}
-      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 20, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'var(--sidebar-w) 1fr', gap: 20, alignItems: 'start' }}>
         {/* ── Settings Nav ── */}
         <div className="card" style={{ padding: 8, position: 'sticky', top: 20 }}>
           {SETTINGS_NAV.map(item => (
@@ -335,14 +333,14 @@ export default function SettingsPage() {
               style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 width: '100%', padding: '8px 12px', border: 'none',
-                borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
+                borderRadius: 'var(--radius-md)', cursor: 'pointer', fontFamily: 'inherit',
                 background: tab === item.id ? 'rgba(245,130,32,0.08)' : 'transparent',
-                color: tab === item.id ? '#F58220' : '#475569',
+                color: tab === item.id ? '#F58220' : 'var(--text-secondary)',
                 fontWeight: tab === item.id ? 700 : 500,
-                fontSize: 12.5, transition: 'all 0.12s',
+                fontSize: 'var(--fs-sm)', transition: 'all 0.12s',
               }}
-              onMouseEnter={e => { if (tab !== item.id) { e.currentTarget.style.background = '#F1F5F9'; e.currentTarget.style.color = '#0F172A' } }}
-              onMouseLeave={e => { if (tab !== item.id) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#475569' } }}
+              onMouseEnter={e => { if (tab !== item.id) { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-bright)' } }}
+              onMouseLeave={e => { if (tab !== item.id) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)' } }}
             >
               {item.icon}
               {item.label}
@@ -361,31 +359,31 @@ export default function SettingsPage() {
               {sectionDesc('Configure global application preferences and defaults')}
 
               {settingsLoading ? (
-                <div style={{ textAlign: 'center', padding: 32 }}><Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: '#94A3B8' }} /></div>
+                <div style={{ textAlign: 'center', padding: 32 }}><Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-muted)' }} /></div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                     <div>
-                      <label style={labelStyle}>Application Name</label>
-                      <input className="input" value={appSettings.app_name || ''} onChange={e => setAppSettings(p => ({ ...p, app_name: e.target.value }))} placeholder="SOV Panel" style={{ height: 38, fontSize: 13 }} />
+                      <label className="field-label">Application Name</label>
+                      <input className="input" value={appSettings.app_name || ''} onChange={e => setAppSettings(p => ({ ...p, app_name: e.target.value }))} placeholder="SOV Panel" style={{ height: 38 }} />
                     </div>
                     <div>
-                      <label style={labelStyle}>Tagline</label>
-                      <input className="input" value={appSettings.app_tagline || ''} onChange={e => setAppSettings(p => ({ ...p, app_tagline: e.target.value }))} placeholder="YouTube Share-of-Voice Analytics" style={{ height: 38, fontSize: 13 }} />
+                      <label className="field-label">Tagline</label>
+                      <input className="input" value={appSettings.app_tagline || ''} onChange={e => setAppSettings(p => ({ ...p, app_tagline: e.target.value }))} placeholder="YouTube Share-of-Voice Analytics" style={{ height: 38 }} />
                     </div>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
                     <div>
-                      <label style={labelStyle}>Timezone</label>
-                      <select className="input" value={appSettings.timezone || 'UTC'} onChange={e => setAppSettings(p => ({ ...p, timezone: e.target.value }))} style={{ height: 38, fontSize: 13 }}>
+                      <label className="field-label">Timezone</label>
+                      <select className="input" value={appSettings.timezone || 'UTC'} onChange={e => setAppSettings(p => ({ ...p, timezone: e.target.value }))} style={{ height: 38 }}>
                         {['UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Europe/London', 'Europe/Paris', 'Asia/Dubai', 'Asia/Kolkata', 'Asia/Singapore', 'Asia/Tokyo', 'Australia/Sydney'].map(tz => (
                           <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
                         ))}
                       </select>
                     </div>
                     <div>
-                      <label style={labelStyle}>Date Format</label>
-                      <select className="input" value={appSettings.date_format || 'MMM DD, YYYY'} onChange={e => setAppSettings(p => ({ ...p, date_format: e.target.value }))} style={{ height: 38, fontSize: 13 }}>
+                      <label className="field-label">Date Format</label>
+                      <select className="input" value={appSettings.date_format || 'MMM DD, YYYY'} onChange={e => setAppSettings(p => ({ ...p, date_format: e.target.value }))} style={{ height: 38 }}>
                         <option value="MMM DD, YYYY">Jan 15, 2026</option>
                         <option value="DD/MM/YYYY">15/01/2026</option>
                         <option value="YYYY-MM-DD">2026-01-15</option>
@@ -393,8 +391,8 @@ export default function SettingsPage() {
                       </select>
                     </div>
                     <div>
-                      <label style={labelStyle}>Items Per Page</label>
-                      <select className="input" value={appSettings.items_per_page || 25} onChange={e => setAppSettings(p => ({ ...p, items_per_page: parseInt(e.target.value) }))} style={{ height: 38, fontSize: 13 }}>
+                      <label className="field-label">Items Per Page</label>
+                      <select className="input" value={appSettings.items_per_page || 25} onChange={e => setAppSettings(p => ({ ...p, items_per_page: parseInt(e.target.value) }))} style={{ height: 38 }}>
                         <option value={10}>10</option>
                         <option value={25}>25</option>
                         <option value={50}>50</option>
@@ -423,8 +421,8 @@ export default function SettingsPage() {
                 {sectionDesc('Manage project-level membership and role-based permissions')}
 
                 <div style={{ marginBottom: 16 }}>
-                  <label style={labelStyle}>Select Project</label>
-                  <select className="input" value={memberCampaignId} onChange={e => { setMemberCampaignId(e.target.value); if (e.target.value) fetchMembers(e.target.value) }} style={{ height: 38, fontSize: 13, maxWidth: 320 }}>
+                  <label className="field-label">Select Project</label>
+                  <select className="input" value={memberCampaignId} onChange={e => { setMemberCampaignId(e.target.value); if (e.target.value) fetchMembers(e.target.value) }} style={{ height: 38, maxWidth: 320 }}>
                     <option value="">-- Select Project --</option>
                     {campaigns.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
@@ -444,15 +442,15 @@ export default function SettingsPage() {
                       </thead>
                       <tbody>
                         {members.length === 0 ? (
-                          <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: '#CBD5E1', fontSize: 13 }}>No members in this project.</td></tr>
+                          <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: 'var(--neutral-300)' }}>No members in this project.</td></tr>
                         ) : members.map((m: any) => (
                           <tr key={m.user_id}>
-                            <td style={{ fontWeight: 600, color: '#0F172A' }}>{m.email}</td>
+                            <td style={{ fontWeight: 600, color: 'var(--text-bright)' }}>{m.email}</td>
                             <td>
                               <select value={m.role} style={{
-                                padding: '3px 8px', borderRadius: 6, fontSize: 11.5, fontWeight: 700,
-                                border: '1.5px solid rgba(26,115,232,0.1)', background: '#FFF', cursor: 'pointer', fontFamily: 'inherit',
-                                color: m.role === 'owner' ? '#00C853' : m.role === 'admin' ? '#1A73E8' : m.role === 'editor' ? '#7C3AED' : '#64748B',
+                                padding: '3px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--fs-label)', fontWeight: 700,
+                                border: '1.5px solid rgba(26,115,232,0.1)', background: 'var(--surface)', cursor: 'pointer', fontFamily: 'inherit',
+                                color: m.role === 'owner' ? '#00C853' : m.role === 'admin' ? '#1A73E8' : m.role === 'editor' ? '#7C3AED' : 'var(--text-secondary)',
                               }} disabled={m.role === 'owner'}>
                                 <option value="owner" disabled>Owner</option>
                                 <option value="admin">Admin</option>
@@ -460,10 +458,10 @@ export default function SettingsPage() {
                                 <option value="viewer">Viewer</option>
                               </select>
                             </td>
-                            <td style={{ fontSize: 11, color: '#64748B' }}>
+                            <td style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)' }}>
                               {m.role === 'owner' ? 'Everything' : m.role === 'admin' ? 'Manage + Edit' : m.role === 'editor' ? 'Edit Content' : 'View Only'}
                             </td>
-                            <td style={{ fontSize: 12, color: '#64748B' }}>{new Date(m.joined_at).toLocaleDateString()}</td>
+                            <td style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>{new Date(m.joined_at).toLocaleDateString()}</td>
                             <td style={{ textAlign: 'center' }}>
                               {m.role !== 'owner' && (
                                 <button onClick={() => {
@@ -471,7 +469,7 @@ export default function SettingsPage() {
                                   fetch(`/api/workspace/members?campaign_id=${memberCampaignId}&user_id=${m.user_id}`, { method: 'DELETE' })
                                     .then(() => { fetchMembers(memberCampaignId); showToast('Member removed') })
                                     .catch(() => showToast('Failed', 'error'))
-                                }} style={{ background: '#FEF2F2', border: '1.5px solid rgba(255,45,85,0.1)', borderRadius: 6, padding: '4px 7px', cursor: 'pointer', color: '#EF4444', display: 'inline-flex', alignItems: 'center' }}>
+                                }} style={{ background: 'var(--danger-dim)', border: '1.5px solid rgba(255,45,85,0.1)', borderRadius: 'var(--radius-sm)', padding: '4px 7px', cursor: 'pointer', color: 'var(--danger)', display: 'inline-flex', alignItems: 'center' }}>
                                   <Trash2 size={11} />
                                 </button>
                               )}
@@ -482,15 +480,15 @@ export default function SettingsPage() {
                     </table>
                   </div>
                 ) : (
-                  <div style={{ textAlign: 'center', padding: 32, color: '#94A3B8', fontSize: 13 }}>Select a project to manage its members.</div>
+                  <div style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)', fontSize: 'var(--fs-body)' }}>Select a project to manage its members.</div>
                 )}
               </div>
 
               {/* Permissions Matrix */}
               <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                 <div style={{ padding: '14px 18px', borderBottom: '1.5px solid rgba(26,115,232,0.06)' }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>Role Permissions</span>
-                  <span style={{ fontSize: 11, color: '#64748B', marginLeft: 8, fontWeight: 500 }}>What each role can access</span>
+                  <span style={{ fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--text-bright)' }}>Role Permissions</span>
+                  <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginLeft: 8, fontWeight: 500 }}>What each role can access</span>
                 </div>
                 <div style={{ overflowX: 'auto' }}>
                   <table className="data-table" style={{ minWidth: 580 }}>
@@ -522,12 +520,12 @@ export default function SettingsPage() {
                         { feature: 'Backup & Sync', o: true, a: false, e: false, v: false },
                       ].map(row => (
                         <tr key={row.feature}>
-                          <td style={{ fontSize: 12.5, fontWeight: 600, color: '#0F172A' }}>{row.feature}</td>
+                          <td style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-bright)' }}>{row.feature}</td>
                           {['o', 'a', 'e', 'v'].map(k => (
                             <td key={k} style={{ textAlign: 'center' }}>
                               {(row as any)[k]
-                                ? <Check size={13} style={{ color: '#00C853' }} />
-                                : <X size={13} style={{ color: '#CBD5E1' }} />
+                                ? <Check size={13} style={{ color: 'var(--success)' }} />
+                                : <X size={13} style={{ color: 'var(--neutral-300)' }} />
                               }
                             </td>
                           ))}
@@ -555,8 +553,8 @@ export default function SettingsPage() {
                     { label: 'Capacity', value: (apiKeyStats.total_capacity || 0).toLocaleString(), color: '#FF6D00' },
                   ].map(s => (
                     <div key={s.label} className="card" style={{ padding: '12px 16px' }}>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: s.color, fontVariantNumeric: 'tabular-nums' }}>{s.value}</div>
-                      <div style={{ fontSize: 10.5, fontWeight: 600, color: '#64748B', marginTop: 2 }}>{s.label}</div>
+                      <div style={{ fontSize: 'var(--fs-h1)', fontWeight: 800, color: s.color, fontVariantNumeric: 'tabular-nums' }}>{s.value}</div>
+                      <div style={{ fontSize: 'var(--fs-label)', fontWeight: 600, color: 'var(--text-secondary)', marginTop: 2 }}>{s.label}</div>
                     </div>
                   ))}
                 </div>
@@ -564,7 +562,7 @@ export default function SettingsPage() {
 
               <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                 <div style={{ padding: '14px 18px', borderBottom: '1.5px solid rgba(26,115,232,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>API Keys ({apiKeys.length})</span>
+                  <span style={{ fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--text-bright)' }}>API Keys ({apiKeys.length})</span>
                   <button className="btn btn-blue btn-sm" onClick={() => setShowAddKey(true)}><Plus size={12} /> Add Key</button>
                 </div>
                 <div style={{ overflowX: 'auto' }}>
@@ -581,13 +579,13 @@ export default function SettingsPage() {
                     </thead>
                     <tbody>
                       {apiKeys.length === 0 ? (
-                        <tr><td colSpan={6} style={{ textAlign: 'center', padding: 32, color: '#CBD5E1', fontSize: 13 }}>No API keys configured.</td></tr>
+                        <tr><td colSpan={6} style={{ textAlign: 'center', padding: 32, color: 'var(--neutral-300)' }}>No API keys configured.</td></tr>
                       ) : apiKeys.map((k: any) => (
                         <tr key={k.id}>
                           <td style={{ fontWeight: 600 }}>{k.label}</td>
-                          <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+                          <td style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)' }}>
                             {keyVisible[k.id] ? k.api_key_masked : k.api_key_masked.slice(0, 12) + '••••••••'}
-                            <button onClick={() => setKeyVisible(p => ({ ...p, [k.id]: !p[k.id] }))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', marginLeft: 6, verticalAlign: 'middle' }}>
+                            <button onClick={() => setKeyVisible(p => ({ ...p, [k.id]: !p[k.id] }))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', marginLeft: 6, verticalAlign: 'middle' }}>
                               {keyVisible[k.id] ? <EyeOff size={12} /> : <Eye size={12} />}
                             </button>
                           </td>
@@ -598,24 +596,24 @@ export default function SettingsPage() {
                           </td>
                           <td style={{ minWidth: 140 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <div style={{ flex: 1, height: 5, borderRadius: 99, background: '#E2E8F0', overflow: 'hidden' }}>
+                              <div style={{ flex: 1, height: 5, borderRadius: 99, background: 'var(--border-2)', overflow: 'hidden' }}>
                                 <div style={{ width: `${Math.min(k.usage_pct, 100)}%`, height: '100%', borderRadius: 99, background: k.usage_pct > 80 ? '#FF2D55' : k.usage_pct > 60 ? '#FF6D00' : '#00C853' }} />
                               </div>
-                              <span style={{ fontSize: 10.5, fontWeight: 700, color: '#64748B', whiteSpace: 'nowrap', fontFamily: "'JetBrains Mono', monospace" }}>
+                              <span style={{ fontSize: 'var(--fs-label)', fontWeight: 700, color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>
                                 {k.usage_pct}%
                               </span>
                             </div>
                           </td>
-                          <td style={{ fontSize: 12 }}>Bucket {k.bucket}</td>
+                          <td style={{ fontSize: 'var(--fs-sm)' }}>Bucket {k.bucket}</td>
                           <td style={{ textAlign: 'center' }}>
                             <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                              <button onClick={() => toggleKey(k.id)} className="btn btn-xs btn-ghost" style={{ padding: '3px 7px', fontSize: 10 }} title={k.is_active ? 'Disable' : 'Enable'}>
+                              <button onClick={() => toggleKey(k.id)} className="btn btn-xs btn-ghost" title={k.is_active ? 'Disable' : 'Enable'}>
                                 {k.is_active ? <ToggleRight size={12} /> : <ToggleLeft size={12} />}
                               </button>
-                              <button onClick={() => resetKey(k.id)} className="btn btn-xs btn-ghost" style={{ padding: '3px 7px', fontSize: 10 }} title="Reset quota">
+                              <button onClick={() => resetKey(k.id)} className="btn btn-xs btn-ghost" title="Reset quota">
                                 <RefreshCw size={11} />
                               </button>
-                              <button onClick={() => deleteKey(k.id)} className="btn btn-xs btn-danger" style={{ padding: '3px 7px', fontSize: 10 }}>
+                              <button onClick={() => deleteKey(k.id)} className="btn btn-xs btn-danger">
                                 <Trash2 size={11} />
                               </button>
                             </div>
@@ -629,23 +627,23 @@ export default function SettingsPage() {
 
               {/* Add Key Modal */}
               {showAddKey && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
-                  <div className="card" style={{ maxWidth: 460, width: '100%', padding: 24, position: 'relative' }}>
+                <div className="modal-scrim">
+                  <div className="card" style={{ maxWidth: 460, width: '100%', padding: 'var(--space-6)', position: 'relative' }}>
                     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #F58220, #FF9F43, transparent)', borderRadius: '14px 14px 0 0' }} />
-                    <button onClick={() => setShowAddKey(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(26,115,232,0.04)', border: '1.5px solid rgba(26,115,232,0.08)', borderRadius: 8, cursor: 'pointer', color: '#94A3B8', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} /></button>
-                    <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0F172A', margin: '0 0 16px' }}>Add YouTube API Key</h3>
+                    <button onClick={() => setShowAddKey(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(26,115,232,0.04)', border: '1.5px solid rgba(26,115,232,0.08)', borderRadius: 'var(--radius-md)', cursor: 'pointer', color: 'var(--text-muted)', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} /></button>
+                    <h3 style={{ fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--text-bright)', margin: '0 0 16px' }}>Add YouTube API Key</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                       <div>
-                        <label style={labelStyle}>Label</label>
-                        <input className="input" value={newKey.label} onChange={e => setNewKey(p => ({ ...p, label: e.target.value }))} placeholder="e.g. Main Key Bucket 1" style={{ height: 38, fontSize: 13 }} />
+                        <label className="field-label">Label</label>
+                        <input className="input" value={newKey.label} onChange={e => setNewKey(p => ({ ...p, label: e.target.value }))} placeholder="e.g. Main Key Bucket 1" style={{ height: 38 }} />
                       </div>
                       <div>
-                        <label style={labelStyle}>API Key</label>
-                        <input className="input" value={newKey.api_key} onChange={e => setNewKey(p => ({ ...p, api_key: e.target.value }))} placeholder="AIza..." style={{ height: 38, fontSize: 13, fontFamily: "'JetBrains Mono', monospace" }} />
+                        <label className="field-label">API Key</label>
+                        <input className="input" value={newKey.api_key} onChange={e => setNewKey(p => ({ ...p, api_key: e.target.value }))} placeholder="AIza..." style={{ height: 38, fontFamily: 'var(--font-mono)' }} />
                       </div>
                       <div>
-                        <label style={labelStyle}>Daily Quota Limit</label>
-                        <input className="input" type="number" value={newKey.units_limit} onChange={e => setNewKey(p => ({ ...p, units_limit: e.target.value }))} style={{ height: 38, fontSize: 13 }} />
+                        <label className="field-label">Daily Quota Limit</label>
+                        <input className="input" type="number" value={newKey.units_limit} onChange={e => setNewKey(p => ({ ...p, units_limit: e.target.value }))} style={{ height: 38 }} />
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
@@ -668,16 +666,16 @@ export default function SettingsPage() {
                 {sectionDesc('Register a new dashboard user account')}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <div>
-                    <label style={labelStyle}>Email</label>
-                    <input className="input" type="email" value={newUser.email} onChange={e => setNewUser(p => ({ ...p, email: e.target.value }))} placeholder="user@company.com" style={{ height: 36, fontSize: 12.5 }} />
+                    <label className="field-label">Email</label>
+                    <input className="input" type="email" value={newUser.email} onChange={e => setNewUser(p => ({ ...p, email: e.target.value }))} placeholder="user@company.com" style={{ height: 36 }} />
                   </div>
                   <div>
-                    <label style={labelStyle}>Password</label>
-                    <input className="input" type="password" value={newUser.password} onChange={e => setNewUser(p => ({ ...p, password: e.target.value }))} placeholder="••••••••" style={{ height: 36, fontSize: 12.5 }} />
+                    <label className="field-label">Password</label>
+                    <input className="input" type="password" value={newUser.password} onChange={e => setNewUser(p => ({ ...p, password: e.target.value }))} placeholder="••••••••" style={{ height: 36 }} />
                   </div>
                   <div>
-                    <label style={labelStyle}>Role</label>
-                    <select className="input" value={newUser.role} onChange={e => setNewUser(p => ({ ...p, role: e.target.value as 'admin' | 'brand' }))} style={{ height: 36, fontSize: 12.5 }}>
+                    <label className="field-label">Role</label>
+                    <select className="input" value={newUser.role} onChange={e => setNewUser(p => ({ ...p, role: e.target.value as 'admin' | 'brand' }))} style={{ height: 36 }}>
                       <option value="brand">Brand Client (restricted)</option>
                       <option value="admin">Administrator (full access)</option>
                     </select>
@@ -688,7 +686,7 @@ export default function SettingsPage() {
 
               <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                 <div style={{ padding: '14px 18px', borderBottom: '1.5px solid rgba(26,115,232,0.06)' }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>Registered Users ({users.length})</span>
+                  <span style={{ fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--text-bright)' }}>Registered Users ({users.length})</span>
                 </div>
                 <div style={{ overflowX: 'auto' }}>
                   <table className="data-table">
@@ -702,14 +700,14 @@ export default function SettingsPage() {
                     </thead>
                     <tbody>
                       {users.length === 0 ? (
-                        <tr><td colSpan={4} style={{ textAlign: 'center', padding: 24, color: '#CBD5E1', fontSize: 13 }}>No users registered.</td></tr>
+                        <tr><td colSpan={4} style={{ textAlign: 'center', padding: 24, color: 'var(--neutral-300)' }}>No users registered.</td></tr>
                       ) : users.map((u: any) => (
                         <tr key={u.id}>
-                          <td style={{ fontWeight: 600, color: '#0F172A' }}>{u.email}</td>
+                          <td style={{ fontWeight: 600, color: 'var(--text-bright)' }}>{u.email}</td>
                           <td><span className={`badge ${u.role === 'admin' ? 'badge-blue' : 'badge-purple'}`}>{u.role}</span></td>
-                          <td style={{ fontSize: 12, color: '#64748B' }}>{u.campaign_name || u.brand_name || 'All'}</td>
+                          <td style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>{u.campaign_name || u.brand_name || 'All'}</td>
                           <td style={{ textAlign: 'center' }}>
-                            <button onClick={() => deleteUser(u.id, u.email)} className="btn btn-xs btn-danger" style={{ padding: '3px 7px' }}><Trash2 size={11} /></button>
+                            <button onClick={() => deleteUser(u.id, u.email)} className="btn btn-xs btn-danger"><Trash2 size={11} /></button>
                           </td>
                         </tr>
                       ))}
@@ -730,17 +728,17 @@ export default function SettingsPage() {
                 {sectionDesc('Sync campaign data to Google Sheets for external backup and reporting')}
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
-                  <div style={{ padding: 16, borderRadius: 10, background: syncStatus?.configured ? 'rgba(0,200,83,0.04)' : '#FFF8F0', border: `1.5px solid ${syncStatus?.configured ? 'rgba(0,200,83,0.15)' : 'rgba(255,109,0,0.15)'}` }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: syncStatus?.configured ? '#00C853' : '#FF6D00', marginBottom: 4 }}>
+                  <div style={{ padding: 16, borderRadius: 'var(--radius-md)', background: syncStatus?.configured ? 'rgba(0,200,83,0.04)' : '#FFF8F0', border: `1.5px solid ${syncStatus?.configured ? 'rgba(0,200,83,0.15)' : 'rgba(255,109,0,0.15)'}` }}>
+                    <div style={{ fontSize: 'var(--fs-label)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: syncStatus?.configured ? 'var(--success)' : 'var(--warning)', marginBottom: 4 }}>
                       {syncStatus?.configured ? 'Connected' : 'Not Configured'}
                     </div>
-                    <div style={{ fontSize: 12.5, color: '#64748B' }}>
+                    <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
                       {syncStatus?.configured ? 'Google Sheets integration is active' : 'Set up GOOGLE_SERVICE_ACCOUNT_EMAIL and GOOGLE_PRIVATE_KEY'}
                     </div>
                   </div>
-                  <div style={{ padding: 16, borderRadius: 10, background: 'rgba(26,115,232,0.04)', border: '1.5px solid rgba(26,115,232,0.1)' }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#1A73E8', marginBottom: 4 }}>Last Sync</div>
-                    <div style={{ fontSize: 12.5, color: '#64748B' }}>
+                  <div style={{ padding: 16, borderRadius: 'var(--radius-md)', background: 'rgba(26,115,232,0.04)', border: '1.5px solid rgba(26,115,232,0.1)' }}>
+                    <div style={{ fontSize: 'var(--fs-label)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--accent)', marginBottom: 4 }}>Last Sync</div>
+                    <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
                       {syncStatus?.lastSyncAt ? new Date(syncStatus.lastSyncAt).toLocaleString() : 'Never'}
                     </div>
                   </div>
@@ -753,14 +751,14 @@ export default function SettingsPage() {
               </div>
 
               <div className="card">
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>Data Export</div>
-                <p style={{ fontSize: 12.5, color: '#64748B', marginBottom: 16, fontWeight: 500 }}>Export raw data for offline analysis</p>
+                <div style={{ fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--text-bright)', marginBottom: 4 }}>Data Export</div>
+                <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', marginBottom: 16, fontWeight: 500 }}>Export raw data for offline analysis</p>
                 <div style={{ display: 'flex', gap: 10 }}>
                   <button className="btn btn-ghost btn-sm" disabled>Export Campaigns (CSV)</button>
                   <button className="btn btn-ghost btn-sm" disabled>Export Keywords (CSV)</button>
                   <button className="btn btn-ghost btn-sm" disabled>Export Rankings (CSV)</button>
                 </div>
-                <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 10, fontWeight: 500 }}>CSV export coming soon</div>
+                <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', marginTop: 10, fontWeight: 500 }}>CSV export coming soon</div>
               </div>
             </div>
           )}
@@ -773,13 +771,13 @@ export default function SettingsPage() {
               <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                 <div style={{ padding: '14px 18px', borderBottom: '1.5px solid rgba(26,115,232,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>All Projects</span>
-                    <span style={{ fontSize: 11, color: '#64748B', marginLeft: 8, fontWeight: 500 }}>{campaigns.length} total</span>
+                    <span style={{ fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--text-bright)' }}>All Projects</span>
+                    <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginLeft: 8, fontWeight: 500 }}>{campaigns.length} total</span>
                   </div>
                 </div>
                 <div style={{ overflowX: 'auto', maxHeight: 500, overflowY: 'auto' }}>
                   <table className="data-table" style={{ position: 'relative' }}>
-                    <thead style={{ position: 'sticky', top: 0, background: '#FFF', zIndex: 2 }}>
+                    <thead style={{ position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 2 }}>
                       <tr>
                         <th>Name</th>
                         <th>Category</th>
@@ -791,20 +789,20 @@ export default function SettingsPage() {
                     </thead>
                     <tbody>
                       {campaigns.length === 0 ? (
-                        <tr><td colSpan={6} style={{ textAlign: 'center', padding: 32, color: '#CBD5E1', fontSize: 13 }}>No projects yet.</td></tr>
+                        <tr><td colSpan={6} style={{ textAlign: 'center', padding: 32, color: 'var(--neutral-300)' }}>No projects yet.</td></tr>
                       ) : campaigns.map((p: any) => (
                         <tr key={p.id}>
-                          <td style={{ fontWeight: 600, color: '#0F172A' }}>{p.name}</td>
-                          <td style={{ fontSize: 12.5, color: '#475569' }}>{p.category || <span style={{ color: '#CBD5E1' }}>—</span>}</td>
-                          <td style={{ fontSize: 12.5, color: '#475569' }}>{p.sub_category || <span style={{ color: '#CBD5E1' }}>—</span>}</td>
-                          <td style={{ fontSize: 12.5 }}>{p.keyword_count ?? 0}</td>
+                          <td style={{ fontWeight: 600, color: 'var(--text-bright)' }}>{p.name}</td>
+                          <td style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>{p.category || <span style={{ color: 'var(--neutral-300)' }}>—</span>}</td>
+                          <td style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>{p.sub_category || <span style={{ color: 'var(--neutral-300)' }}>—</span>}</td>
+                          <td style={{ fontSize: 'var(--fs-sm)' }}>{p.keyword_count ?? 0}</td>
                           <td><span className={`badge ${p.status === 'active' ? 'badge-green' : 'badge-gray'}`}>{p.status}</span></td>
                           <td style={{ textAlign: 'center' }}>
                             <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                              <button onClick={() => openEditProject(p)} className="btn btn-xs btn-ghost" style={{ padding: '3px 7px', fontSize: 10 }} title="Edit">
+                              <button onClick={() => openEditProject(p)} className="btn btn-xs btn-ghost" title="Edit">
                                 <SettingsIcon size={11} />
                               </button>
-                              <button onClick={() => setDeleteProjectTarget(p)} className="btn btn-xs btn-danger" style={{ padding: '3px 7px', fontSize: 10 }} title="Delete">
+                              <button onClick={() => setDeleteProjectTarget(p)} className="btn btn-xs btn-danger" title="Delete">
                                 <Trash2 size={11} />
                               </button>
                             </div>
@@ -818,39 +816,39 @@ export default function SettingsPage() {
 
               {/* Edit Project Modal */}
               {editingProject && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
-                  <div className="card" style={{ maxWidth: 520, width: '100%', padding: 24, position: 'relative' }}>
+                <div className="modal-scrim">
+                  <div className="card" style={{ maxWidth: 520, width: '100%', padding: 'var(--space-6)', position: 'relative' }}>
                     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #F58220, #FF9F43, transparent)', borderRadius: '14px 14px 0 0' }} />
-                    <button onClick={() => setEditingProject(null)} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(26,115,232,0.04)', border: '1.5px solid rgba(26,115,232,0.08)', borderRadius: 8, cursor: 'pointer', color: '#94A3B8', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} /></button>
-                    <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0F172A', margin: '0 0 16px' }}>Edit Project</h3>
+                    <button onClick={() => setEditingProject(null)} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(26,115,232,0.04)', border: '1.5px solid rgba(26,115,232,0.08)', borderRadius: 'var(--radius-md)', cursor: 'pointer', color: 'var(--text-muted)', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} /></button>
+                    <h3 style={{ fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--text-bright)', margin: '0 0 16px' }}>Edit Project</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                       <div>
-                        <label style={labelStyle}>Project Name</label>
-                        <input className="input" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} style={{ height: 38, fontSize: 13 }} />
+                        <label className="field-label">Project Name</label>
+                        <input className="input" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} style={{ height: 38 }} />
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                         <div>
-                          <label style={labelStyle}>Category</label>
-                          <select value={editCatId} onChange={e => { setEditCatId(e.target.value); setEditSubCatId('') }} style={{ height: 38, fontSize: 13, padding: '6px 12px', border: '1.5px solid rgba(26,115,232,0.12)', borderRadius: 9, background: '#FFF', fontFamily: 'inherit', color: '#0F172A', cursor: 'pointer', width: '100%' }}>
+                          <label className="field-label">Category</label>
+                          <select value={editCatId} onChange={e => { setEditCatId(e.target.value); setEditSubCatId('') }} style={{ height: 38, fontSize: 'var(--fs-body)', padding: '6px 12px', border: '1.5px solid rgba(26,115,232,0.12)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', fontFamily: 'inherit', color: 'var(--text-bright)', cursor: 'pointer', width: '100%' }}>
                             <option value="">— None —</option>
                             {AMAZON_INDIA_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                           </select>
                         </div>
                         <div>
-                          <label style={labelStyle}>Subcategory</label>
-                          <select value={editSubCatId} onChange={e => setEditSubCatId(e.target.value)} style={{ height: 38, fontSize: 13, padding: '6px 12px', border: '1.5px solid rgba(26,115,232,0.12)', borderRadius: 9, background: '#FFF', fontFamily: 'inherit', color: '#0F172A', cursor: 'pointer', width: '100%' }} disabled={!editCatId}>
+                          <label className="field-label">Subcategory</label>
+                          <select value={editSubCatId} onChange={e => setEditSubCatId(e.target.value)} style={{ height: 38, fontSize: 'var(--fs-body)', padding: '6px 12px', border: '1.5px solid rgba(26,115,232,0.12)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', fontFamily: 'inherit', color: 'var(--text-bright)', cursor: 'pointer', width: '100%' }} disabled={!editCatId}>
                             <option value="">— None —</option>
                             {AMAZON_INDIA_CATEGORIES.find(c => c.id === editCatId)?.subCategories.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                           </select>
                         </div>
                       </div>
                       <div>
-                        <label style={labelStyle}>Description</label>
-                        <textarea className="input" value={editForm.description} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} rows={2} style={{ resize: 'none', fontSize: 13 }} />
+                        <label className="field-label">Description</label>
+                        <textarea className="input" value={editForm.description} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} rows={2} style={{ resize: 'none' }} />
                       </div>
                       <div>
-                        <label style={labelStyle}>Status</label>
-                        <select value={editForm.status} onChange={e => setEditForm(p => ({ ...p, status: e.target.value }))} style={{ height: 38, fontSize: 13, padding: '6px 12px', border: '1.5px solid rgba(26,115,232,0.12)', borderRadius: 9, background: '#FFF', fontFamily: 'inherit', color: '#0F172A', cursor: 'pointer', width: '100%' }}>
+                        <label className="field-label">Status</label>
+                        <select value={editForm.status} onChange={e => setEditForm(p => ({ ...p, status: e.target.value }))} style={{ height: 38, fontSize: 'var(--fs-body)', padding: '6px 12px', border: '1.5px solid rgba(26,115,232,0.12)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', fontFamily: 'inherit', color: 'var(--text-bright)', cursor: 'pointer', width: '100%' }}>
                           <option value="active">Active</option>
                           <option value="paused">Paused</option>
                           <option value="archived">Archived</option>
@@ -869,16 +867,16 @@ export default function SettingsPage() {
 
               {/* Delete Project Confirmation */}
               {deleteProjectTarget && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
-                  <div className="card" style={{ maxWidth: 420, width: '100%', padding: 24, position: 'relative' }}>
+                <div className="modal-scrim">
+                  <div className="card" style={{ maxWidth: 420, width: '100%', padding: 'var(--space-6)', position: 'relative' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,45,85,0.08)', color: '#FF2D55', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AlertTriangle size={18} /></div>
-                      <div><h3 style={{ fontSize: 15, fontWeight: 800, color: '#0F172A', margin: 0 }}>Delete Project</h3><p style={{ fontSize: 12, color: '#64748B', margin: '2px 0 0' }}>This permanently removes all data including keywords and scrape results</p></div>
+                      <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'rgba(255,45,85,0.08)', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AlertTriangle size={18} /></div>
+                      <div><h3 style={{ fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--text-bright)', margin: 0 }}>Delete Project</h3><p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', margin: '2px 0 0' }}>This permanently removes all data including keywords and scrape results</p></div>
                     </div>
-                    <p style={{ fontSize: 12.5, color: '#475569', marginBottom: 14, lineHeight: 1.5 }}>
-                      Type <strong style={{ color: '#EF4444' }}>{deleteProjectTarget.name}</strong> below to confirm.
+                    <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', marginBottom: 14, lineHeight: 1.5 }}>
+                      Type <strong style={{ color: 'var(--danger)' }}>{deleteProjectTarget.name}</strong> below to confirm.
                     </p>
-                    <input className="input" value={deleteProjectConfirm} onChange={e => setDeleteProjectConfirm(e.target.value)} placeholder={deleteProjectTarget.name} style={{ height: 38, fontSize: 13, marginBottom: 12 }} />
+                    <input className="input" value={deleteProjectConfirm} onChange={e => setDeleteProjectConfirm(e.target.value)} placeholder={deleteProjectTarget.name} style={{ height: 38, marginBottom: 12 }} />
                     <div style={{ display: 'flex', gap: 10 }}>
                       <button className="btn btn-danger btn-sm" onClick={confirmDeleteProject} disabled={deleteProjectConfirm !== deleteProjectTarget.name || deletingProject} style={{ flex: 1, opacity: deleteProjectConfirm !== deleteProjectTarget.name ? 0.5 : 1 }}>
                         {deletingProject ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={13} />} Delete Permanently
@@ -899,8 +897,8 @@ export default function SettingsPage() {
               <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                 <div style={{ padding: '14px 18px', borderBottom: '1.5px solid rgba(26,115,232,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>Alert Rules</span>
-                    <span style={{ fontSize: 11, color: '#64748B', marginLeft: 8, fontWeight: 500 }}>Get notified when metrics cross thresholds</span>
+                    <span style={{ fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--text-bright)' }}>Alert Rules</span>
+                    <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginLeft: 8, fontWeight: 500 }}>Get notified when metrics cross thresholds</span>
                   </div>
                   <button className="btn btn-blue btn-sm" onClick={() => setShowAddAlert(true)}><Plus size={12} /> New Alert</button>
                 </div>
@@ -919,26 +917,26 @@ export default function SettingsPage() {
                     </thead>
                     <tbody>
                       {alertRules.length === 0 ? (
-                        <tr><td colSpan={7} style={{ textAlign: 'center', padding: 32, color: '#CBD5E1', fontSize: 13 }}>No alert rules configured.</td></tr>
+                        <tr><td colSpan={7} style={{ textAlign: 'center', padding: 32, color: 'var(--neutral-300)' }}>No alert rules configured.</td></tr>
                       ) : alertRules.map(rule => (
                         <tr key={rule.id}>
                           <td style={{ fontWeight: 600 }}>{rule.campaign_name || rule.campaign_id.slice(0, 8)}</td>
-                          <td style={{ fontSize: 12 }}>{rule.brand_name || 'All'}</td>
+                          <td style={{ fontSize: 'var(--fs-sm)' }}>{rule.brand_name || 'All'}</td>
                           <td><span className="badge badge-blue">{METRIC_LABELS[rule.metric] || rule.metric}</span></td>
-                          <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+                          <td style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)' }}>
                             {rule.direction === 'above' ? '>' : '<'} {rule.threshold}{rule.metric === 'sov_percent' ? '%' : ''}
                           </td>
-                          <td style={{ fontSize: 12 }}>
+                          <td style={{ fontSize: 'var(--fs-sm)' }}>
                             {rule.email && <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><Mail size={10} /> {rule.email}</span>}
-                            {rule.webhook_url && <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: '#94A3B8', fontSize: 10, marginTop: 2 }}><Webhook size={10} /> Webhook</span>}
+                            {rule.webhook_url && <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: 'var(--text-muted)', fontSize: 'var(--fs-micro)', marginTop: 2 }}><Webhook size={10} /> Webhook</span>}
                           </td>
                           <td>
-                            <button onClick={() => toggleAlert(rule.id, rule.is_active)} className={`badge ${rule.is_active ? 'badge-green' : 'badge-gray'}`} style={{ cursor: 'pointer', border: 'none', fontFamily: 'inherit', fontSize: 10 }}>
+                            <button onClick={() => toggleAlert(rule.id, rule.is_active)} className={`badge ${rule.is_active ? 'badge-green' : 'badge-gray'}`} style={{ cursor: 'pointer', border: 'none', fontFamily: 'inherit' }}>
                               {rule.is_active ? 'Active' : 'Disabled'}
                             </button>
                           </td>
                           <td style={{ textAlign: 'center' }}>
-                            <button onClick={() => deleteAlert(rule.id)} className="btn btn-xs btn-danger" style={{ padding: '3px 7px' }}><Trash2 size={11} /></button>
+                            <button onClick={() => deleteAlert(rule.id)} className="btn btn-xs btn-danger"><Trash2 size={11} /></button>
                           </td>
                         </tr>
                       ))}
@@ -949,31 +947,31 @@ export default function SettingsPage() {
 
               {/* Add Alert Modal */}
               {showAddAlert && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
-                  <div className="card" style={{ maxWidth: 480, width: '100%', padding: 24, position: 'relative' }}>
+                <div className="modal-scrim">
+                  <div className="card" style={{ maxWidth: 480, width: '100%', padding: 'var(--space-6)', position: 'relative' }}>
                     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #F58220, #FF9F43, transparent)', borderRadius: '14px 14px 0 0' }} />
-                    <button onClick={() => setShowAddAlert(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(26,115,232,0.04)', border: '1.5px solid rgba(26,115,232,0.08)', borderRadius: 8, cursor: 'pointer', color: '#94A3B8', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} /></button>
-                    <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0F172A', margin: '0 0 16px' }}>New Alert Rule</h3>
+                    <button onClick={() => setShowAddAlert(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(26,115,232,0.04)', border: '1.5px solid rgba(26,115,232,0.08)', borderRadius: 'var(--radius-md)', cursor: 'pointer', color: 'var(--text-muted)', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} /></button>
+                    <h3 style={{ fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--text-bright)', margin: '0 0 16px' }}>New Alert Rule</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                       <div>
-                        <label style={labelStyle}>Campaign</label>
-                        <select className="input" value={newAlert.campaign_id} onChange={e => setNewAlert(p => ({ ...p, campaign_id: e.target.value }))} style={{ height: 38, fontSize: 13 }}>
+                        <label className="field-label">Campaign</label>
+                        <select className="input" value={newAlert.campaign_id} onChange={e => setNewAlert(p => ({ ...p, campaign_id: e.target.value }))} style={{ height: 38 }}>
                           <option value="">-- Select Campaign --</option>
                           {campaigns.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </select>
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                         <div>
-                          <label style={labelStyle}>Metric</label>
-                          <select className="input" value={newAlert.metric} onChange={e => setNewAlert(p => ({ ...p, metric: e.target.value as AlertRule['metric'] }))} style={{ height: 38, fontSize: 13 }}>
+                          <label className="field-label">Metric</label>
+                          <select className="input" value={newAlert.metric} onChange={e => setNewAlert(p => ({ ...p, metric: e.target.value as AlertRule['metric'] }))} style={{ height: 38 }}>
                             <option value="sov_percent">SOV %</option>
                             <option value="view_growth">View Growth</option>
                             <option value="frequency_growth">Frequency Growth</option>
                           </select>
                         </div>
                         <div>
-                          <label style={labelStyle}>Direction</label>
-                          <select className="input" value={newAlert.direction} onChange={e => setNewAlert(p => ({ ...p, direction: e.target.value as 'above' | 'below' }))} style={{ height: 38, fontSize: 13 }}>
+                          <label className="field-label">Direction</label>
+                          <select className="input" value={newAlert.direction} onChange={e => setNewAlert(p => ({ ...p, direction: e.target.value as 'above' | 'below' }))} style={{ height: 38 }}>
                             <option value="above">Above threshold</option>
                             <option value="below">Below threshold</option>
                           </select>
@@ -981,21 +979,21 @@ export default function SettingsPage() {
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                         <div>
-                          <label style={labelStyle}>Threshold</label>
-                          <input className="input" type="number" value={newAlert.threshold} onChange={e => setNewAlert(p => ({ ...p, threshold: e.target.value }))} style={{ height: 38, fontSize: 13 }} />
+                          <label className="field-label">Threshold</label>
+                          <input className="input" type="number" value={newAlert.threshold} onChange={e => setNewAlert(p => ({ ...p, threshold: e.target.value }))} style={{ height: 38 }} />
                         </div>
                         <div>
-                          <label style={labelStyle}>Brand (optional)</label>
-                          <input className="input" value={newAlert.brand_name} onChange={e => setNewAlert(p => ({ ...p, brand_name: e.target.value }))} placeholder="e.g. Atomberg" style={{ height: 38, fontSize: 13 }} />
+                          <label className="field-label">Brand (optional)</label>
+                          <input className="input" value={newAlert.brand_name} onChange={e => setNewAlert(p => ({ ...p, brand_name: e.target.value }))} placeholder="e.g. Atomberg" style={{ height: 38 }} />
                         </div>
                       </div>
                       <div>
-                        <label style={labelStyle}>Email Notification</label>
-                        <input className="input" type="email" value={newAlert.email} onChange={e => setNewAlert(p => ({ ...p, email: e.target.value }))} placeholder="you@company.com" style={{ height: 38, fontSize: 13 }} />
+                        <label className="field-label">Email Notification</label>
+                        <input className="input" type="email" value={newAlert.email} onChange={e => setNewAlert(p => ({ ...p, email: e.target.value }))} placeholder="you@company.com" style={{ height: 38 }} />
                       </div>
                       <div>
-                        <label style={labelStyle}>Webhook URL (optional)</label>
-                        <input className="input" value={newAlert.webhook_url} onChange={e => setNewAlert(p => ({ ...p, webhook_url: e.target.value }))} placeholder="https://hooks.slack.com/..." style={{ height: 38, fontSize: 13 }} />
+                        <label className="field-label">Webhook URL (optional)</label>
+                        <input className="input" value={newAlert.webhook_url} onChange={e => setNewAlert(p => ({ ...p, webhook_url: e.target.value }))} placeholder="https://hooks.slack.com/..." style={{ height: 38 }} />
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
@@ -1011,7 +1009,6 @@ export default function SettingsPage() {
       </div>
 
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }

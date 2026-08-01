@@ -7,8 +7,9 @@ import {
   PolarGrid, PolarAngleAxis, PolarRadiusAxis, Legend, ComposedChart,
   Area, ReferenceLine
 } from 'recharts'
-import { Eye, Video, Hash, TrendingUp, AlertTriangle, ChevronRight, Loader2, AlertCircle, Target, Activity } from 'lucide-react'
+import { Eye, Video, Hash, TrendingUp, AlertTriangle, Loader2, AlertCircle, Activity } from 'lucide-react'
 import ClientSidebar from '@/components/ClientSidebar'
+import { EmptyState } from '@/components/StateViews'
 
 const COLORS = [
   '#4C78A8', '#54A24B', '#E45756', '#72B7B2', '#EECA3B',
@@ -34,13 +35,13 @@ function fmt(n: number | null | undefined): string {
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div style={{ background: '#1E293B', border: 'none', borderRadius: 10, padding: '10px 14px', boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}>
-      <div style={{ fontSize: 10.5, color: '#94A3B8', marginBottom: 6, fontWeight: 600 }}>{label}</div>
+    <div className="tooltip-box tooltip-box--dark">
+      <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600 }}>{label}</div>
       {payload.map((p: any) => (
         <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
           <div style={{ width: 7, height: 7, borderRadius: '50%', background: p.color || p.fill }} />
-          <span style={{ fontSize: 11, color: '#CBD5E1', flex: 1 }}>{p.name}</span>
-          <span style={{ fontSize: 12, fontWeight: 700, color: '#FFF' }}>
+          <span style={{ fontSize: 'var(--fs-label)', color: 'var(--neutral-300)', flex: 1 }}>{p.name}</span>
+          <span className="num" style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--tooltip-text)' }}>
             {typeof p.value === 'number' && p.value > 100 ? fmt(p.value) : typeof p.value === 'number' ? `${p.value.toFixed(1)}%` : p.value}
           </span>
         </div>
@@ -53,10 +54,10 @@ function ChartCard({ title, subtitle, height = 220, children }: {
   title: string; subtitle?: string; height?: number; children: React.ReactNode
 }) {
   return (
-    <div style={{ background: '#FFFFFF', borderRadius: 14, padding: '20px 22px', border: '1px solid #F1F5F9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+    <div className="chart-container">
       <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>{title}</div>
-        {subtitle && <div style={{ fontSize: 11.5, color: '#94A3B8', marginTop: 2 }}>{subtitle}</div>}
+        <div className="t-h3">{title}</div>
+        {subtitle && <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', marginTop: 2 }}>{subtitle}</div>}
       </div>
       <div style={{ height }}>{children}</div>
     </div>
@@ -77,14 +78,14 @@ function GaugeChart({ value, color = '#1A73E8', label }: { value: number; color?
   return (
     <svg width={140} height={96} viewBox="0 0 140 96">
       <path d={`M ${arc(startAngle).x} ${arc(startAngle).y} A ${r} ${r} 0 ${sweep > 180 ? 1 : 0} 1 ${arc(endAngle).x} ${arc(endAngle).y}`}
-        fill="none" stroke="#F1F5F9" strokeWidth={10} strokeLinecap="round" />
+        fill="none" stroke="var(--border-light)" strokeWidth={10} strokeLinecap="round" />
       {pct > 0 && (
         <path d={`M ${s.x} ${s.y} A ${r} ${r} 0 ${largeArc} 1 ${e.x} ${e.y}`}
           fill="none" stroke={color} strokeWidth={10} strokeLinecap="round"
           style={{ filter: `drop-shadow(0 0 6px ${color}60)` }} />
       )}
-      <text x={cx} y={cy + 8} textAnchor="middle" fontSize={18} fontWeight={800} fill="#0F172A" fontFamily="'JetBrains Mono', monospace">{value.toFixed(1)}%</text>
-      <text x={cx} y={cx + 26} textAnchor="middle" fontSize={9} fontWeight={600} fill="#94A3B8">{label}</text>
+      <text x={cx} y={cy + 8} textAnchor="middle" fontSize={18} fontWeight={800} fill="var(--text-bright)" fontFamily="var(--font-mono)">{value.toFixed(1)}%</text>
+      <text x={cx} y={cx + 26} textAnchor="middle" fontSize={9} fontWeight={600} fill="var(--text-muted)">{label}</text>
     </svg>
   )
 }
@@ -92,7 +93,7 @@ function GaugeChart({ value, color = '#1A73E8', label }: { value: number; color?
 // Rank distribution: bin keyword ranks into buckets
 function buildRankDistribution(keywordRankings: any[]) {
   const buckets = [
-    { range: '#1–3', min: 1, max: 3, count: 0, color: '#10B981' },
+    { range: '#1–3', min: 1, max: 3, count: 0, color: '#22C55E' },
     { range: '#4–5', min: 4, max: 5, count: 0, color: '#1A73E8' },
     { range: '#6–10', min: 6, max: 10, count: 0, color: '#8B5CF6' },
     { range: '#11–15', min: 11, max: 15, count: 0, color: '#F59E0B' },
@@ -200,20 +201,21 @@ export default function ClientDashboard() {
   }, [selectedCampaignId, selectedBrandName, session, fetchDashboardData])
 
   if (loading) return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: 12, background: '#F8FAFC' }}>
-      <Loader2 size={32} style={{ color: '#1A73E8', animation: 'spin 1s linear infinite' }} />
-      <div style={{ fontSize: 13.5, color: '#64748B', fontWeight: 600 }}>Assembling client dashboard…</div>
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+    <div className="state-panel" style={{ minHeight: '100vh', justifyContent: 'center' }}>
+      <div className="state-panel__icon">
+        <Loader2 size={22} strokeWidth={1.75} className="state-panel__spin" />
+      </div>
+      <div className="state-panel__title">Assembling client dashboard…</div>
     </div>
   )
 
   if (error || !session) return (
-    <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', background: '#F8FAFC' }}>
-      <div style={{ background: '#FFFFFF', padding: 30, borderRadius: 12, border: '1px solid #E2E8F0', textAlign: 'center', maxWidth: 360 }}>
-        <AlertCircle size={36} style={{ color: '#EF4444', marginBottom: 12 }} />
-        <div style={{ fontSize: 15, fontWeight: 700, color: '#0F172A', marginBottom: 6 }}>Unauthorized Access</div>
-        <div style={{ fontSize: 12.5, color: '#64748B', marginBottom: 16 }}>Please log in to access this client workspace.</div>
-        <a href="/login" style={{ display: 'inline-block', background: '#1A73E8', color: '#FFF', padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>Go to Login</a>
+    <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-base)' }}>
+      <div style={{ background: 'var(--surface)', padding: 30, borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-2)', textAlign: 'center', maxWidth: 360 }}>
+        <AlertCircle size={36} style={{ color: 'var(--danger)', marginBottom: 12 }} />
+        <div style={{ fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--text-bright)', marginBottom: 6 }}>Unauthorized Access</div>
+        <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', marginBottom: 16 }}>Please log in to access this client workspace.</div>
+        <a href="/login" className="btn btn-blue" style={{ textDecoration: 'none' }}>Go to Login</a>
       </div>
     </div>
   )
@@ -267,36 +269,36 @@ export default function ClientDashboard() {
   const sortedKws = [...keywordRankings].sort((a, b) => (a.best_rank ?? 99) - (b.best_rank ?? 99))
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#F8FAFC' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-base)' }}>
       <ClientSidebar brandName={brandName} campaignName={campName} />
 
       <main style={{ flex: 1, marginLeft: 'var(--sidebar-w)', padding: '24px 32px', minWidth: 0 }}>
 
         {/* Header */}
-        <div style={{ background: '#FFFFFF', borderRadius: 14, padding: '20px 24px', border: '1px solid #F1F5F9', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <div className="card" style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', margin: '0 0 4px 0' }}>{brandName} Dashboard</h1>
-            <p style={{ fontSize: 12.5, color: '#64748B', margin: 0 }}>Market intelligence and share of voice analytics for {campName}</p>
+            <h1 style={{ fontSize: 'var(--fs-h1)', fontWeight: 800, color: 'var(--text-bright)', margin: '0 0 4px 0' }}>{brandName} Dashboard</h1>
+            <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', margin: 0 }}>Market intelligence and share of voice analytics for {campName}</p>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             {session?.role === 'admin' ? (
               <>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase' }}>Campaign</span>
-                  <select className="input" value={selectedCampaignId} onChange={e => setSelectedCampaignId(e.target.value)} style={{ padding: '6px 12px', fontSize: 12.5, cursor: 'pointer' }}>
+                  <span style={{ fontSize: 'var(--fs-micro)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Campaign</span>
+                  <select className="input" value={selectedCampaignId} onChange={e => setSelectedCampaignId(e.target.value)} style={{ padding: '6px 12px', fontSize: 'var(--fs-sm)', cursor: 'pointer' }}>
                     {allCampaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase' }}>Brand View</span>
-                  <select className="input" value={selectedBrandName} onChange={e => setSelectedBrandName(e.target.value)} style={{ padding: '6px 12px', fontSize: 12.5, cursor: 'pointer' }}>
+                  <span style={{ fontSize: 'var(--fs-micro)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Brand View</span>
+                  <select className="input" value={selectedBrandName} onChange={e => setSelectedBrandName(e.target.value)} style={{ padding: '6px 12px', fontSize: 'var(--fs-sm)', cursor: 'pointer' }}>
                     {campaignBrands.map(b => <option key={b} value={b}>{b}</option>)}
                   </select>
                 </div>
               </>
             ) : (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20, background: '#E0F2FE', color: '#0369A1' }}>
-                ● Live Client Access
+              <span className="badge badge-blue" style={{ gap: 6, display: 'inline-flex', alignItems: 'center' }}>
+                <span style={{ fontSize: 9 }}>●</span> Live Client Access
               </span>
             )}
           </div>
@@ -304,9 +306,9 @@ export default function ClientDashboard() {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <div />
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => setScope('unique')} style={{ padding: '6px 10px', borderRadius: 8, border: scope === 'unique' ? '1px solid #1A73E8' : '1px solid #E2E8F0', background: scope === 'unique' ? '#EFF6FF' : 'transparent', cursor: 'pointer', fontWeight: 700 }}>Unique</button>
-            <button onClick={() => setScope('all')} style={{ padding: '6px 10px', borderRadius: 8, border: scope === 'all' ? '1px solid #1A73E8' : '1px solid #E2E8F0', background: scope === 'all' ? '#EFF6FF' : 'transparent', cursor: 'pointer', fontWeight: 700 }}>All</button>
+          <div className="toggle-group compact">
+            <button className={`toggle-btn${scope === 'unique' ? ' active' : ''}`} onClick={() => setScope('unique')}>Unique</button>
+            <button className={`toggle-btn${scope === 'all' ? ' active' : ''}`} onClick={() => setScope('all')}>All</button>
           </div>
         </div>
 
@@ -314,37 +316,34 @@ export default function ClientDashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 20 }}>
           {((scope === 'unique') ? [
             { label: 'Share of Voice', value: `${metrics.sov_percent}%`, icon: TrendingUp, color: '#1A73E8', sub: 'of total campaign views' },
-            { label: 'Unique Views', value: fmt(metrics.unique_views), icon: Eye, color: '#10B981', sub: 'on your tracked videos' },
+            { label: 'Unique Views', value: fmt(metrics.unique_views), icon: Eye, color: '#22C55E', sub: 'on your tracked videos' },
             { label: 'Unique Videos', value: String(metrics.unique_videos), icon: Video, color: '#8B5CF6', sub: 'distinct YouTube assets' },
             { label: 'Ranking Keywords', value: String(metrics.total_keywords), icon: Hash, color: '#F59E0B', sub: 'keywords with rankings' },
           ] : [
-            { label: 'Total Views', value: fmt(campaignOverview?.totalViewership ?? 0), icon: Eye, color: '#10B981', sub: 'all extracted video views' },
+            { label: 'Total Views', value: fmt(campaignOverview?.totalViewership ?? 0), icon: Eye, color: '#22C55E', sub: 'all extracted video views' },
             { label: 'Tracked Keywords', value: String(campaignOverview?.totalKeywords ?? 0), icon: Hash, color: '#F59E0B', sub: 'keywords tracked in campaign' },
             { label: 'Indexed Videos', value: String(campaignOverview?.totalVideos ?? 0), icon: Video, color: '#8B5CF6', sub: 'videos indexed in campaign' },
             { label: 'Creator Channels', value: String(campaignOverview?.uniqueChannels ?? 0), icon: Activity, color: '#1A73E8', sub: 'unique channels indexing' },
           ])
           .map(({ label, value, icon: Icon, color, sub }) => (
-            <div key={label} style={{ background: '#FFFFFF', padding: '16px 18px', borderRadius: 12, border: '1px solid #F1F5F9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', transition: 'all 0.2s' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = `0 4px 16px ${color}20` }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)' }}
-            >
+            <div key={label} className="kpi-card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 700, color: '#94A3B8' }}>{label}</span>
-                <div style={{ width: 28, height: 28, borderRadius: 8, background: `${color}12`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span className="kpi-label">{label}</span>
+                <div style={{ width: 28, height: 28, borderRadius: 'var(--radius-md)', background: `${color}12`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Icon size={14} style={{ color }} />
                 </div>
               </div>
-              <div style={{ fontSize: 22, fontWeight: 800, color, fontFamily: "'JetBrains Mono',monospace" }}>{value}</div>
-              <div style={{ fontSize: 10, color: '#94A3B8', marginTop: 3 }}>{sub}</div>
+              <div className="kpi-value" style={{ fontSize: 22, color }}>{value}</div>
+              <div className="kpi-sub" style={{ fontSize: 'var(--fs-micro)' }}>{sub}</div>
             </div>
           ))}
         </div>
 
         {/* ── SOV Gauge + Timeline ── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 16, marginBottom: 20 }}>
-          <div style={{ background: '#FFFFFF', borderRadius: 14, padding: '20px 24px', border: '1px solid #F1F5F9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: 200 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', marginBottom: 4, alignSelf: 'flex-start' }}>SOV Score</div>
-            <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 16, alignSelf: 'flex-start' }}>Your market share</div>
+          <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: 200 }}>
+            <div style={{ fontSize: 'var(--fs-h3)', fontWeight: 700, color: 'var(--text-bright)', marginBottom: 4, alignSelf: 'flex-start' }}>SOV Score</div>
+            <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', marginBottom: 16, alignSelf: 'flex-start' }}>Your market share</div>
             <GaugeChart value={metrics.sov_percent} color="#1A73E8" label="VIEW SOV" />
           </div>
 
@@ -353,15 +352,15 @@ export default function ClientDashboard() {
               <ComposedChart data={sovTimeline} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="clientSovGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#1A73E8" stopOpacity={0.15} />
-                    <stop offset="95%" stopColor="#1A73E8" stopOpacity={0} />
+                    <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-                <YAxis unit="%" tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} domain={[0, 'auto']} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
+                <YAxis unit="%" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} domain={[0, 'auto']} />
                 <Tooltip content={<ChartTooltip />} />
-                <Area type="monotone" dataKey="sov" name="SOV" stroke="#1A73E8" strokeWidth={2.5} fill="url(#clientSovGrad)" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
+                <Area type="monotone" dataKey="sov" name="SOV" stroke="var(--accent)" strokeWidth={2.5} fill="url(#clientSovGrad)" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
               </ComposedChart>
             </ResponsiveContainer>
           </ChartCard>
@@ -374,13 +373,13 @@ export default function ClientDashboard() {
           <ChartCard title="Brand capability radar" subtitle="You vs estimated market average" height={220}>
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={radarData} margin={{ top: 0, right: 20, left: 20, bottom: 0 }}>
-                <PolarGrid stroke="#F1F5F9" />
-                <PolarAngleAxis dataKey="metric" tick={{ fontSize: 10.5, fill: '#64748B', fontWeight: 600 }} />
-                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fontSize: 8, fill: '#94A3B8' }} tickCount={3} />
-                <Radar name="Your Brand" dataKey="brand" stroke="#1A73E8" fill="#1A73E8" fillOpacity={0.2} strokeWidth={2.5} dot={{ r: 3, fill: '#1A73E8' }} />
-                <Radar name="Market Avg" dataKey="market_avg" stroke="#CBD5E1" fill="#CBD5E1" fillOpacity={0.08} strokeWidth={1.5} strokeDasharray="4 4" />
+                <PolarGrid stroke="var(--border-light)" />
+                <PolarAngleAxis dataKey="metric" tick={{ fontSize: 10.5, fill: 'var(--text-secondary)', fontWeight: 600 }} />
+                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fontSize: 8, fill: 'var(--text-muted)' }} tickCount={3} />
+                <Radar name="Your Brand" dataKey="brand" stroke="var(--accent)" fill="var(--accent)" fillOpacity={0.2} strokeWidth={2.5} dot={{ r: 3, fill: 'var(--accent)' }} />
+                <Radar name="Market Avg" dataKey="market_avg" stroke="var(--neutral-300)" fill="var(--neutral-300)" fillOpacity={0.08} strokeWidth={1.5} strokeDasharray="4 4" />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-                <Tooltip contentStyle={{ background: '#1E293B', border: 'none', borderRadius: 8, fontSize: 11 }} labelStyle={{ color: '#94A3B8' }} itemStyle={{ color: '#FFF' }} />
+                <Tooltip contentStyle={{ background: 'var(--tooltip-bg)', border: 'none', borderRadius: 'var(--radius-md)', fontSize: 11 }} labelStyle={{ color: 'var(--text-muted)' }} itemStyle={{ color: 'var(--tooltip-text)' }} />
               </RadarChart>
             </ResponsiveContainer>
           </ChartCard>
@@ -390,10 +389,10 @@ export default function ClientDashboard() {
             <ChartCard title="Rank distribution" subtitle="How often your brand ranks in each position bucket" height={220}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={rankDistribution} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
-                  <XAxis dataKey="range" tick={{ fontSize: 11, fill: '#64748B', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                  <Tooltip formatter={(v: any) => [v, 'Keywords']} contentStyle={{ background: '#1E293B', border: 'none', borderRadius: 8, fontSize: 11 }} labelStyle={{ color: '#94A3B8' }} itemStyle={{ color: '#FFF' }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light)" vertical={false} />
+                  <XAxis dataKey="range" tick={{ fontSize: 11, fill: 'var(--text-secondary)', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <Tooltip formatter={(v: any) => [v, 'Keywords']} contentStyle={{ background: 'var(--tooltip-bg)', border: 'none', borderRadius: 'var(--radius-md)', fontSize: 11 }} labelStyle={{ color: 'var(--text-muted)' }} itemStyle={{ color: 'var(--tooltip-text)' }} />
                   <Bar dataKey="count" name="Keywords" radius={[7, 7, 0, 0]}>
                     {rankDistribution.map((d, i) => (
                       <Cell key={i} fill={d.color} style={{ filter: `drop-shadow(0 2px 6px ${d.color}40)` }} />
@@ -406,9 +405,9 @@ export default function ClientDashboard() {
 
           {/* Competitor Pie */}
           {competitorPie.length > 0 && (
-            <div style={{ background: '#FFFFFF', borderRadius: 14, padding: '20px 22px', border: '1px solid #F1F5F9', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>Market Share Breakdown</div>
-              <div style={{ fontSize: 11.5, color: '#94A3B8', marginBottom: 14 }}>Your brand (blue) vs competitors</div>
+            <div className="chart-container">
+              <div className="t-h3" style={{ marginBottom: 4 }}>Market Share Breakdown</div>
+              <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', marginBottom: 14 }}>Your brand (blue) vs competitors</div>
               <div style={{ height: 160, display: 'flex', alignItems: 'center' }}>
                 <div style={{ flex: 1, height: '100%' }}>
                   <ResponsiveContainer width="100%" height="100%">
@@ -418,7 +417,7 @@ export default function ClientDashboard() {
                           <Cell key={idx} fill={pieColors[idx % pieColors.length]} stroke="transparent" />
                         ))}
                       </Pie>
-                      <Tooltip contentStyle={{ background: '#1E293B', border: 'none', borderRadius: 8, fontSize: 11 }} labelStyle={{ color: '#94A3B8' }} itemStyle={{ color: '#FFF' }} />
+                      <Tooltip contentStyle={{ background: 'var(--tooltip-bg)', border: 'none', borderRadius: 'var(--radius-md)', fontSize: 11 }} labelStyle={{ color: 'var(--text-muted)' }} itemStyle={{ color: 'var(--tooltip-text)' }} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -427,8 +426,8 @@ export default function ClientDashboard() {
                     <div key={c.name} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <div style={{ width: 7, height: 7, borderRadius: '50%', background: pieColors[i % pieColors.length], flexShrink: 0 }} />
                       <span style={{
-                        fontSize: 11, fontWeight: c.name?.toLowerCase() === brandName.toLowerCase() ? 700 : 500,
-                        color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        fontSize: 'var(--fs-label)', fontWeight: c.name?.toLowerCase() === brandName.toLowerCase() ? 700 : 500,
+                        color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                       }}>
                         {c.name} ({c.sov_percent}%)
                       </span>
@@ -442,16 +441,16 @@ export default function ClientDashboard() {
 
         {/* ── Dropped Rankings Alert ── */}
         {dropped.length > 0 && (
-          <div style={{ background: '#FFFFFF', borderRadius: 14, padding: '20px 22px', border: '1px solid #F1F5F9', marginBottom: 20 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#EF4444', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div className="card" style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 'var(--fs-h3)', fontWeight: 700, color: 'var(--danger)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
               <AlertTriangle size={15} /> Dropped Rankings Alert
             </div>
-            <div style={{ fontSize: 11.5, color: '#94A3B8', marginBottom: 14 }}>Videos that slipped out of search results this week</div>
+            <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', marginBottom: 14 }}>Videos that slipped out of search results this week</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
               {dropped.map((d, idx) => (
-                <div key={idx} style={{ padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8 }}>
-                  <div style={{ fontWeight: 700, color: '#991B1B', fontSize: 12.5 }}>{d.title}</div>
-                  <div style={{ color: '#B91C1C', fontSize: 10.5, marginTop: 4 }}>
+                <div key={idx} style={{ padding: '10px 14px', background: 'var(--danger-dim)', border: '1px solid var(--danger-border)', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ fontWeight: 700, color: 'var(--danger-text)', fontSize: 'var(--fs-sm)' }}>{d.title}</div>
+                  <div style={{ color: 'var(--danger-text)', fontSize: 'var(--fs-label)', marginTop: 4 }}>
                     Dropped from rank <strong>#{d.last_rank}</strong> · keyword "{d.keyword}"
                   </div>
                 </div>
@@ -462,44 +461,41 @@ export default function ClientDashboard() {
 
         {/* ── Keyword Rankings Table ── */}
         <div className="card" style={{ padding: 20, marginBottom: 20 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>Keyword Search Positions</div>
-          <div style={{ fontSize: 11.5, color: '#94A3B8', marginBottom: 14 }}>Your current ranking positions per tracked keyword</div>
+          <div className="t-h3" style={{ marginBottom: 4 }}>Keyword Search Positions</div>
+          <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', marginBottom: 14 }}>Your current ranking positions per tracked keyword</div>
           {keywordRankings.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 24, fontSize: 12.5, color: '#94A3B8' }}>Your brand does not currently rank on any campaign keywords.</div>
+            <EmptyState title="No rankings yet" body="Your brand does not currently rank on any campaign keywords." />
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
+              <table className="data-table">
                 <thead>
-                  <tr style={{ borderBottom: '1.5px solid #F1F5F9', color: '#94A3B8', fontWeight: 700, fontSize: 11.5 }}>
-                    <th style={{ padding: '8px 12px' }}>Keyword</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'center' }}>Position</th>
-                    <th style={{ padding: '8px 12px' }}>Type</th>
-                    <th style={{ padding: '8px 12px' }}>Language</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>Top Video Views</th>
+                  <tr>
+                    <th>Keyword</th>
+                    <th style={{ textAlign: 'center' }}>Position</th>
+                    <th>Type</th>
+                    <th>Language</th>
+                    <th style={{ textAlign: 'right' }}>Top Video Views</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sortedKws.map((k: any, idx: number) => {
                     const rank = k.best_rank ?? 0
-                    const rankColor = rank <= 3 ? '#10B981' : rank <= 10 ? '#1A73E8' : rank <= 15 ? '#F59E0B' : '#EF4444'
+                    const rankColor = rank <= 3 ? '#22C55E' : rank <= 10 ? '#1A73E8' : rank <= 15 ? '#F59E0B' : '#EF4444'
                     return (
-                      <tr key={idx} style={{ borderBottom: '1px solid #F1F5F9' }}
-                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#FAFBFF'}
-                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-                      >
-                        <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1E293B' }}>{k.keyword}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                      <tr key={idx} className="row-hover">
+                        <td style={{ fontWeight: 600 }}>{k.keyword}</td>
+                        <td style={{ textAlign: 'center' }}>
                           <span style={{
                             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                            width: 36, height: 26, borderRadius: 7, fontWeight: 800, fontSize: 13,
+                            width: 36, height: 26, borderRadius: 'var(--radius-sm)', fontWeight: 800, fontSize: 13,
                             background: `${rankColor}12`, color: rankColor,
                           }}>
                             #{rank}
                           </span>
                         </td>
-                        <td style={{ padding: '10px 12px', textTransform: 'capitalize', color: '#64748B' }}>{k.type}</td>
-                        <td style={{ padding: '10px 12px', textTransform: 'uppercase', color: '#64748B' }}>{k.language}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700 }}>{fmt(k.top_views)}</td>
+                        <td style={{ textTransform: 'capitalize', color: 'var(--text-secondary)' }}>{k.type}</td>
+                        <td style={{ textTransform: 'uppercase', color: 'var(--text-secondary)' }}>{k.language}</td>
+                        <td className="num" style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(k.top_views)}</td>
                       </tr>
                     )
                   })}
@@ -511,24 +507,23 @@ export default function ClientDashboard() {
 
         {/* ── Top Videos Grid ── */}
         <div className="card" style={{ padding: 20 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', marginBottom: 12 }}>Top Performing Videos</div>
+          <div className="t-h3" style={{ marginBottom: 12 }}>Top Performing Videos</div>
           {videos.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 24, fontSize: 12.5, color: '#94A3B8' }}>No brand videos available.</div>
+            <EmptyState title="No videos yet" body="No brand videos available." />
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
               {videos.map((v, idx) => (
                 <a key={idx} href={`https://youtube.com/watch?v=${v.youtube_id}`} target="_blank" rel="noopener noreferrer"
-                  style={{ border: '1px solid #F1F5F9', borderRadius: 10, padding: 12, display: 'flex', gap: 12, background: '#FAFBFC', textDecoration: 'none', transition: 'all 0.2s' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'none'; (e.currentTarget as HTMLElement).style.transform = 'translateY(0)' }}
+                  className="row-hover"
+                  style={{ border: '1px solid var(--border-1)', borderRadius: 'var(--radius-md)', padding: 12, display: 'flex', gap: 12, background: 'var(--bg-base)', textDecoration: 'none' }}
                 >
-                  <img src={`https://img.youtube.com/vi/${v.youtube_id}/mqdefault.jpg`} alt="" style={{ width: 80, height: 48, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />
+                  <img src={`https://img.youtube.com/vi/${v.youtube_id}/mqdefault.jpg`} alt="" style={{ width: 80, height: 48, borderRadius: 'var(--radius-sm)', objectFit: 'cover', flexShrink: 0 }} />
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: '#1E293B', lineHeight: 1.3, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title}</div>
-                    <div style={{ fontSize: 10.5, color: '#64748B' }}>{v.channel_name}</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 10.5, fontWeight: 600 }}>
-                      <span style={{ color: '#10B981' }}>{fmt(v.view_count)} views</span>
-                      <span style={{ color: '#1A73E8' }}>Rank #{v.best_rank}</span>
+                    <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.3, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title}</div>
+                    <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)' }}>{v.channel_name}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 'var(--fs-label)', fontWeight: 600 }}>
+                      <span style={{ color: 'var(--success-text)' }}>{fmt(v.view_count)} views</span>
+                      <span style={{ color: 'var(--accent)' }}>Rank #{v.best_rank}</span>
                     </div>
                   </div>
                 </a>
