@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   Settings as SettingsIcon, Shield, Key, Globe, BookOpen, Bell,
   Plus, Trash2, X, Check, Loader2, AlertTriangle, CheckCircle, XCircle,
-  Users, Tag, Hash, BarChart3, Copy, Eye, EyeOff, RefreshCw,
+  Eye, EyeOff, RefreshCw,
   ToggleLeft, ToggleRight, Webhook, Mail, Zap,   FolderKanban,
 } from 'lucide-react'
 import { AMAZON_INDIA_CATEGORIES } from '@/lib/amazon-india'
@@ -334,8 +334,8 @@ export default function SettingsPage() {
                 display: 'flex', alignItems: 'center', gap: 10,
                 width: '100%', padding: '8px 12px', border: 'none',
                 borderRadius: 'var(--radius-md)', cursor: 'pointer', fontFamily: 'inherit',
-                background: tab === item.id ? 'rgba(245,130,32,0.08)' : 'transparent',
-                color: tab === item.id ? '#F58220' : 'var(--text-secondary)',
+                background: tab === item.id ? 'var(--warning-dim)' : 'transparent',
+                color: tab === item.id ? 'var(--brand-amazon)' : 'var(--text-secondary)',
                 fontWeight: tab === item.id ? 700 : 500,
                 fontSize: 'var(--fs-sm)', transition: 'all 0.12s',
               }}
@@ -400,7 +400,7 @@ export default function SettingsPage() {
                       </select>
                     </div>
                   </div>
-                  <div style={{ paddingTop: 12, borderTop: '1.5px solid rgba(26,115,232,0.06)', display: 'flex', justifyContent: 'flex-end' }}>
+                  <div style={{ paddingTop: 12, borderTop: '1.5px solid var(--accent-dim)', display: 'flex', justifyContent: 'flex-end' }}>
                     <button className="btn btn-blue btn-sm" onClick={saveSettings} disabled={settingsSaving}>
                       {settingsSaving ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={14} />}
                       Save Settings
@@ -429,7 +429,7 @@ export default function SettingsPage() {
                 </div>
 
                 {memberCampaignId ? (
-                  <div style={{ overflowX: 'auto' }}>
+                  <div className="table-wrap">
                     <table className="data-table">
                       <thead>
                         <tr>
@@ -449,8 +449,8 @@ export default function SettingsPage() {
                             <td>
                               <select value={m.role} style={{
                                 padding: '3px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--fs-label)', fontWeight: 700,
-                                border: '1.5px solid rgba(26,115,232,0.1)', background: 'var(--surface)', cursor: 'pointer', fontFamily: 'inherit',
-                                color: m.role === 'owner' ? '#00C853' : m.role === 'admin' ? '#1A73E8' : m.role === 'editor' ? '#7C3AED' : 'var(--text-secondary)',
+                                border: '1.5px solid var(--accent-dim)', background: 'var(--surface)', cursor: 'pointer', fontFamily: 'inherit',
+                                color: m.role === 'owner' ? 'var(--success)' : m.role === 'admin' ? 'var(--accent)' : m.role === 'editor' ? 'var(--info)' : 'var(--text-secondary)',
                               }} disabled={m.role === 'owner'}>
                                 <option value="owner" disabled>Owner</option>
                                 <option value="admin">Admin</option>
@@ -469,7 +469,7 @@ export default function SettingsPage() {
                                   fetch(`/api/workspace/members?campaign_id=${memberCampaignId}&user_id=${m.user_id}`, { method: 'DELETE' })
                                     .then(() => { fetchMembers(memberCampaignId); showToast('Member removed') })
                                     .catch(() => showToast('Failed', 'error'))
-                                }} style={{ background: 'var(--danger-dim)', border: '1.5px solid rgba(255,45,85,0.1)', borderRadius: 'var(--radius-sm)', padding: '4px 7px', cursor: 'pointer', color: 'var(--danger)', display: 'inline-flex', alignItems: 'center' }}>
+                                }} style={{ background: 'var(--danger-dim)', border: '1.5px solid var(--danger-dim)', borderRadius: 'var(--radius-sm)', padding: '4px 7px', cursor: 'pointer', color: 'var(--danger)', display: 'inline-flex', alignItems: 'center' }}>
                                   <Trash2 size={11} />
                                 </button>
                               )}
@@ -486,11 +486,11 @@ export default function SettingsPage() {
 
               {/* Permissions Matrix */}
               <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                <div style={{ padding: '14px 18px', borderBottom: '1.5px solid rgba(26,115,232,0.06)' }}>
+                <div style={{ padding: '14px 18px', borderBottom: '1.5px solid var(--accent-dim)' }}>
                   <span style={{ fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--text-bright)' }}>Role Permissions</span>
                   <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginLeft: 8, fontWeight: 500 }}>What each role can access</span>
                 </div>
-                <div style={{ overflowX: 'auto' }}>
+                <div className="table-wrap">
                   <table className="data-table" style={{ minWidth: 580 }}>
                     <thead>
                       <tr>
@@ -561,11 +561,11 @@ export default function SettingsPage() {
               )}
 
               <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                <div style={{ padding: '14px 18px', borderBottom: '1.5px solid rgba(26,115,232,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ padding: '14px 18px', borderBottom: '1.5px solid var(--accent-dim)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--text-bright)' }}>API Keys ({apiKeys.length})</span>
                   <button className="btn btn-blue btn-sm" onClick={() => setShowAddKey(true)}><Plus size={12} /> Add Key</button>
                 </div>
-                <div style={{ overflowX: 'auto' }}>
+                <div className="table-wrap">
                   <table className="data-table">
                     <thead>
                       <tr>
@@ -628,9 +628,9 @@ export default function SettingsPage() {
               {/* Add Key Modal */}
               {showAddKey && (
                 <div className="modal-scrim">
-                  <div className="card" style={{ maxWidth: 460, width: '100%', padding: 'var(--space-6)', position: 'relative' }}>
-                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #F58220, #FF9F43, transparent)', borderRadius: '14px 14px 0 0' }} />
-                    <button onClick={() => setShowAddKey(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(26,115,232,0.04)', border: '1.5px solid rgba(26,115,232,0.08)', borderRadius: 'var(--radius-md)', cursor: 'pointer', color: 'var(--text-muted)', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} /></button>
+                  <div className="modal-panel" style={{ maxWidth: 460 }}>
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, var(--brand-amazon), #FF9F43, transparent)', borderRadius: 'var(--radius-xl) var(--radius-xl) 0 0' }} />
+                    <button onClick={() => setShowAddKey(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'var(--accent-dim)', border: '1.5px solid var(--accent-dim)', borderRadius: 'var(--radius-md)', cursor: 'pointer', color: 'var(--text-muted)', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} /></button>
                     <h3 style={{ fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--text-bright)', margin: '0 0 16px' }}>Add YouTube API Key</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                       <div>
@@ -685,10 +685,10 @@ export default function SettingsPage() {
               </div>
 
               <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                <div style={{ padding: '14px 18px', borderBottom: '1.5px solid rgba(26,115,232,0.06)' }}>
+                <div style={{ padding: '14px 18px', borderBottom: '1.5px solid var(--accent-dim)' }}>
                   <span style={{ fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--text-bright)' }}>Registered Users ({users.length})</span>
                 </div>
-                <div style={{ overflowX: 'auto' }}>
+                <div className="table-wrap">
                   <table className="data-table">
                     <thead>
                       <tr>
@@ -728,7 +728,7 @@ export default function SettingsPage() {
                 {sectionDesc('Sync campaign data to Google Sheets for external backup and reporting')}
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
-                  <div style={{ padding: 16, borderRadius: 'var(--radius-md)', background: syncStatus?.configured ? 'rgba(0,200,83,0.04)' : '#FFF8F0', border: `1.5px solid ${syncStatus?.configured ? 'rgba(0,200,83,0.15)' : 'rgba(255,109,0,0.15)'}` }}>
+                  <div style={{ padding: 16, borderRadius: 'var(--radius-md)', background: syncStatus?.configured ? 'var(--success-dim)' : 'var(--warning-dim)', border: `1.5px solid ${syncStatus?.configured ? 'var(--success-border)' : 'var(--warning-border)'}` }}>
                     <div style={{ fontSize: 'var(--fs-label)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: syncStatus?.configured ? 'var(--success)' : 'var(--warning)', marginBottom: 4 }}>
                       {syncStatus?.configured ? 'Connected' : 'Not Configured'}
                     </div>
@@ -736,7 +736,7 @@ export default function SettingsPage() {
                       {syncStatus?.configured ? 'Google Sheets integration is active' : 'Set up GOOGLE_SERVICE_ACCOUNT_EMAIL and GOOGLE_PRIVATE_KEY'}
                     </div>
                   </div>
-                  <div style={{ padding: 16, borderRadius: 'var(--radius-md)', background: 'rgba(26,115,232,0.04)', border: '1.5px solid rgba(26,115,232,0.1)' }}>
+                  <div style={{ padding: 16, borderRadius: 'var(--radius-md)', background: 'var(--accent-dim)', border: '1.5px solid var(--accent-dim)' }}>
                     <div style={{ fontSize: 'var(--fs-label)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--accent)', marginBottom: 4 }}>Last Sync</div>
                     <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
                       {syncStatus?.lastSyncAt ? new Date(syncStatus.lastSyncAt).toLocaleString() : 'Never'}
@@ -769,13 +769,13 @@ export default function SettingsPage() {
           {tab === 'projects' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                <div style={{ padding: '14px 18px', borderBottom: '1.5px solid rgba(26,115,232,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ padding: '14px 18px', borderBottom: '1.5px solid var(--accent-dim)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <span style={{ fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--text-bright)' }}>All Projects</span>
                     <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginLeft: 8, fontWeight: 500 }}>{campaigns.length} total</span>
                   </div>
                 </div>
-                <div style={{ overflowX: 'auto', maxHeight: 500, overflowY: 'auto' }}>
+                <div className="table-wrap" style={{ maxHeight: 500, overflowY: 'auto' }}>
                   <table className="data-table" style={{ position: 'relative' }}>
                     <thead style={{ position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 2 }}>
                       <tr>
@@ -817,9 +817,9 @@ export default function SettingsPage() {
               {/* Edit Project Modal */}
               {editingProject && (
                 <div className="modal-scrim">
-                  <div className="card" style={{ maxWidth: 520, width: '100%', padding: 'var(--space-6)', position: 'relative' }}>
-                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #F58220, #FF9F43, transparent)', borderRadius: '14px 14px 0 0' }} />
-                    <button onClick={() => setEditingProject(null)} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(26,115,232,0.04)', border: '1.5px solid rgba(26,115,232,0.08)', borderRadius: 'var(--radius-md)', cursor: 'pointer', color: 'var(--text-muted)', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} /></button>
+                  <div className="modal-panel" style={{ maxWidth: 520 }}>
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, var(--brand-amazon), #FF9F43, transparent)', borderRadius: 'var(--radius-xl) var(--radius-xl) 0 0' }} />
+                    <button onClick={() => setEditingProject(null)} style={{ position: 'absolute', top: 16, right: 16, background: 'var(--accent-dim)', border: '1.5px solid var(--accent-dim)', borderRadius: 'var(--radius-md)', cursor: 'pointer', color: 'var(--text-muted)', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} /></button>
                     <h3 style={{ fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--text-bright)', margin: '0 0 16px' }}>Edit Project</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                       <div>
@@ -829,14 +829,14 @@ export default function SettingsPage() {
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                         <div>
                           <label className="field-label">Category</label>
-                          <select value={editCatId} onChange={e => { setEditCatId(e.target.value); setEditSubCatId('') }} style={{ height: 38, fontSize: 'var(--fs-body)', padding: '6px 12px', border: '1.5px solid rgba(26,115,232,0.12)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', fontFamily: 'inherit', color: 'var(--text-bright)', cursor: 'pointer', width: '100%' }}>
+                          <select value={editCatId} onChange={e => { setEditCatId(e.target.value); setEditSubCatId('') }} style={{ height: 38, fontSize: 'var(--fs-body)', padding: '6px 12px', border: '1.5px solid var(--accent-dim)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', fontFamily: 'inherit', color: 'var(--text-bright)', cursor: 'pointer', width: '100%' }}>
                             <option value="">— None —</option>
                             {AMAZON_INDIA_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                           </select>
                         </div>
                         <div>
                           <label className="field-label">Subcategory</label>
-                          <select value={editSubCatId} onChange={e => setEditSubCatId(e.target.value)} style={{ height: 38, fontSize: 'var(--fs-body)', padding: '6px 12px', border: '1.5px solid rgba(26,115,232,0.12)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', fontFamily: 'inherit', color: 'var(--text-bright)', cursor: 'pointer', width: '100%' }} disabled={!editCatId}>
+                          <select value={editSubCatId} onChange={e => setEditSubCatId(e.target.value)} style={{ height: 38, fontSize: 'var(--fs-body)', padding: '6px 12px', border: '1.5px solid var(--accent-dim)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', fontFamily: 'inherit', color: 'var(--text-bright)', cursor: 'pointer', width: '100%' }} disabled={!editCatId}>
                             <option value="">— None —</option>
                             {AMAZON_INDIA_CATEGORIES.find(c => c.id === editCatId)?.subCategories.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                           </select>
@@ -848,7 +848,7 @@ export default function SettingsPage() {
                       </div>
                       <div>
                         <label className="field-label">Status</label>
-                        <select value={editForm.status} onChange={e => setEditForm(p => ({ ...p, status: e.target.value }))} style={{ height: 38, fontSize: 'var(--fs-body)', padding: '6px 12px', border: '1.5px solid rgba(26,115,232,0.12)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', fontFamily: 'inherit', color: 'var(--text-bright)', cursor: 'pointer', width: '100%' }}>
+                        <select value={editForm.status} onChange={e => setEditForm(p => ({ ...p, status: e.target.value }))} style={{ height: 38, fontSize: 'var(--fs-body)', padding: '6px 12px', border: '1.5px solid var(--accent-dim)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', fontFamily: 'inherit', color: 'var(--text-bright)', cursor: 'pointer', width: '100%' }}>
                           <option value="active">Active</option>
                           <option value="paused">Paused</option>
                           <option value="archived">Archived</option>
@@ -868,9 +868,9 @@ export default function SettingsPage() {
               {/* Delete Project Confirmation */}
               {deleteProjectTarget && (
                 <div className="modal-scrim">
-                  <div className="card" style={{ maxWidth: 420, width: '100%', padding: 'var(--space-6)', position: 'relative' }}>
+                  <div className="modal-panel" style={{ maxWidth: 420 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'rgba(255,45,85,0.08)', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AlertTriangle size={18} /></div>
+                      <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'var(--danger-dim)', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AlertTriangle size={18} /></div>
                       <div><h3 style={{ fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--text-bright)', margin: 0 }}>Delete Project</h3><p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', margin: '2px 0 0' }}>This permanently removes all data including keywords and scrape results</p></div>
                     </div>
                     <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', marginBottom: 14, lineHeight: 1.5 }}>
@@ -895,14 +895,14 @@ export default function SettingsPage() {
           {tab === 'alerts' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                <div style={{ padding: '14px 18px', borderBottom: '1.5px solid rgba(26,115,232,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ padding: '14px 18px', borderBottom: '1.5px solid var(--accent-dim)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <span style={{ fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--text-bright)' }}>Alert Rules</span>
                     <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginLeft: 8, fontWeight: 500 }}>Get notified when metrics cross thresholds</span>
                   </div>
                   <button className="btn btn-blue btn-sm" onClick={() => setShowAddAlert(true)}><Plus size={12} /> New Alert</button>
                 </div>
-                <div style={{ overflowX: 'auto' }}>
+                <div className="table-wrap">
                   <table className="data-table">
                     <thead>
                       <tr>
@@ -948,9 +948,9 @@ export default function SettingsPage() {
               {/* Add Alert Modal */}
               {showAddAlert && (
                 <div className="modal-scrim">
-                  <div className="card" style={{ maxWidth: 480, width: '100%', padding: 'var(--space-6)', position: 'relative' }}>
-                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #F58220, #FF9F43, transparent)', borderRadius: '14px 14px 0 0' }} />
-                    <button onClick={() => setShowAddAlert(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(26,115,232,0.04)', border: '1.5px solid rgba(26,115,232,0.08)', borderRadius: 'var(--radius-md)', cursor: 'pointer', color: 'var(--text-muted)', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} /></button>
+                  <div className="modal-panel" style={{ maxWidth: 480 }}>
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, var(--brand-amazon), #FF9F43, transparent)', borderRadius: 'var(--radius-xl) var(--radius-xl) 0 0' }} />
+                    <button onClick={() => setShowAddAlert(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'var(--accent-dim)', border: '1.5px solid var(--accent-dim)', borderRadius: 'var(--radius-md)', cursor: 'pointer', color: 'var(--text-muted)', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} /></button>
                     <h3 style={{ fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--text-bright)', margin: '0 0 16px' }}>New Alert Rule</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                       <div>

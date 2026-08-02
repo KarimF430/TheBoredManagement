@@ -5,6 +5,7 @@ import {
   Tag, Search, ChevronDown, ChevronRight, Package, Star,
   ExternalLink, Loader2, ShoppingBag, Layers, Filter,
 } from 'lucide-react'
+import { LoadingState } from '@/components/StateViews'
 
 interface Category {
   id: string
@@ -68,14 +69,7 @@ export default function BrandsProductsPage() {
     : allBrands
 
   if (loading) {
-    return (
-      <div className="anim-fade-up" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-        <div style={{ textAlign: 'center' }}>
-          <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: '#F58220' }} />
-          <div style={{ marginTop: 10, fontSize: 13, color: '#64748B', fontWeight: 600 }}>Loading Amazon India catalog...</div>
-        </div>
-      </div>
-    )
+    return <LoadingState title="Loading Amazon India catalog..." />
   }
 
   return (
@@ -87,13 +81,13 @@ export default function BrandsProductsPage() {
           <p className="page-subtitle">Browse Amazon India categories, subcategories, brands, and products</p>
         </div>
         <div style={{ position: 'relative', width: 280 }}>
-          <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', pointerEvents: 'none' }} />
+          <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
           <input
             className="input"
             placeholder="Search categories, brands..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            style={{ height: 38, paddingLeft: 34, fontSize: 13 }}
+            style={{ height: 38, paddingLeft: 34, fontSize: 'var(--fs-body)' }}
           />
         </div>
       </div>
@@ -121,12 +115,12 @@ export default function BrandsProductsPage() {
             { label: 'Brands', value: filteredBrands.length, color: '#F58220' },
           ].map(s => (
             <div key={s.label} className="card" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: `${s.color}0D`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: s.color }}>
+              <div style={{ width: 32, height: 32, borderRadius: 'var(--radius-md)', background: `${s.color}0D`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: s.color }}>
                 {s.label === 'Categories' ? <Layers size={14} /> : s.label === 'Subcategories' ? <Filter size={14} /> : <ShoppingBag size={14} />}
               </div>
               <div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: s.color, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{s.value}</div>
-                <div style={{ fontSize: 10.5, fontWeight: 600, color: '#64748B', marginTop: 1 }}>{s.label}</div>
+                <div style={{ fontSize: 'var(--fs-h1)', fontWeight: 800, color: s.color, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{s.value}</div>
+                <div style={{ fontSize: 'var(--fs-label)', fontWeight: 600, color: 'var(--text-secondary)', marginTop: 1 }}>{s.label}</div>
               </div>
             </div>
           ))}
@@ -136,7 +130,7 @@ export default function BrandsProductsPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 16, alignItems: 'start' }}>
           {/* Left: Category tree */}
           <div className="card" style={{ padding: 0, overflow: 'hidden', maxHeight: 600, overflowY: 'auto' }}>
-            <div style={{ padding: '12px 16px', borderBottom: '1.5px solid rgba(26,115,232,0.06)', fontSize: 12.5, fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1.5px solid var(--accent-dim)', fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--text-bright)', display: 'flex', alignItems: 'center', gap: 6 }}>
               <Tag size={13} /> Amazon India Categories
             </div>
             {(activeTab === 'all' || activeTab === 'categories') && (
@@ -148,21 +142,21 @@ export default function BrandsProductsPage() {
                       style={{
                         display: 'flex', alignItems: 'center', gap: 8,
                         padding: '10px 16px', cursor: 'pointer',
-                        background: expandedCat === cat.id ? 'rgba(245,130,32,0.04)' : 'transparent',
-                        borderBottom: '1px solid rgba(26,115,232,0.04)',
+                        background: expandedCat === cat.id ? 'var(--warning-dim)' : 'transparent',
+                        borderBottom: '1px solid var(--accent-dim)',
                         fontWeight: expandedCat === cat.id ? 700 : 500,
-                        color: '#0F172A', fontSize: 13,
+                        color: 'var(--text-bright)', fontSize: 'var(--fs-body)',
                         transition: 'all 0.1s',
                       }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(26,115,232,0.03)' }}
-                      onMouseLeave={e => { e.currentTarget.style.background = expandedCat === cat.id ? 'rgba(245,130,32,0.04)' : 'transparent' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-dim)' }}
+                      onMouseLeave={e => { e.currentTarget.style.background = expandedCat === cat.id ? 'var(--warning-dim)' : 'transparent' }}
                     >
-                      {expandedCat === cat.id ? <ChevronDown size={14} style={{ color: '#F58220', flexShrink: 0 }} /> : <ChevronRight size={14} style={{ color: '#94A3B8', flexShrink: 0 }} />}
+                      {expandedCat === cat.id ? <ChevronDown size={14} style={{ color: 'var(--brand-amazon)', flexShrink: 0 }} /> : <ChevronRight size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />}
                       {cat.name}
-                      <span style={{ marginLeft: 'auto', fontSize: 10.5, color: '#94A3B8', fontWeight: 500 }}>{cat.subCategories.length}</span>
+                      <span style={{ marginLeft: 'auto', fontSize: 'var(--fs-label)', color: 'var(--text-muted)', fontWeight: 500 }}>{cat.subCategories.length}</span>
                     </div>
                     {expandedCat === cat.id && (
-                      <div style={{ background: 'rgba(244,247,252,0.5)' }}>
+                      <div style={{ background: 'var(--bg-base)' }}>
                         {cat.subCategories.map(sub => (
                           <div
                             key={sub.id}
@@ -170,16 +164,16 @@ export default function BrandsProductsPage() {
                             style={{
                               display: 'flex', alignItems: 'center', gap: 8,
                               padding: '8px 16px 8px 40px', cursor: 'pointer',
-                              borderBottom: '1px solid rgba(26,115,232,0.03)',
-                              fontSize: 12.5, color: selectedSubCat === sub.id ? '#F58220' : '#475569',
+                              borderBottom: '1px solid var(--accent-dim)',
+                              fontSize: 'var(--fs-sm)', color: selectedSubCat === sub.id ? 'var(--brand-amazon)' : 'var(--text-secondary)',
                               fontWeight: selectedSubCat === sub.id ? 700 : 500,
-                              background: selectedSubCat === sub.id ? 'rgba(245,130,32,0.06)' : 'transparent',
+                              background: selectedSubCat === sub.id ? 'var(--warning-dim)' : 'transparent',
                               transition: 'all 0.1s',
                             }}
-                            onMouseEnter={e => { if (selectedSubCat !== sub.id) e.currentTarget.style.background = 'rgba(26,115,232,0.03)' }}
+                            onMouseEnter={e => { if (selectedSubCat !== sub.id) e.currentTarget.style.background = 'var(--accent-dim)' }}
                             onMouseLeave={e => { if (selectedSubCat !== sub.id) e.currentTarget.style.background = 'transparent' }}
                           >
-                            {selectedSubCat === sub.id ? <ChevronRight size={12} style={{ color: '#F58220' }} /> : <Package size={12} style={{ color: '#94A3B8' }} />}
+                            {selectedSubCat === sub.id ? <ChevronRight size={12} style={{ color: 'var(--brand-amazon)' }} /> : <Package size={12} style={{ color: 'var(--text-muted)' }} />}
                             {sub.name}
                           </div>
                         ))}
@@ -193,18 +187,18 @@ export default function BrandsProductsPage() {
 
           {/* Right: Brands grid */}
           <div className="card" style={{ padding: 0, overflow: 'hidden', minHeight: 300 }}>
-            <div style={{ padding: '12px 16px', borderBottom: '1.5px solid rgba(26,115,232,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1.5px solid var(--accent-dim)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--text-bright)', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <ShoppingBag size={13} />
                 {selectedSubCat
                   ? `Brands in ${categories.flatMap(c => c.subCategories).find(s => s.id === selectedSubCat)?.name || ''}`
                   : 'All Brands'}
-                <span style={{ fontSize: 11, color: '#94A3B8', fontWeight: 500 }}>({filteredBrands.length})</span>
+                <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', fontWeight: 500 }}>({filteredBrands.length})</span>
               </span>
-              {brandsLoading && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite', color: '#F58220' }} />}
+              {brandsLoading && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite', color: 'var(--brand-amazon)' }} />}
             </div>
             {filteredBrands.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 48, color: '#94A3B8', fontSize: 13 }}>
+              <div style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)', fontSize: 'var(--fs-body)' }}>
                 {selectedSubCat ? 'No brands found for this subcategory.' : 'Select a subcategory from the left to view brands.'}
               </div>
             ) : (
@@ -213,14 +207,14 @@ export default function BrandsProductsPage() {
                   <div
                     key={brand.id}
                     style={{
-                      padding: '10px 12px', borderRadius: 8,
-                      background: '#FFFFFF', border: '1.5px solid rgba(26,115,232,0.06)',
-                      fontSize: 12, fontWeight: 600, color: '#0F172A',
+                      padding: '10px 12px', borderRadius: 'var(--radius-md)',
+                      background: 'var(--surface)', border: '1.5px solid var(--accent-dim)',
+                      fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-bright)',
                       textAlign: 'center', cursor: 'default',
                       transition: 'all 0.12s',
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(245,130,32,0.2)'; e.currentTarget.style.background = 'rgba(245,130,32,0.03)' }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(26,115,232,0.06)'; e.currentTarget.style.background = '#FFFFFF' }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--warning-border)'; e.currentTarget.style.background = 'var(--warning-dim)' }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--accent-dim)'; e.currentTarget.style.background = 'var(--surface)' }}
                   >
                     {brand.name}
                   </div>
@@ -231,7 +225,6 @@ export default function BrandsProductsPage() {
         </div>
       </div>
 
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }

@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  Plus, Trash2, Play, Pause, RefreshCw, Key, Tag,
-  ChevronDown, ChevronUp, Search, Check, AlertTriangle,
+  Plus, Trash2, Play, Pause, RefreshCw,
+  Search, Check, AlertTriangle,
   Zap, BarChart2, CheckCircle, XCircle, Loader2, X,
-  Hash, Users as UsersIcon, Shield, ShieldCheck, ShieldAlert,
-  Eye, UserPlus, UserMinus, MoreVertical, ShoppingBag, Activity, Pencil,
+  Hash, Users as UsersIcon,
+  UserPlus, UserMinus, MoreVertical, ShoppingBag, Activity, Pencil,
 } from 'lucide-react'
 import { AMAZON_INDIA_CATEGORIES } from '@/lib/amazon-india'
 import { useCampaignStore } from '@/lib/store'
@@ -50,15 +50,15 @@ function fmtRelative(iso: string | null): string {
 
 function Toast({ msg, type, onClose }: { msg: string; type: 'success' | 'error' | 'info' | 'warning'; onClose: () => void }) {
   useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [onClose])
-  const bg = type === 'success' ? '#00C853' : type === 'error' ? '#FF2D55' : type === 'warning' ? '#F59E0B' : '#1A73E8'
+  const bg = type === 'success' ? 'var(--success)' : type === 'error' ? 'var(--danger)' : type === 'warning' ? 'var(--warning)' : 'var(--accent)'
   return (
-    <div style={{ position: 'fixed', bottom: 28, right: 28, zIndex: 9999, display: 'flex', alignItems: 'center', gap: 10, padding: '14px 20px', borderRadius: 12, minWidth: 280, background: bg, color: '#FFF', fontWeight: 600, fontSize: 13, boxShadow: '0 8px 32px rgba(0,0,0,0.18)', animation: 'fadeUp 0.25s ease' }}>
+    <div style={{ position: 'fixed', bottom: 28, right: 28, zIndex: 9999, display: 'flex', alignItems: 'center', gap: 10, padding: '14px 20px', borderRadius: 'var(--radius-lg)', minWidth: 280, background: bg, color: 'var(--on-accent)', fontWeight: 600, fontSize: 'var(--fs-body)', boxShadow: 'var(--shadow-lg)', animation: 'fadeUp 0.25s ease' }}>
       {type === 'success' && <CheckCircle size={16} />}
       {type === 'error' && <XCircle size={16} />}
       {type === 'info' && <Zap size={16} />}
       {type === 'warning' && <AlertTriangle size={16} />}
       <span style={{ flex: 1 }}>{msg}</span>
-      <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#FFF', padding: 2 }}><X size={14} /></button>
+      <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--on-accent)', padding: 2 }}><X size={14} /></button>
     </div>
   )
 }
@@ -71,14 +71,14 @@ function PageAccessBadge({ role }: { role: string }) {
     viewer: { label: 'View Only', color: '#64748B' },
   }
   const { label, color } = cfg[role] || cfg.viewer
-  return <span style={{ fontSize: 10.5, fontWeight: 700, color, background: `${color}15`, padding: '2px 8px', borderRadius: 99, display: 'inline-block' }}>{label}</span>
+  return <span style={{ fontSize: 'var(--fs-label)', fontWeight: 700, color, background: `${color}15`, padding: '2px 8px', borderRadius: '50%', display: 'inline-block' }}>{label}</span>
 }
 
 function ScrapeStatusIcon({ status }: { status: string }) {
-  if (status === 'running') return <Loader2 size={12} style={{ animation: 'spin 1s linear infinite', color: '#1A73E8' }} />
-  if (status === 'completed') return <CheckCircle size={12} style={{ color: '#00C853' }} />
-  if (status === 'failed') return <XCircle size={12} style={{ color: '#FF2D55' }} />
-  return <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#CBD5E1' }} />
+  if (status === 'running') return <Loader2 size={12} style={{ animation: 'spin 1s linear infinite', color: 'var(--accent)' }} />
+  if (status === 'completed') return <CheckCircle size={12} style={{ color: 'var(--success)' }} />
+  if (status === 'failed') return <XCircle size={12} style={{ color: 'var(--danger)' }} />
+  return <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--neutral-300)' }} />
 }
 
 export default function ControlPage() {
@@ -331,7 +331,7 @@ export default function ControlPage() {
 
   const kwListCss: React.CSSProperties = {
     display: 'flex', alignItems: 'center', gap: 8,
-    padding: '10px 14px', borderRadius: 8, fontSize: 12.5,
+    padding: '10px 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--fs-sm)',
     border: '1.5px solid transparent', transition: 'all 0.12s',
     cursor: 'default',
   }
@@ -347,7 +347,7 @@ export default function ControlPage() {
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           {runningJobs.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', background: 'var(--blue-dim)', border: '1.5px solid var(--border-blue)', borderRadius: 20, fontSize: 12, fontWeight: 600, color: 'var(--blue)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', background: 'var(--accent-dim)', border: '1.5px solid var(--accent-border)', borderRadius: 20, fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--accent)' }}>
               <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
               {runningJobs.length} job{runningJobs.length > 1 ? 's' : ''} running
             </div>
@@ -373,62 +373,62 @@ export default function ControlPage() {
         }}>
           {/* ── Campaign List ── */}
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)' }}>Campaigns <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({campaigns.length})</span></span>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--text-primary)' }}>Campaigns <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({campaigns.length})</span></span>
               <button className="btn btn-blue btn-xs" onClick={() => setShowNewCampaign(v => !v)}><Plus size={11} /> New</button>
             </div>
             {showNewCampaign && (
-              <div style={{ padding: 12, borderBottom: '1px solid var(--border-1)', background: 'var(--blue-dim)' }}>
-                <input className="input" placeholder="Campaign name *" value={newCampaign.name} style={{ marginBottom: 5, fontSize: 12, height: 32 }} onChange={e => setNewCampaign(p => ({ ...p, name: e.target.value }))} onKeyDown={e => e.key === 'Enter' && createCampaign()} />
+              <div style={{ padding: 12, borderBottom: '1px solid var(--border-light)', background: 'var(--accent-dim)' }}>
+                <input className="input" placeholder="Campaign name *" value={newCampaign.name} style={{ marginBottom: 5, fontSize: 'var(--fs-sm)', height: 32 }} onChange={e => setNewCampaign(p => ({ ...p, name: e.target.value }))} onKeyDown={e => e.key === 'Enter' && createCampaign()} />
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, marginBottom: 5 }}>
-                  <select value={campaignCategory} onChange={e => { setCampaignCategory(e.target.value); setCampaignSubCategory('') }} style={{ height: 32, fontSize: 11.5, padding: '4px 8px', border: '1.5px solid rgba(26,115,232,0.12)', borderRadius: 9, background: '#FFF', fontFamily: 'inherit', color: '#0F172A', cursor: 'pointer', width: '100%' }}>
+                  <select value={campaignCategory} onChange={e => { setCampaignCategory(e.target.value); setCampaignSubCategory('') }} style={{ height: 32, fontSize: 'var(--fs-label)', padding: '4px 8px', border: '1.5px solid var(--accent-border)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', fontFamily: 'inherit', color: 'var(--text-bright)', cursor: 'pointer', width: '100%' }}>
                     <option value="">Select Category</option>
                     {AMAZON_INDIA_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
-                  <select value={campaignSubCategory} onChange={e => setCampaignSubCategory(e.target.value)} style={{ height: 32, fontSize: 11.5, padding: '4px 8px', border: '1.5px solid rgba(26,115,232,0.12)', borderRadius: 9, background: '#FFF', fontFamily: 'inherit', color: '#0F172A', cursor: 'pointer', width: '100%' }} disabled={!campaignCategory}>
+                  <select value={campaignSubCategory} onChange={e => setCampaignSubCategory(e.target.value)} style={{ height: 32, fontSize: 'var(--fs-label)', padding: '4px 8px', border: '1.5px solid var(--accent-border)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', fontFamily: 'inherit', color: 'var(--text-bright)', cursor: 'pointer', width: '100%' }} disabled={!campaignCategory}>
                     <option value="">Select Subcategory</option>
                     {AMAZON_INDIA_CATEGORIES.find(c => c.id === campaignCategory)?.subCategories.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </div>
-                <input className="input" placeholder="Description (optional)" value={newCampaign.description} style={{ marginBottom: 6, fontSize: 12, height: 32 }} onChange={e => setNewCampaign(p => ({ ...p, description: e.target.value }))} />
+                <input className="input" placeholder="Description (optional)" value={newCampaign.description} style={{ marginBottom: 6, fontSize: 'var(--fs-sm)', height: 32 }} onChange={e => setNewCampaign(p => ({ ...p, description: e.target.value }))} />
                 <div style={{ display: 'flex', gap: 5 }}>
-                  <button className="btn btn-blue btn-sm" onClick={createCampaign} disabled={loading} style={{ flex: 1, fontSize: 11.5, height: 30 }}>{loading ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={11} />} Create</button>
+                  <button className="btn btn-blue btn-sm" onClick={createCampaign} disabled={loading} style={{ flex: 1, fontSize: 'var(--fs-label)', height: 30 }}>{loading ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={11} />} Create</button>
                   <button className="btn btn-ghost btn-sm" onClick={() => setShowNewCampaign(false)} style={{ height: 30 }}><X size={11} /></button>
                 </div>
               </div>
             )}
             <div style={{ maxHeight: 540, overflowY: 'auto' }}>
-              {campaigns.length === 0 && <div style={{ padding: 28, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12.5 }}>No campaigns yet.</div>}
+              {campaigns.length === 0 && <div style={{ padding: 28, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}>No campaigns yet.</div>}
               {campaigns.map(c => (
                 <div key={c.id} onClick={() => setActiveCampaign(c.id)}
-                  style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-1)', cursor: 'pointer',
-                    background: activeCampaign === c.id ? 'var(--blue-dim)' : 'white',
-                    borderLeft: activeCampaign === c.id ? '3px solid var(--blue)' : '3px solid transparent',
+                  style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-light)', cursor: 'pointer',
+                    background: activeCampaign === c.id ? 'var(--accent-dim)' : 'var(--surface)',
+                    borderLeft: activeCampaign === c.id ? '3px solid var(--accent)' : '3px solid transparent',
                     transition: 'all 0.12s', paddingLeft: activeCampaign === c.id ? 11 : 14 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 700, color: activeCampaign === c.id ? 'var(--blue)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
+                      <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: activeCampaign === c.id ? 'var(--accent)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</div>
                       {c.category && (
-                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <div style={{ fontSize: 'var(--fs-micro)', color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
                           <ShoppingBag size={9} style={{ flexShrink: 0 }} />
-                          {c.category}{c.sub_category ? <><span style={{ color: '#CBD5E1' }}>/</span>{c.sub_category}</> : ''}
+                          {c.category}{c.sub_category ? <><span style={{ color: 'var(--neutral-300)' }}>/</span>{c.sub_category}</> : ''}
                         </div>
                       )}
                       <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                        <span style={{ fontSize: 10.5, color: 'var(--text-secondary)' }}><Hash size={9} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 1 }} />{c.keyword_count} kw</span>
-                        {c.last_scraped && <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{fmtRelative(c.last_scraped)}</span>}
+                        <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)' }}><Hash size={9} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 1 }} />{c.keyword_count} kw</span>
+                        {c.last_scraped && <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)' }}>{fmtRelative(c.last_scraped)}</span>}
                       </div>
                     </div>
                     <div style={{ position: 'relative', flexShrink: 0 }} data-menu-id={c.id}>
                       <button onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === c.id ? null : c.id) }}
-                        style={{ background: openMenuId === c.id ? 'var(--blue-dim)' : 'none', border: 'none', cursor: 'pointer', padding: 3, color: 'var(--text-muted)', borderRadius: 4 }}>
+                        style={{ background: openMenuId === c.id ? 'var(--accent-dim)' : 'none', border: 'none', cursor: 'pointer', padding: 3, color: 'var(--text-muted)', borderRadius: 'var(--radius-xs)' }}>
                         <MoreVertical size={13} />
                       </button>
                       {openMenuId === c.id && (
-                        <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 3, background: '#FFF', border: '1.5px solid var(--border-1)', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.08)', zIndex: 50, minWidth: 150, overflow: 'hidden' }}>
+                        <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 3, background: 'var(--surface)', border: '1.5px solid var(--border-light)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)', zIndex: 50, minWidth: 150, overflow: 'hidden' }}>
                           <button onClick={() => { setDeleteTarget({ id: c.id, name: c.name }); setOpenMenuId(null) }}
-                            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '7px 12px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 11.5, color: '#EF4444', fontFamily: 'inherit' }}
-                            onMouseEnter={e => e.currentTarget.style.background = '#FEF2F2'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '7px 12px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 'var(--fs-label)', color: 'var(--danger)', fontFamily: 'inherit' }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'var(--danger-dim)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                             <Trash2 size={11} /> Delete Campaign
                           </button>
                         </div>
@@ -443,19 +443,19 @@ export default function ControlPage() {
           {/* ── Keyword Management ── */}
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             {!activeCampaign ? (
-              <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Select a campaign to manage keywords.</div>
+              <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-body)' }}>Select a campaign to manage keywords.</div>
             ) : (
               <>
                 {/* Header */}
-                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)' }}>
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--text-primary)' }}>
                     {selectedCampaign?.name} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({keywords.length} keywords)</span>
                   </span>
                   <div style={{ display: 'flex', gap: 5 }}>
-                    <button className="btn btn-blue btn-xs" onClick={() => { setShowAddKw(v => !v); setSelCategory(''); setSelSubCategory('') }} style={{ fontSize: 10.5 }}>
+                    <button className="btn btn-blue btn-xs" onClick={() => { setShowAddKw(v => !v); setSelCategory(''); setSelSubCategory('') }} style={{ fontSize: 'var(--fs-label)' }}>
                       <Plus size={10} /> Add Keywords
                     </button>
-                    <button className="btn btn-ghost btn-xs" onClick={() => triggerScrape()} disabled={scraping} style={{ fontSize: 10.5 }}>
+                    <button className="btn btn-ghost btn-xs" onClick={() => triggerScrape()} disabled={scraping} style={{ fontSize: 'var(--fs-label)' }}>
                       {scraping ? <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={10} />} Scrape All
                     </button>
                   </div>
@@ -463,21 +463,21 @@ export default function ControlPage() {
 
                 {/* Add Keywords form */}
                 {showAddKw && (
-                  <div style={{ padding: 14, borderBottom: '1px solid var(--border-1)', background: 'rgba(245,130,32,0.03)' }}>
+                  <div style={{ padding: 14, borderBottom: '1px solid var(--border-light)', background: 'rgba(245,130,32,0.03)' }}>
                     {/* Amazon India Category / Subcategory */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
                       <div>
-                        <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 3 }}>Category</label>
+                        <label className="field-label">Category</label>
                         <select value={selCategory} onChange={e => { setSelCategory(e.target.value); setSelSubCategory('') }}
-                          style={{ height: 32, fontSize: 11.5, padding: '4px 8px', border: '1.5px solid rgba(26,115,232,0.12)', borderRadius: 9, background: '#FFF', fontFamily: 'inherit', color: '#0F172A', cursor: 'pointer', width: '100%' }}>
+                          style={{ height: 32, fontSize: 'var(--fs-label)', padding: '4px 8px', border: '1.5px solid var(--accent-border)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', fontFamily: 'inherit', color: 'var(--text-bright)', cursor: 'pointer', width: '100%' }}>
                           <option value="">All Categories</option>
                           {AMAZON_INDIA_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 3 }}>Subcategory</label>
+                        <label className="field-label">Subcategory</label>
                         <select value={selSubCategory} onChange={e => setSelSubCategory(e.target.value)}
-                          style={{ height: 32, fontSize: 11.5, padding: '4px 8px', border: '1.5px solid rgba(26,115,232,0.12)', borderRadius: 9, background: '#FFF', fontFamily: 'inherit', color: '#0F172A', cursor: 'pointer', width: '100%' }} disabled={!selCategory}>
+                          style={{ height: 32, fontSize: 'var(--fs-label)', padding: '4px 8px', border: '1.5px solid var(--accent-border)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', fontFamily: 'inherit', color: 'var(--text-bright)', cursor: 'pointer', width: '100%' }} disabled={!selCategory}>
                           <option value="">All Subcategories</option>
                           {subCategories.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
@@ -486,28 +486,28 @@ export default function ControlPage() {
 
                     <textarea className="input" rows={3} value={bulkKw} onChange={e => setBulkKw(e.target.value)}
                       placeholder="Enter keywords, one per line&#10;e.g.&#10;best smartphones 2026&#10;top laptops under 50000&#10;wireless headphones review"
-                      style={{ resize: 'none', fontSize: 12, marginBottom: 8 }} />
+                      style={{ resize: 'none', fontSize: 'var(--fs-sm)', marginBottom: 8 }} />
                     <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-                      <select className="input" value={kwLang} onChange={e => setKwLang(e.target.value)} style={{ height: 30, fontSize: 11, flex: 1 }}>
+                      <select className="input" value={kwLang} onChange={e => setKwLang(e.target.value)} style={{ height: 30, fontSize: 'var(--fs-label)', flex: 1 }}>
                         <option value="en">English</option>
                         <option value="hi">Hindi</option><option value="ta">Tamil</option><option value="te">Telugu</option><option value="bn">Bengali</option>
                       </select>
-                      <select className="input" value={kwType} onChange={e => setKwType(e.target.value as any)} style={{ height: 30, fontSize: 11, flex: 1 }}>
+                      <select className="input" value={kwType} onChange={e => setKwType(e.target.value as any)} style={{ height: 30, fontSize: 'var(--fs-label)', flex: 1 }}>
                         <option value="generic">Generic</option>
                         <option value="branded">Branded</option>
                         <option value="comparison">Comparison</option>
                       </select>
-                      <button className="btn btn-blue btn-sm" onClick={addKeywords} disabled={loading} style={{ height: 30, fontSize: 11 }}>
+                      <button className="btn btn-blue btn-sm" onClick={addKeywords} disabled={loading} style={{ height: 30, fontSize: 'var(--fs-label)' }}>
                         {loading ? <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={10} />} Add
                       </button>
                     </div>
                     {selCategory && (
-                      <div style={{ fontSize: 10, color: '#94A3B8', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <div style={{ fontSize: 'var(--fs-micro)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
                         <ShoppingBag size={10} />
                         {AMAZON_INDIA_CATEGORIES.find(c => c.id === selCategory)?.name}
                         {selSubCategory && <> &rarr; {subCategories.find(s => s.id === selSubCategory)?.name}</>}
                         {selSubCategory && AMAZON_INDIA_CATEGORIES.find(c => c.id === selCategory) && (
-                          <span style={{ marginLeft: 'auto', color: '#F58220', fontWeight: 600 }}>
+                          <span style={{ marginLeft: 'auto', color: 'var(--brand-amazon)', fontWeight: 600 }}>
                             {keywords.length} keywords in this campaign
                           </span>
                         )}
@@ -517,22 +517,22 @@ export default function ControlPage() {
                 )}
 
                 {/* Search */}
-                <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--border-1)' }}>
+                <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--border-light)' }}>
                   <div style={{ position: 'relative' }}>
-                    <Search size={12} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', pointerEvents: 'none' }} />
+                    <Search size={12} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
                     <input className="input" placeholder="Search keywords..." value={search} onChange={e => setSearch(e.target.value)}
-                      style={{ height: 30, paddingLeft: 28, fontSize: 11.5 }} />
+                      style={{ height: 30, paddingLeft: 28, fontSize: 'var(--fs-label)' }} />
                   </div>
                 </div>
 
                 {/* Keyword list - improved card-style rows */}
                 <div style={{ maxHeight: 480, overflowY: 'auto' }}>
                   {detailLoading && filteredKw.length === 0 ? (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 40, color: '#94A3B8', fontSize: 13 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 40, color: 'var(--text-muted)', fontSize: 'var(--fs-body)' }}>
                       <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Loading keywords…
                     </div>
                   ) : filteredKw.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: 40, color: '#CBD5E1', fontSize: 13 }}>
+                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--neutral-300)', fontSize: 'var(--fs-body)' }}>
                       {search ? 'No matching keywords.' : 'No keywords yet. Add keywords above.'}
                     </div>
                   ) : (
@@ -541,25 +541,25 @@ export default function ControlPage() {
                         <div key={kw.id}
                           style={{
                             ...kwListCss,
-                            background: kw.status === 'active' ? '#FFFFFF' : '#FAFBFC',
-                            borderColor: kw.status === 'active' ? 'rgba(26,115,232,0.05)' : 'rgba(100,116,139,0.05)',
+                            background: kw.status === 'active' ? 'var(--surface)' : 'var(--bg-base)',
+                            borderColor: kw.status === 'active' ? 'var(--accent-dim)' : 'rgba(100,116,139,0.05)',
                             marginBottom: 4,
                           }}
                           onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(245,130,32,0.15)'; e.currentTarget.style.background = 'rgba(245,130,32,0.02)' }}
-                          onMouseLeave={e => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.background = kw.status === 'active' ? '#FFFFFF' : '#FAFBFC' }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.background = kw.status === 'active' ? 'var(--surface)' : 'var(--bg-base)' }}
                         >
                           {/* Status dot */}
                           <div style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                            background: kw.status === 'active' ? '#00C853' : '#94A3B8' }} />
+                            background: kw.status === 'active' ? 'var(--success)' : 'var(--text-muted)' }} />
 
                           {/* Keyword text */}
-                          <span style={{ flex: 1, fontWeight: 600, color: '#0F172A', fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <span style={{ flex: 1, fontWeight: 600, color: 'var(--text-bright)', fontSize: 'var(--fs-sm)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {kw.text}
                           </span>
 
                           {/* Type badge */}
                           <span style={{
-                            fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99,
+                            fontSize: 'var(--fs-micro)', fontWeight: 700, padding: '1px 6px', borderRadius: '50%',
                             color: kw.category === 'branded' ? '#7C3AED' : kw.category === 'comparison' ? '#FF6D00' : '#1A73E8',
                             background: kw.category === 'branded' ? 'rgba(124,58,237,0.08)' : kw.category === 'comparison' ? 'rgba(255,109,0,0.08)' : 'rgba(26,115,232,0.08)',
                             whiteSpace: 'nowrap',
@@ -568,12 +568,12 @@ export default function ControlPage() {
                           </span>
 
                           {/* Lang */}
-                          <span style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600, minWidth: 24, textAlign: 'center' }}>
+                          <span style={{ fontSize: 'var(--fs-micro)', color: 'var(--text-muted)', fontWeight: 600, minWidth: 24, textAlign: 'center' }}>
                             {kw.language.toUpperCase()}
                           </span>
 
                           {/* Last scraped */}
-                          <span style={{ fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap', minWidth: 50, textAlign: 'right' }}>
+                          <span style={{ fontSize: 'var(--fs-micro)', color: 'var(--text-muted)', whiteSpace: 'nowrap', minWidth: 50, textAlign: 'right' }}>
                             {fmtRelative(kw.last_scraped)}
                           </span>
 
@@ -581,26 +581,26 @@ export default function ControlPage() {
                           <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
                             <button onClick={() => toggleKeyword(kw.id, kw.status)}
                               style={{
-                                padding: '3px 5px', borderRadius: 4, border: 'none', cursor: 'pointer',
-                                background: kw.status === 'active' ? 'rgba(0,200,83,0.08)' : 'rgba(148,163,184,0.1)',
-                                color: kw.status === 'active' ? '#00C853' : '#94A3B8',
+                                padding: '3px 5px', borderRadius: 'var(--radius-xs)', border: 'none', cursor: 'pointer',
+                                background: kw.status === 'active' ? 'var(--success-dim)' : 'var(--bg-hover)',
+                                color: kw.status === 'active' ? 'var(--success)' : 'var(--text-muted)',
                                 display: 'flex', alignItems: 'center',
                               }}
                               title={kw.status === 'active' ? 'Pause' : 'Activate'}>
                               {kw.status === 'active' ? <Pause size={10} /> : <Play size={10} />}
                             </button>
                             <button onClick={() => setEditKw({ id: kw.id, text: kw.text, language: kw.language, category: kw.category })}
-                              style={{ padding: '3px 5px', borderRadius: 4, border: 'none', cursor: 'pointer', background: 'rgba(245,130,32,0.08)', color: '#F58220', display: 'flex', alignItems: 'center' }}
+                              style={{ padding: '3px 5px', borderRadius: 'var(--radius-xs)', border: 'none', cursor: 'pointer', background: 'rgba(245,130,32,0.08)', color: 'var(--brand-amazon)', display: 'flex', alignItems: 'center' }}
                               title="Edit keyword">
                               <Pencil size={10} />
                             </button>
                             <button onClick={() => triggerScrape(kw.id)}
-                              style={{ padding: '3px 5px', borderRadius: 4, border: 'none', cursor: 'pointer', background: 'rgba(26,115,232,0.06)', color: '#1A73E8', display: 'flex', alignItems: 'center' }}
+                              style={{ padding: '3px 5px', borderRadius: 'var(--radius-xs)', border: 'none', cursor: 'pointer', background: 'var(--accent-dim)', color: 'var(--accent)', display: 'flex', alignItems: 'center' }}
                               title="Scrape this keyword">
                               <RefreshCw size={10} />
                             </button>
                             <button onClick={() => deleteKeyword(kw.id)}
-                              style={{ padding: '3px 5px', borderRadius: 4, border: 'none', cursor: 'pointer', background: 'rgba(255,45,85,0.06)', color: '#FF2D55', display: 'flex', alignItems: 'center' }}
+                              style={{ padding: '3px 5px', borderRadius: 'var(--radius-xs)', border: 'none', cursor: 'pointer', background: 'var(--danger-dim)', color: 'var(--danger)', display: 'flex', alignItems: 'center' }}
                               title="Delete">
                               <Trash2 size={10} />
                             </button>
@@ -617,40 +617,40 @@ export default function ControlPage() {
           {/* ── Scrape Progress Panel ── */}
           {showProgressPanel && activeCampaign && (
             <div className="card" style={{ padding: 0, overflow: 'hidden', position: 'sticky', top: 20 }}>
-              <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 11.5, fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 'var(--fs-label)', fontWeight: 700, color: 'var(--text-bright)', display: 'flex', alignItems: 'center', gap: 5 }}>
                   <Activity size={12} /> Scrape Progress
                 </span>
-                <span style={{ fontSize: 10, fontWeight: 600, color: '#64748B' }}>
+                <span style={{ fontSize: 'var(--fs-micro)', fontWeight: 600, color: 'var(--text-secondary)' }}>
                   {scrapeProgress.filter(s => s.status === 'completed').length}/{scrapeProgress.length} done
                 </span>
               </div>
               <div style={{ maxHeight: 460, overflowY: 'auto', padding: '6px 8px' }}>
                 {scrapeProgress.length === 0 ? (
-                  <div style={{ padding: 20, textAlign: 'center', color: '#94A3B8', fontSize: 11.5 }}>No scrape activity yet.</div>
+                  <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-label)' }}>No scrape activity yet.</div>
                 ) : (
                   scrapeProgress.map(item => (
                     <div key={item.keywordId} style={{
                       display: 'flex', alignItems: 'center', gap: 8,
-                      padding: '7px 8px', borderRadius: 6, fontSize: 11,
+                      padding: '7px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--fs-label)',
                       marginBottom: 2,
-                      background: item.status === 'running' ? 'rgba(26,115,232,0.03)' : 'transparent',
+                      background: item.status === 'running' ? 'var(--accent-dim)' : 'transparent',
                     }}>
                       <ScrapeStatusIcon status={item.status} />
                       <span style={{
                         flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         fontWeight: item.status === 'running' ? 600 : 500,
-                        color: item.status === 'failed' ? '#FF2D55' : item.status === 'completed' ? '#00C853' : '#0F172A',
+                        color: item.status === 'failed' ? 'var(--danger)' : item.status === 'completed' ? 'var(--success)' : 'var(--text-bright)',
                       }}>
                         {item.text}
                       </span>
                       {item.status === 'running' && (
-                        <span style={{ fontSize: 9, color: '#1A73E8', fontWeight: 600, animation: 'pulse 1.5s ease-in-out infinite' }}>
+                        <span style={{ fontSize: 'var(--fs-micro)', color: 'var(--accent)', fontWeight: 600, animation: 'pulse 1.5s ease-in-out infinite' }}>
                           scraping...
                         </span>
                       )}
                       {item.status === 'failed' && item.message && (
-                        <span style={{ fontSize: 9, color: '#FF2D55', fontWeight: 500, textAlign: 'right', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: 'var(--fs-micro)', color: 'var(--danger)', fontWeight: 500, textAlign: 'right', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {item.message}
                         </span>
                       )}
@@ -660,10 +660,10 @@ export default function ControlPage() {
               </div>
               {scrapeProgress.some(s => s.status === 'running' || s.status === 'pending') && (
                 <div style={{ padding: '6px 14px 10px' }}>
-                  <div style={{ height: 3, borderRadius: 99, background: '#E2E8F0', overflow: 'hidden' }}>
+                  <div style={{ height: 3, borderRadius: '50%', background: 'var(--border-medium)', overflow: 'hidden' }}>
                     <div style={{
-                      height: '100%', borderRadius: 99,
-                      background: 'linear-gradient(90deg, #F58220, #FF9F43)',
+                      height: '100%', borderRadius: '50%',
+                      background: 'linear-gradient(90deg, var(--brand-amazon), #FF9F43)',
                       width: `${(scrapeProgress.filter(s => s.status === 'completed' || s.status === 'failed').length / Math.max(scrapeProgress.length, 1)) * 100}%`,
                       transition: 'width 0.3s ease',
                     }} />
@@ -671,8 +671,8 @@ export default function ControlPage() {
                 </div>
               )}
               {scrapeProgress.filter(s => s.status === 'completed' || s.status === 'failed').length === scrapeProgress.length && scrapeProgress.length > 0 && (
-                <div style={{ padding: '8px 14px', borderTop: '1px solid var(--border-1)' }}>
-                  <button className="btn btn-ghost btn-xs" onClick={() => setScrapeProgress([])} style={{ width: '100%', fontSize: 10.5 }}>
+                <div style={{ padding: '8px 14px', borderTop: '1px solid var(--border-light)' }}>
+                  <button className="btn btn-ghost btn-xs" onClick={() => setScrapeProgress([])} style={{ width: '100%', fontSize: 'var(--fs-label)' }}>
                     <X size={10} /> Clear History
                   </button>
                 </div>
@@ -686,11 +686,11 @@ export default function ControlPage() {
       {tab === 'members' && (
         <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 20, alignItems: 'start' }}>
           <div className="card" style={{ padding: 18 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>Project Access</div>
-            <p style={{ fontSize: 12, color: '#64748B', lineHeight: 1.5, marginBottom: 14 }}>Manage members and roles per project.</p>
+            <div style={{ fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--text-bright)', marginBottom: 4 }}>Project Access</div>
+            <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 14 }}>Manage members and roles per project.</p>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: 4 }}>Select Project</label>
-              <select className="input" value={memberCampaignId} onChange={e => { setMemberCampaignId(e.target.value); if (e.target.value) fetchMembers(e.target.value) }} style={{ height: 34, fontSize: 12.5 }}>
+              <label className="field-label">Select Project</label>
+              <select className="input" value={memberCampaignId} onChange={e => { setMemberCampaignId(e.target.value); if (e.target.value) fetchMembers(e.target.value) }} style={{ height: 34, fontSize: 'var(--fs-sm)' }}>
                 <option value="">-- Select --</option>
                 {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
@@ -698,15 +698,15 @@ export default function ControlPage() {
             {memberCampaignId && (
               <>
                 <div style={{ marginBottom: 8 }}>
-                  <label style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: 4 }}>Add User</label>
-                  <select className="input" value={newMember.user_id} onChange={e => setNewMember(p => ({ ...p, user_id: e.target.value }))} style={{ height: 34, fontSize: 12.5, marginBottom: 6 }}>
+                  <label className="field-label">Add User</label>
+                  <select className="input" value={newMember.user_id} onChange={e => setNewMember(p => ({ ...p, user_id: e.target.value }))} style={{ height: 34, fontSize: 'var(--fs-sm)', marginBottom: 6 }}>
                     <option value="">-- User --</option>
                     {usersList.filter((u, i, arr) => arr.findIndex(x => x.id === u.id) === i).map(u => <option key={u.id} value={u.id}>{u.email}</option>)}
                   </select>
                 </div>
                 <div style={{ marginBottom: 8 }}>
-                  <label style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: 4 }}>Role</label>
-                  <select className="input" value={newMember.role} onChange={e => setNewMember(p => ({ ...p, role: e.target.value as any }))} style={{ height: 34, fontSize: 12.5 }}>
+                  <label className="field-label">Role</label>
+                  <select className="input" value={newMember.role} onChange={e => setNewMember(p => ({ ...p, role: e.target.value as any }))} style={{ height: 34, fontSize: 'var(--fs-sm)' }}>
                     <option value="viewer">Viewer (read-only)</option>
                     <option value="editor">Editor (add keywords/brands)</option>
                     <option value="admin">Admin (manage members)</option>
@@ -718,28 +718,28 @@ export default function ControlPage() {
           </div>
 
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>{memberCampaignId ? `Members (${members.length})` : 'Select a project'}</span>
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--text-bright)' }}>{memberCampaignId ? `Members (${members.length})` : 'Select a project'}</span>
             </div>
             {memberCampaignId ? (
-              <div style={{ overflowX: 'auto' }}>
+              <div className="table-wrap">
                 <table className="data-table">
                   <thead><tr><th>User</th><th>Role</th><th>Access</th><th>Joined</th><th style={{ width: 60, textAlign: 'center' }}>Action</th></tr></thead>
                   <tbody>
-                    {members.length === 0 ? <tr><td colSpan={5} style={{ textAlign: 'center', padding: 32, color: '#CBD5E1', fontSize: 13 }}>No members.</td></tr>
+                    {members.length === 0 ? <tr><td colSpan={5} style={{ textAlign: 'center', padding: 32, color: 'var(--neutral-300)', fontSize: 'var(--fs-body)' }}>No members.</td></tr>
                     : members.map(m => (
                       <tr key={m.user_id}>
-                        <td style={{ fontWeight: 600, color: '#0F172A' }}>{m.email}{m.user_role === 'admin' && <span className="badge badge-blue" style={{ marginLeft: 6, fontSize: 9 }}>MASTER</span>}</td>
+                        <td style={{ fontWeight: 600, color: 'var(--text-bright)' }}>{m.email}{m.user_role === 'admin' && <span className="badge badge-blue" style={{ marginLeft: 6, fontSize: 'var(--fs-micro)' }}>MASTER</span>}</td>
                         <td>
-                          <select value={m.role} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11.5, fontWeight: 700, border: '1.5px solid rgba(26,115,232,0.1)', background: '#FFF', cursor: 'pointer', fontFamily: 'inherit', color: m.role === 'owner' ? '#00C853' : m.role === 'admin' ? '#1A73E8' : m.role === 'editor' ? '#7C3AED' : '#64748B' }} disabled={m.role === 'owner'}>
+                          <select value={m.role} style={{ padding: '3px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--fs-label)', fontWeight: 700, border: '1.5px solid var(--accent-dim)', background: 'var(--surface)', cursor: 'pointer', fontFamily: 'inherit', color: m.role === 'owner' ? '#00C853' : m.role === 'admin' ? '#1A73E8' : m.role === 'editor' ? '#7C3AED' : '#64748B' }} disabled={m.role === 'owner'}>
                             <option value="owner" disabled>Owner</option><option value="admin">Admin</option><option value="editor">Editor</option><option value="viewer">Viewer</option>
                           </select>
                         </td>
                         <td><PageAccessBadge role={m.role} /></td>
-                        <td style={{ fontSize: 12, color: '#64748B' }}>{new Date(m.joined_at).toLocaleDateString()}</td>
+                        <td style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>{new Date(m.joined_at).toLocaleDateString()}</td>
                         <td style={{ textAlign: 'center' }}>
                           {m.role !== 'owner' && (
-                            <button onClick={() => removeMember(m.user_id)} style={{ background: '#FEF2F2', border: '1.5px solid rgba(255,45,85,0.1)', borderRadius: 6, padding: '4px 7px', cursor: 'pointer', color: '#EF4444', display: 'inline-flex', alignItems: 'center' }}>
+                            <button onClick={() => removeMember(m.user_id)} style={{ background: 'var(--danger-dim)', border: '1.5px solid var(--danger-border)', borderRadius: 'var(--radius-sm)', padding: '4px 7px', cursor: 'pointer', color: 'var(--danger)', display: 'inline-flex', alignItems: 'center' }}>
                               <UserMinus size={11} />
                             </button>
                           )}
@@ -749,48 +749,48 @@ export default function ControlPage() {
                   </tbody>
                 </table>
               </div>
-            ) : <div style={{ textAlign: 'center', padding: 48, color: '#94A3B8', fontSize: 13 }}>Select a project to manage members.</div>}
+            ) : <div style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)', fontSize: 'var(--fs-body)' }}>Select a project to manage members.</div>}
           </div>
         </div>
       )}
 
       {/* ════════════════════════ DELETE CONFIRMATION MODAL ════════════════════════ */}
       {editKw && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}
+        <div className="modal-scrim"
           onClick={e => { if (e.target === e.currentTarget) setEditKw(null) }}>
-          <div className="card" style={{ maxWidth: 460, width: '100%', padding: 24 }}>
+          <div className="modal-panel" style={{ maxWidth: 460, width: '100%', boxShadow: 'var(--shadow-modal)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(245,130,32,0.1)', color: '#F58220', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Pencil size={17} /></div>
+              <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'rgba(245,130,32,0.1)', color: 'var(--brand-amazon)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Pencil size={17} /></div>
               <div>
-                <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0F172A', margin: 0 }}>Edit Keyword</h3>
-                <p style={{ fontSize: 12, color: '#64748B', margin: '2px 0 0' }}>Update the text, language or type</p>
+                <h3 className="modal-title">Edit Keyword</h3>
+                <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', margin: '2px 0 0' }}>Update the text, language or type</p>
               </div>
             </div>
 
-            <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 4 }}>Keyword</label>
+            <label className="field-label">Keyword</label>
             <input className="input" value={editKw.text} autoFocus
               onChange={e => setEditKw(p => p && { ...p, text: e.target.value })}
               onKeyDown={e => { if (e.key === 'Enter') saveEditKeyword(); if (e.key === 'Escape') setEditKw(null) }}
-              style={{ marginBottom: 12, fontSize: 13 }} />
+              style={{ marginBottom: 12, fontSize: 'var(--fs-body)' }} />
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
+            <div className="modal-grid-2" style={{ marginBottom: 18 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 4 }}>Language</label>
-                <select className="input" value={editKw.language} onChange={e => setEditKw(p => p && { ...p, language: e.target.value })} style={{ height: 34, fontSize: 12, width: '100%' }}>
+                <label className="field-label">Language</label>
+                <select className="input" value={editKw.language} onChange={e => setEditKw(p => p && { ...p, language: e.target.value })} style={{ height: 34, fontSize: 'var(--fs-sm)', width: '100%' }}>
                   <option value="en">English</option>
                   <option value="hi">Hindi</option><option value="ta">Tamil</option><option value="te">Telugu</option>
                   <option value="kn">Kannada</option><option value="ml">Malayalam</option><option value="bn">Bengali</option>
                 </select>
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: 9.5, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 4 }}>Type</label>
-                <select className="input" value={editKw.category} onChange={e => setEditKw(p => p && { ...p, category: e.target.value as Keyword['category'] })} style={{ height: 34, fontSize: 12, width: '100%' }}>
+                <label className="field-label">Type</label>
+                <select className="input" value={editKw.category} onChange={e => setEditKw(p => p && { ...p, category: e.target.value as Keyword['category'] })} style={{ height: 34, fontSize: 'var(--fs-sm)', width: '100%' }}>
                   <option value="generic">Generic</option><option value="branded">Branded</option><option value="comparison">Comparison</option>
                 </select>
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div className="modal-actions">
               <button className="btn btn-blue btn-sm" onClick={saveEditKeyword} disabled={savingEdit} style={{ flex: 1, height: 36 }}>
                 {savingEdit ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={12} />} Save Changes
               </button>
@@ -801,17 +801,17 @@ export default function ControlPage() {
       )}
 
       {deleteTarget && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
-          <div className="card" style={{ maxWidth: 420, width: '100%', padding: 24, position: 'relative' }}>
+        <div className="modal-scrim">
+          <div className="modal-panel" style={{ maxWidth: 420, width: '100%', boxShadow: 'var(--shadow-modal)', position: 'relative' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--red-dim)', color: 'var(--red)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AlertTriangle size={18} /></div>
-              <div><h3 style={{ fontSize: 15, fontWeight: 800, color: '#0F172A', margin: 0 }}>Delete Campaign</h3><p style={{ fontSize: 12, color: '#64748B', margin: '2px 0 0' }}>This action cannot be undone</p></div>
+              <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'var(--danger-dim)', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AlertTriangle size={18} /></div>
+              <div><h3 className="modal-title">Delete Campaign</h3><p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', margin: '2px 0 0' }}>This action cannot be undone</p></div>
             </div>
-            <p style={{ fontSize: 12.5, color: '#475569', marginBottom: 14, lineHeight: 1.5 }}>
-              Type <strong style={{ color: '#EF4444' }}>{deleteTarget.name}</strong> below to confirm permanent deletion.
+            <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', marginBottom: 14, lineHeight: 1.5 }}>
+              Type <strong style={{ color: 'var(--danger)' }}>{deleteTarget.name}</strong> below to confirm permanent deletion.
             </p>
-            <input className="input" value={deleteConfirmText} onChange={e => setDeleteConfirmText(e.target.value)} placeholder={deleteTarget.name} style={{ height: 38, fontSize: 13, marginBottom: 12 }} />
-            <div style={{ display: 'flex', gap: 10 }}>
+            <input className="input" value={deleteConfirmText} onChange={e => setDeleteConfirmText(e.target.value)} placeholder={deleteTarget.name} style={{ height: 38, fontSize: 'var(--fs-body)', marginBottom: 12 }} />
+            <div className="modal-actions">
               <button className="btn btn-danger btn-sm" onClick={confirmDeleteCampaign} disabled={deleteConfirmText !== deleteTarget.name || deleting} style={{ flex: 1, opacity: deleteConfirmText !== deleteTarget.name ? 0.5 : 1 }}>
                 {deleting ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Trash2 size={13} />} Delete Permanently
               </button>
@@ -822,7 +822,6 @@ export default function ControlPage() {
       )}
 
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }`}</style>
     </div>
   )
 }

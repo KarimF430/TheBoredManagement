@@ -12,19 +12,19 @@ import {
    ════════════════════════════════════════════════════════════ */
 
 const C = {
-  orange:    '#F58220',
+  orange:    'var(--brand-amazon)',
   orangeHov: '#E6781C',
-  blue:      '#0052CC',
-  text:      '#172B4D',
-  textSec:   '#42526E',
-  muted:     '#6B778C',
-  faint:     '#97A0AF',
-  border:    '#DFE1E6',
-  borderFoc: '#4C9AFF',
-  bg:        '#F4F5F7',
-  red:       '#DE350B',
-  redDim:    'rgba(222,53,11,0.06)',
-  green:     '#00875A',
+  blue:      'var(--accent)',
+  text:      'var(--text-bright)',
+  textSec:   'var(--text-secondary)',
+  muted:     'var(--text-secondary)',
+  faint:     'var(--text-muted)',
+  border:    'var(--border-medium)',
+  borderFoc: 'var(--accent)',
+  bg:        'var(--bg-base)',
+  red:       'var(--danger)',
+  redDim:    'var(--danger-dim)',
+  green:     'var(--success-text)',
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -99,12 +99,12 @@ export default function LoginPage() {
     width: '100%',
     height: 40,
     padding: '0 12px',
-    fontSize: 14,
+    fontSize: 'var(--fs-body)',
     fontFamily: 'inherit',
     color: C.text,
-    background: '#FFFFFF',
+    background: 'var(--surface)',
     border: `2px solid ${hasError ? C.red : C.border}`,
-    borderRadius: 4,
+    borderRadius: 'var(--radius-xs)',
     outline: 'none',
     transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
     boxSizing: 'border-box' as const,
@@ -143,9 +143,9 @@ export default function LoginPage() {
         style={{
           width: '100%',
           maxWidth: 400,
-          background: '#FFFFFF',
+          background: 'var(--surface)',
           border: `1px solid ${C.border}`,
-          borderRadius: 4,
+          borderRadius: 'var(--radius-xs)',
           boxShadow: '0 1px 1px rgba(9,30,66,0.08), 0 0 1px 1px rgba(9,30,66,0.04)',
           padding: '32px 32px 20px',
         }}
@@ -153,12 +153,12 @@ export default function LoginPage() {
         {/* heading */}
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <h1 style={{
-            fontSize: 20, fontWeight: 600, color: C.text,
+            fontSize: 'var(--fs-h1)', fontWeight: 600, color: C.text,
             margin: 0, letterSpacing: '-0.2px',
           }}>
             Log in to your account
           </h1>
-          <p style={{ fontSize: 13, color: C.muted, margin: '6px 0 0', fontWeight: 400 }}>
+          <p style={{ fontSize: 'var(--fs-body)', color: C.muted, margin: '6px 0 0', fontWeight: 400 }}>
             SOV Panel · Share of Voice analytics
           </p>
         </div>
@@ -176,11 +176,11 @@ export default function LoginPage() {
                 display: 'flex', alignItems: 'flex-start', gap: 8,
                 padding: '10px 12px', marginBottom: 16,
                 background: C.redDim, border: `2px solid ${C.red}`,
-                borderRadius: 4, overflow: 'hidden',
+                borderRadius: 'var(--radius-xs)', overflow: 'hidden',
               }}
             >
               <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1, color: C.red }} />
-              <div style={{ fontSize: 13, color: C.text, fontWeight: 500, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 'var(--fs-body)', color: C.text, fontWeight: 500, lineHeight: 1.5 }}>
                 {serverError}
               </div>
             </motion.div>
@@ -191,7 +191,7 @@ export default function LoginPage() {
           {/* email */}
           <div>
             <label htmlFor="login-email" style={{
-              display: 'block', fontSize: 13, fontWeight: 600, color: C.textSec, marginBottom: 6,
+              display: 'block', fontSize: 'var(--fs-body)', fontWeight: 600, color: C.textSec, marginBottom: 6,
             }}>
               Email address
             </label>
@@ -212,7 +212,7 @@ export default function LoginPage() {
               onBlur={e => { e.currentTarget.style.borderColor = fieldError.email ? C.red : C.border }}
             />
             {fieldError.email && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12, color: C.red, fontWeight: 500 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 'var(--fs-sm)', color: C.red, fontWeight: 500 }}>
                 <AlertCircle size={12} /> {fieldError.email}
               </div>
             )}
@@ -221,12 +221,12 @@ export default function LoginPage() {
           {/* password */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <label htmlFor="login-password" style={{ fontSize: 13, fontWeight: 600, color: C.textSec }}>
+              <label htmlFor="login-password" style={{ fontSize: 'var(--fs-body)', fontWeight: 600, color: C.textSec }}>
                 Password
               </label>
               <a
                 href="mailto:Haji.karim@theboredmonkey.com?subject=SOV%20Panel%20—%20Sign-in%20issue"
-                style={{ fontSize: 12.5, color: C.blue, fontWeight: 500, textDecoration: 'none' }}
+                style={{ fontSize: 'var(--fs-sm)', color: C.blue, fontWeight: 500, textDecoration: 'none' }}
                 onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline' }}
                 onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none' }}
               >
@@ -268,7 +268,7 @@ export default function LoginPage() {
                   position: 'absolute', right: 8, top: '50%',
                   transform: 'translateY(-50%)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  width: 26, height: 26, borderRadius: 3,
+                  width: 26, height: 26, borderRadius: 'var(--radius-xs)',
                   border: 'none', background: 'transparent', cursor: 'pointer',
                   color: C.faint, transition: 'color 0.15s',
                 }}
@@ -280,11 +280,11 @@ export default function LoginPage() {
             </div>
             <div style={{ minHeight: 18, marginTop: 6 }}>
               {fieldError.password ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.red, fontWeight: 500 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--fs-sm)', color: C.red, fontWeight: 500 }}>
                   <AlertCircle size={12} /> {fieldError.password}
                 </div>
               ) : capsLock ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#974F0C', fontWeight: 500 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--fs-sm)', color: 'var(--warning-text)', fontWeight: 500 }}>
                   <AlertCircle size={12} /> Caps Lock is on
                 </div>
               ) : null}
@@ -299,7 +299,7 @@ export default function LoginPage() {
               onChange={e => setRemember(e.target.checked)}
               style={{ width: 15, height: 15, margin: 0, cursor: 'pointer', accentColor: C.orange }}
             />
-            <span style={{ fontSize: 13, color: C.textSec, fontWeight: 500 }}>Remember me</span>
+            <span style={{ fontSize: 'var(--fs-body)', color: C.textSec, fontWeight: 500 }}>Remember me</span>
           </label>
 
           {/* submit */}
@@ -312,8 +312,8 @@ export default function LoginPage() {
               width: '100%',
               height: 40,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              fontFamily: 'inherit', fontSize: 14, fontWeight: 600,
-              color: '#FFFFFF', border: 'none', borderRadius: 4,
+              fontFamily: 'inherit', fontSize: 'var(--fs-body)', fontWeight: 600,
+              color: 'var(--surface)', border: 'none', borderRadius: 'var(--radius-xs)',
               background: success ? C.green : C.orange,
               cursor: loading || success ? 'default' : 'pointer',
               transition: 'background-color 0.15s ease',
@@ -347,7 +347,7 @@ export default function LoginPage() {
         style={{
           marginTop: 24,
           display: 'flex', alignItems: 'center', gap: 18,
-          fontSize: 12.5, color: C.muted, fontWeight: 500,
+          fontSize: 'var(--fs-sm)', color: C.muted, fontWeight: 500,
         }}
       >
         <a
@@ -365,9 +365,6 @@ export default function LoginPage() {
         </span>
       </motion.div>
 
-      <style>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      `}</style>
     </div>
   )
 }

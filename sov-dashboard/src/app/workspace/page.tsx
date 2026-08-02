@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { useCampaignStore, ProjectWithRole } from '@/lib/store'
 import { CATEGORIES } from '@/lib/categories'
+import { LoadingState } from '@/components/StateViews'
 import {
   FolderKanban, Plus, Loader2, LogOut, Hash, Tag,
   Shield, ShieldCheck, ShieldAlert, Eye,
@@ -299,21 +300,7 @@ export default function WorkspacePage() {
   ]
 
   if (loading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-base)' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: 48, height: 48, borderRadius: 14,
-            background: 'linear-gradient(135deg, rgba(245,130,32,0.1), rgba(255,159,67,0.1))',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 16px', border: '1.5px solid rgba(245,130,32,0.15)',
-          }}>
-            <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: '#F58220' }} />
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 600 }}>Loading workspace...</div>
-        </div>
-      </div>
-    )
+    return <LoadingState title="Loading workspace..." />
   }
 
   return (
@@ -323,15 +310,15 @@ export default function WorkspacePage() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '10px 32px', background: 'rgba(255,255,255,0.92)',
         backdropFilter: 'blur(16px)',
-        borderBottom: '1.5px solid rgba(26,115,232,0.06)',
+        borderBottom: '1.5px solid var(--accent-dim)',
         boxShadow: '0 1px 12px rgba(0,0,0,0.02)',
         position: 'sticky', top: 0, zIndex: 100,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <LogoSm />
-          <div style={{ width: 1, height: 22, background: 'rgba(26,115,232,0.1)' }} />
+          <div style={{ width: 1, height: 22, background: 'var(--accent-dim)' }} />
           <div style={{
-            fontSize: 12, fontWeight: 700, color: '#64748B', letterSpacing: '0.3px',
+            fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.3px',
             display: 'flex', alignItems: 'center', gap: 6,
           }}>
             <Activity size={13} /> Workspace
@@ -341,24 +328,24 @@ export default function WorkspacePage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{
             padding: '5px 12px', background: 'linear-gradient(135deg, rgba(245,130,32,0.08), rgba(255,159,67,0.05))',
-            borderRadius: 8, border: '1.5px solid rgba(245,130,32,0.1)',
+            borderRadius: 'var(--radius-md)', border: '1.5px solid var(--warning-dim)',
             display: 'flex', alignItems: 'center', gap: 6,
           }}>
-            <Users size={12} color="#F58220" />
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#0F172A' }}>{userEmail || 'Loading...'}</span>
+            <Users size={12} color="var(--brand-amazon)" />
+            <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-bright)' }}>{userEmail || 'Loading...'}</span>
           </div>
           <button
             onClick={handleLogout}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
-              padding: '6px 13px', borderRadius: 8,
-              background: 'transparent', border: '1.5px solid rgba(26,115,232,0.08)',
-              color: '#64748B', cursor: 'pointer',
-              fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+              padding: '6px 13px', borderRadius: 'var(--radius-md)',
+              background: 'transparent', border: '1.5px solid var(--accent-dim)',
+              color: 'var(--text-secondary)', cursor: 'pointer',
+              fontSize: 'var(--fs-sm)', fontWeight: 600, fontFamily: 'inherit',
               transition: 'all 0.15s',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.color = '#EF4444'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.2)' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#64748B'; e.currentTarget.style.borderColor = 'rgba(26,115,232,0.08)' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--danger-dim)'; e.currentTarget.style.color = 'var(--danger)'; e.currentTarget.style.borderColor = 'var(--danger-border)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--accent-dim)' }}
           >
             <LogOut size={13} /> Sign Out
           </button>
@@ -386,21 +373,21 @@ export default function WorkspacePage() {
               background: 'linear-gradient(135deg, #F58220 0%, #FF9F43 100%)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               boxShadow: '0 8px 24px rgba(245,130,32,0.3)',
-              fontSize: 20, fontWeight: 800, color: '#FFFFFF',
+              fontSize: 'var(--fs-h1)', fontWeight: 800, color: 'var(--surface)',
               letterSpacing: '-0.5px',
             }}>
               {getInitials()}
             </div>
             <div>
               <h1 style={{
-                fontSize: 28, fontWeight: 800, color: 'var(--text-bright)',
+                fontSize: 'var(--fs-display)', fontWeight: 800, color: 'var(--text-bright)',
                 letterSpacing: '-0.7px', margin: 0,
                 background: 'linear-gradient(135deg, #0F172A 0%, #334155 100%)',
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
               }}>
                 Welcome back{getUserName() ? `, ${getUserName()}` : ''}
               </h1>
-              <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', marginTop: 4, fontWeight: 500 }}>
+              <p style={{ fontSize: 'var(--fs-body)', color: 'var(--text-secondary)', marginTop: 4, fontWeight: 500 }}>
                 Here&apos;s what&apos;s happening across your projects today
               </p>
             </div>
@@ -411,10 +398,10 @@ export default function WorkspacePage() {
             whileTap={{ scale: 0.98 }}
             onClick={() => setShowCreateModal(true)}
             style={{
-              padding: '12px 28px', fontSize: 14, flexShrink: 0,
+              padding: '12px 28px', fontSize: 'var(--fs-h3)', flexShrink: 0,
               display: 'flex', alignItems: 'center', gap: 8,
               background: 'linear-gradient(135deg, #F58220 0%, #FF9F43 100%)',
-              color: '#FFFFFF', fontWeight: 700, border: 'none', borderRadius: 12,
+              color: 'var(--surface)', fontWeight: 700, border: 'none', borderRadius: 'var(--radius-lg)',
               cursor: 'pointer', fontFamily: 'inherit',
               boxShadow: '0 6px 20px rgba(245,130,32,0.3)',
               transition: 'all 0.2s',
@@ -477,13 +464,13 @@ export default function WorkspacePage() {
                 </div>
                 <div>
                   <div style={{
-                    fontSize: stat.isText ? 15 : 24, fontWeight: 800, color: 'var(--text-bright)',
+                    fontSize: stat.isText ? 'var(--fs-h2)' : 'var(--fs-display)', fontWeight: 800, color: 'var(--text-bright)',
                     lineHeight: 1.1, letterSpacing: '-0.5px',
                     fontVariantNumeric: 'tabular-nums',
                   }}>
                     {stat.value}
                   </div>
-                  <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-muted)', marginTop: 3 }}>{stat.label}</div>
+                  <div style={{ fontSize: 'var(--fs-label)', fontWeight: 600, color: 'var(--text-muted)', marginTop: 3 }}>{stat.label}</div>
                 </div>
               </div>
             </motion.div>
@@ -501,15 +488,15 @@ export default function WorkspacePage() {
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <h2 style={{
-              fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0,
+              fontSize: 'var(--fs-h2)', fontWeight: 700, color: 'var(--text-primary)', margin: 0,
               display: 'flex', alignItems: 'center', gap: 8,
             }}>
               <FolderKanban size={16} /> Your Projects
             </h2>
             <span style={{
-              fontSize: 12, color: 'var(--text-muted)', fontWeight: 600,
-              padding: '3px 10px', background: 'rgba(26,115,232,0.04)',
-              borderRadius: 6, border: '1.5px solid rgba(26,115,232,0.06)',
+              fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', fontWeight: 600,
+              padding: '3px 10px', background: 'var(--accent-dim)',
+              borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--accent-dim)',
             }}>
               {projects.length} total · {activeProjects} active
             </span>
@@ -521,22 +508,22 @@ export default function WorkspacePage() {
               background: 'rgba(255,255,255,0.92)',
               backdropFilter: 'blur(16px)',
               borderRadius: 'var(--border-radius)',
-              border: '2px dashed rgba(26,115,232,0.1)',
+              border: '2px dashed var(--accent-dim)',
             }}>
               <div style={{
                 width: 72, height: 72, borderRadius: 18,
                 background: 'linear-gradient(135deg, rgba(245,130,32,0.1), rgba(255,159,67,0.05))',
-                color: '#F58220',
+                color: 'var(--brand-amazon)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 margin: '0 auto 20px',
-                border: '1.5px solid rgba(245,130,32,0.15)',
+                border: '1.5px solid var(--warning-border)',
               }}>
                 <Rocket size={34} />
               </div>
-              <h2 style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-bright)', margin: '0 0 10px', letterSpacing: '-0.3px' }}>
+              <h2 style={{ fontSize: 'var(--fs-h1)', fontWeight: 800, color: 'var(--text-bright)', margin: '0 0 10px', letterSpacing: '-0.3px' }}>
                 Your analytics journey starts here
               </h2>
-              <p style={{ fontSize: 13.5, color: 'var(--text-muted)', maxWidth: 440, margin: '0 auto 28px', lineHeight: 1.7 }}>
+              <p style={{ fontSize: 'var(--fs-body)', color: 'var(--text-muted)', maxWidth: 440, margin: '0 auto 28px', lineHeight: 1.7 }}>
                 Create your first project to start tracking Share of Voice across YouTube keywords.
                 Monitor your brand, analyze competitors, and uncover growth opportunities.
               </p>
@@ -545,10 +532,10 @@ export default function WorkspacePage() {
                 whileTap={{ scale: 0.98 }}
                 onClick={() => setShowCreateModal(true)}
                 style={{
-                  padding: '12px 32px', fontSize: 14, fontWeight: 700,
+                  padding: '12px 32px', fontSize: 'var(--fs-h3)', fontWeight: 700,
                   display: 'inline-flex', alignItems: 'center', gap: 8,
                   background: 'linear-gradient(135deg, #F58220 0%, #FF9F43 100%)',
-                  color: '#FFFFFF', border: 'none', borderRadius: 12,
+                  color: 'var(--surface)', border: 'none', borderRadius: 'var(--radius-lg)',
                   cursor: 'pointer', fontFamily: 'inherit',
                   boxShadow: '0 6px 20px rgba(245,130,32,0.3)',
                   transition: 'all 0.2s',
@@ -588,7 +575,7 @@ export default function WorkspacePage() {
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                           <h3 style={{
-                            fontSize: 17, fontWeight: 800, color: 'var(--text-bright)',
+                            fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--text-bright)',
                             margin: 0, lineHeight: 1.2, letterSpacing: '-0.2px',
                           }}>
                             {project.name}
@@ -606,7 +593,7 @@ export default function WorkspacePage() {
                           </div>
                         </div>
                         <div style={{
-                          fontSize: 11, fontWeight: 600, color: 'var(--text-muted)',
+                          fontSize: 'var(--fs-label)', fontWeight: 600, color: 'var(--text-muted)',
                           textTransform: 'uppercase', letterSpacing: '0.5px',
                           display: 'flex', alignItems: 'center', gap: 6,
                         }}>
@@ -633,7 +620,7 @@ export default function WorkspacePage() {
 
                     {project.description && (
                       <p style={{
-                        fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.5,
+                        fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)', lineHeight: 1.5,
                         margin: '0 0 14px', display: '-webkit-box',
                         WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
                       }}>
@@ -646,25 +633,25 @@ export default function WorkspacePage() {
                     {/* Stats Row */}
                     <div style={{
                       display: 'flex', gap: 16, paddingTop: 14,
-                      borderTop: '1.5px solid rgba(26,115,232,0.06)',
+                      borderTop: '1.5px solid var(--accent-dim)',
                       marginBottom: 12,
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <Hash size={12} color="#7C3AED" />
-                        <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)' }}>{project.keyword_count}</span>
-                        <span style={{ fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 500 }}>keywords</span>
+                        <Hash size={12} color="var(--info)" />
+                        <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--text-primary)' }}>{project.keyword_count}</span>
+                        <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', fontWeight: 500 }}>keywords</span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                         <Tag size={12} color="#FF6D00" />
-                        <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)' }}>{project.brand_count}</span>
-                        <span style={{ fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 500 }}>brands</span>
+                        <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--text-primary)' }}>{project.brand_count}</span>
+                        <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', fontWeight: 500 }}>brands</span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <Video size={12} color="#1A73E8" />
-                        <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)' }}>
+                        <Video size={12} color="var(--accent)" />
+                        <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--text-primary)' }}>
                           {Math.floor(project.keyword_count * 8.5)}
                         </span>
-                        <span style={{ fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 500 }}>videos</span>
+                        <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', fontWeight: 500 }}>videos</span>
                       </div>
                       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
                         <MiniSparkline data={sparklineData} />
@@ -675,12 +662,12 @@ export default function WorkspacePage() {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                         <Clock size={11} color="var(--text-muted)" />
-                        <span style={{ fontSize: 10.5, color: 'var(--text-muted)', fontWeight: 600 }}>
+                        <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', fontWeight: 600 }}>
                           {formatTimeAgo(project.last_scraped)}
                         </span>
                       </div>
                       <span style={{
-                        fontSize: 12, color: '#F58220',
+                        fontSize: 'var(--fs-sm)', color: 'var(--brand-amazon)',
                         fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5,
                       }}>
                         Open Dashboard <ArrowRight size={12} />
@@ -710,16 +697,16 @@ export default function WorkspacePage() {
             style={{ padding: 22 }}
           >
             <h2 style={{
-              fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 18px',
+              fontSize: 'var(--fs-h2)', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 18px',
               display: 'flex', alignItems: 'center', gap: 8,
             }}>
-              <Sparkles size={16} color="#F58220" /> Recent Activity
+              <Sparkles size={16} color="var(--brand-amazon)" /> Recent Activity
             </h2>
 
             {recentActivity.length === 0 ? (
               <div style={{
                 textAlign: 'center', padding: '32px 20px',
-                color: 'var(--text-muted)', fontSize: 13,
+                color: 'var(--text-muted)', fontSize: 'var(--fs-body)',
               }}>
                 <Activity size={28} style={{ opacity: 0.3, marginBottom: 10 }} />
                 <p style={{ margin: 0 }}>No recent activity yet</p>
@@ -745,11 +732,11 @@ export default function WorkspacePage() {
                       style={{
                         display: 'flex', alignItems: 'flex-start', gap: 12,
                         padding: '12px 0',
-                        borderBottom: i < recentActivity.length - 1 ? '1px solid rgba(26,115,232,0.06)' : 'none',
+                        borderBottom: i < recentActivity.length - 1 ? '1px solid var(--accent-dim)' : 'none',
                       }}
                     >
                       <div style={{
-                        width: 32, height: 32, borderRadius: 8,
+                        width: 32, height: 32, borderRadius: 'var(--radius-md)',
                         background: `${colorMap[activity.type]}0D`,
                         color: colorMap[activity.type],
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -759,10 +746,10 @@ export default function WorkspacePage() {
                         {iconMap[activity.type]}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>
+                        <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>
                           {activity.message}
                         </div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>
+                        <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', fontWeight: 500 }}>
                           {formatTimeAgo(activity.timestamp)}
                         </div>
                       </div>
@@ -782,10 +769,10 @@ export default function WorkspacePage() {
             style={{ padding: 22 }}
           >
             <h2 style={{
-              fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 18px',
+              fontSize: 'var(--fs-h2)', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 18px',
               display: 'flex', alignItems: 'center', gap: 8,
             }}>
-              <Globe size={16} color="#1A73E8" /> Platform Stats
+              <Globe size={16} color="var(--accent)" /> Platform Stats
             </h2>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -816,7 +803,7 @@ export default function WorkspacePage() {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <div style={{
-                        width: 32, height: 32, borderRadius: 8,
+                        width: 32, height: 32, borderRadius: 'var(--radius-md)',
                         background: `${stat.color}0D`,
                         color: stat.color,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -824,15 +811,15 @@ export default function WorkspacePage() {
                       }}>
                         {stat.icon}
                       </div>
-                      <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-secondary)' }}>{stat.label}</span>
+                      <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-secondary)' }}>{stat.label}</span>
                     </div>
-                    <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-bright)', fontVariantNumeric: 'tabular-nums' }}>
+                    <span style={{ fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--text-bright)', fontVariantNumeric: 'tabular-nums' }}>
                       {stat.value}
                     </span>
                   </div>
                   <div style={{
                     height: 4, borderRadius: 2,
-                    background: 'rgba(26,115,232,0.06)',
+                    background: 'var(--accent-dim)',
                     overflow: 'hidden',
                   }}>
                     <motion.div
@@ -851,12 +838,12 @@ export default function WorkspacePage() {
               {/* Data Freshness */}
               <div style={{
                 marginTop: 8, padding: '14px 16px',
-                background: 'rgba(26,115,232,0.03)',
-                borderRadius: 10, border: '1.5px solid rgba(26,115,232,0.06)',
+                background: 'var(--accent-dim)',
+                borderRadius: 'var(--radius-md)', border: '1.5px solid var(--accent-dim)',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{
-                    width: 32, height: 32, borderRadius: 8,
+                    width: 32, height: 32, borderRadius: 'var(--radius-md)',
                     background: platformStats.lastDataFreshness ? 'rgba(0,200,83,0.1)' : 'rgba(100,116,139,0.1)',
                     color: platformStats.lastDataFreshness ? '#00C853' : '#94A3B8',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -864,8 +851,8 @@ export default function WorkspacePage() {
                     {platformStats.lastDataFreshness ? <Activity size={14} /> : <Clock size={14} />}
                   </div>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>Data Freshness</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>
+                    <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--text-primary)' }}>Data Freshness</div>
+                    <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', fontWeight: 500 }}>
                       {platformStats.lastDataFreshness
                         ? `Last updated ${formatTimeAgo(platformStats.lastDataFreshness)}`
                         : 'No data yet — run your first scrape'}
@@ -900,42 +887,42 @@ export default function WorkspacePage() {
             className="card"
             style={{
               width: '100%', maxWidth: 520, padding: 28,
-              border: '1.5px solid rgba(26,115,232,0.08)', position: 'relative',
+              border: '1.5px solid var(--accent-dim)', position: 'relative',
             }}
           >
             <div style={{
               position: 'absolute', top: 0, left: 0, right: 0, height: 3,
               background: 'linear-gradient(90deg, #F58220, #FF9F43, transparent)',
-              borderRadius: '14px 14px 0 0',
+              borderRadius: 'var(--radius-xl) var(--radius-xl) 0 0',
             }} />
 
             <button
               onClick={() => { setShowCreateModal(false); setError(null) }}
               style={{
                 position: 'absolute', top: 20, right: 20,
-                background: 'rgba(26,115,232,0.04)', border: '1.5px solid rgba(26,115,232,0.08)',
-                borderRadius: 8, cursor: 'pointer', color: '#94A3B8',
+                background: 'var(--accent-dim)', border: '1.5px solid var(--accent-dim)',
+                borderRadius: 'var(--radius-md)', cursor: 'pointer', color: 'var(--text-muted)',
                 width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 transition: 'all 0.12s',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(26,115,232,0.1)'; e.currentTarget.style.color = '#475569' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(26,115,232,0.04)'; e.currentTarget.style.color = '#94A3B8' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-secondary)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'var(--accent-dim)'; e.currentTarget.style.color = 'var(--text-muted)' }}
             >
               <X size={16} />
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
               <div style={{
-                width: 40, height: 40, borderRadius: 10,
+                width: 40, height: 40, borderRadius: 'var(--radius-md)',
                 background: 'linear-gradient(135deg, rgba(245,130,32,0.1), rgba(255,159,67,0.05))',
-                color: '#F58220', border: '1.5px solid rgba(245,130,32,0.15)',
+                color: 'var(--brand-amazon)', border: '1.5px solid var(--warning-border)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 <Plus size={18} />
               </div>
               <div>
-                <h3 style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-bright)', margin: 0 }}>Create Analytics Project</h3>
-                <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                <h3 style={{ fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--text-bright)', margin: 0 }}>Create Analytics Project</h3>
+                <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', margin: '2px 0 0' }}>
                   Set up a new project to start tracking Share of Voice
                 </p>
               </div>
@@ -943,10 +930,10 @@ export default function WorkspacePage() {
 
             {error && (
               <div style={{
-                display: 'flex', gap: 8, padding: '10px 14px', borderRadius: 8,
-                background: 'linear-gradient(135deg, #FEF2F2, #FFF5F5)',
-                border: '1.5px solid rgba(255,45,85,0.15)', color: '#B91C1C',
-                fontSize: 12.5, fontWeight: 500, marginBottom: 18, alignItems: 'center',
+                display: 'flex', gap: 8, padding: '10px 14px', borderRadius: 'var(--radius-md)',
+                background: 'var(--danger-dim)',
+                border: '1.5px solid var(--danger-border)', color: 'var(--danger-text)',
+                fontSize: 'var(--fs-sm)', fontWeight: 500, marginBottom: 18, alignItems: 'center',
               }}>
                 <X size={14} style={{ flexShrink: 0 }} />
                 <span>{error}</span>
@@ -954,21 +941,21 @@ export default function WorkspacePage() {
             )}
 
             <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px', color: '#475569', display: 'block', marginBottom: 6 }}>Project Name *</label>
-              <input className="input" type="text" value={projectName} onChange={e => setProjectName(e.target.value)} placeholder="e.g. Q3 Mobile Launch, Tech Brands India" style={{ height: 40, fontSize: 13.5 }} />
+              <label className="field-label" style={{ display: 'block', marginBottom: 6 }}>Project Name *</label>
+              <input className="input" type="text" value={projectName} onChange={e => setProjectName(e.target.value)} placeholder="e.g. Q3 Mobile Launch, Tech Brands India" style={{ height: 40, fontSize: 'var(--fs-body)' }} />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
               <div>
-                <label style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px', color: '#475569', display: 'block', marginBottom: 6 }}>Category *</label>
-                <select className="input" value={selectedCatId} onChange={e => { setSelectedCatId(e.target.value); setSelectedSubCatId('') }} style={{ height: 40, fontSize: 13 }}>
+                <label className="field-label" style={{ display: 'block', marginBottom: 6 }}>Category *</label>
+                <select className="input" value={selectedCatId} onChange={e => { setSelectedCatId(e.target.value); setSelectedSubCatId('') }} style={{ height: 40, fontSize: 'var(--fs-body)' }}>
                   <option value="">Select Category</option>
                   {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px', color: '#475569', display: 'block', marginBottom: 6 }}>Sub-category</label>
-                <select className="input" value={selectedSubCatId} onChange={e => setSelectedSubCatId(e.target.value)} disabled={!selectedCatId} style={{ height: 40, fontSize: 13 }}>
+                <label className="field-label" style={{ display: 'block', marginBottom: 6 }}>Sub-category</label>
+                <select className="input" value={selectedSubCatId} onChange={e => setSelectedSubCatId(e.target.value)} disabled={!selectedCatId} style={{ height: 40, fontSize: 'var(--fs-body)' }}>
                   <option value="">Select Sub-category</option>
                   {subCategories.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
@@ -976,18 +963,18 @@ export default function WorkspacePage() {
             </div>
 
             <div style={{ marginBottom: 24 }}>
-              <label style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.7px', color: '#475569', display: 'block', marginBottom: 6 }}>Description</label>
-              <textarea className="input" rows={2} value={projectDesc} onChange={e => setProjectDesc(e.target.value)} placeholder="Briefly describe the campaign target for reference..." style={{ resize: 'none', fontSize: 13 }} />
+              <label className="field-label" style={{ display: 'block', marginBottom: 6 }}>Description</label>
+              <textarea className="input" rows={2} value={projectDesc} onChange={e => setProjectDesc(e.target.value)} placeholder="Briefly describe the campaign target for reference..." style={{ resize: 'none', fontSize: 'var(--fs-body)' }} />
             </div>
 
             <div style={{ display: 'flex', gap: 10 }}>
               <button
                 onClick={handleCreateProject} disabled={creating}
                 style={{
-                  flex: 1, height: 42, fontSize: 13.5, fontWeight: 700,
+                  flex: 1, height: 42, fontSize: 'var(--fs-body)', fontWeight: 700,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   background: 'linear-gradient(135deg, #F58220 0%, #FF9F43 100%)',
-                  color: '#FFFFFF', border: 'none', borderRadius: 10,
+                  color: 'var(--surface)', border: 'none', borderRadius: 'var(--radius-md)',
                   cursor: creating ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
                   opacity: creating ? 0.7 : 1,
                   boxShadow: '0 4px 14px rgba(245,130,32,0.25)',
@@ -1009,9 +996,6 @@ export default function WorkspacePage() {
         </motion.div>
       )}
 
-      <style>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      `}</style>
     </div>
   )
 }

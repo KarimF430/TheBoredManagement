@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Video, Search, ExternalLink, ChevronLeft, ChevronRight, Tag, Eye } from 'lucide-react'
 import { useCampaignStore } from '@/lib/store'
 import { PageSkeleton } from '@/components/PageSkeleton'
+import { EmptyState, ErrorState } from '@/components/StateViews'
 import Link from 'next/link'
 
 interface CampaignVideo {
@@ -70,7 +71,6 @@ export default function VideosPage() {
 
   return (
     <div className="anim-fade-up">
-      <style>{`@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } } @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
 
       <div className="page-header">
         <div>
@@ -103,16 +103,13 @@ export default function VideosPage() {
       {loading ? (
         <PageSkeleton cols={4} rows={8} />
       ) : videosQuery.error ? (
-        <div style={{ textAlign: 'center', padding: 60, color: '#EF4444', fontSize: 13 }}>{(videosQuery.error as Error).message}</div>
+        <ErrorState title="Error loading videos" body={(videosQuery.error as Error).message} />
       ) : data.length === 0 ? (
-        <div style={{
-          display: 'flex', gap: 12, padding: 28, borderRadius: 14, background: '#FFFFFF',
-          border: '1px solid #F1F5F9', alignItems: 'center', justifyContent: 'center', flexDirection: 'column'
-        }}>
-          <Video size={32} style={{ color: '#94A3B8', marginBottom: 8 }} />
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#1E293B' }}>No Videos Found</div>
-          <div style={{ fontSize: 12, color: '#64748B' }}>Run scrape jobs in Campaign Control to discover videos.</div>
-        </div>
+        <EmptyState
+          icon={<Video size={20} strokeWidth={1.75} />}
+          title="No Videos Found"
+          body="Run scrape jobs in Campaign Control to discover videos."
+        />
       ) : (
         <>
           <div className="card" style={{ padding: 0, overflow: 'hidden', position: 'relative' }}>
@@ -122,13 +119,13 @@ export default function VideosPage() {
                 background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(2px)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 8, background: '#0F172A', color: '#FFF', fontSize: 12, fontWeight: 600 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 'var(--radius-md)', background: 'var(--text-bright)', color: 'var(--surface)', fontSize: 'var(--fs-sm)', fontWeight: 600 }}>
                   <div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#FFF', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                   Loading page…
                 </div>
               </div>
             )}
-            <div style={{ overflowX: 'auto' }}>
+            <div className="table-wrap">
               <table className="data-table">
                 <thead>
                   <tr>
@@ -147,7 +144,7 @@ export default function VideosPage() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                           <Link
                             href={`/video/${v.youtube_id}`}
-                            style={{ flexShrink: 0, display: 'block', width: 72, height: 40, borderRadius: 6, background: '#F1F5F9', overflow: 'hidden' }}
+                            style={{ flexShrink: 0, display: 'block', width: 72, height: 40, borderRadius: 'var(--radius-sm)', background: 'var(--bg-hover)', overflow: 'hidden' }}
                           >
                             <img
                               src={`https://img.youtube.com/vi/${v.youtube_id}/mqdefault.jpg`}
@@ -159,18 +156,18 @@ export default function VideosPage() {
                             <Link
                               href={`/video/${v.youtube_id}`}
                               style={{
-                                fontSize: 12, fontWeight: 600, color: 'var(--text-primary)',
+                                fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-primary)',
                                 textDecoration: 'none', lineHeight: 1.4,
                                 display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
                               } as React.CSSProperties}
                             >
                               {v.title || 'Untitled'}
                             </Link>
-                            <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>{v.duration || '—'}</div>
+                            <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', marginTop: 2 }}>{v.duration || '—'}</div>
                           </div>
                         </div>
                       </td>
-                      <td style={{ color: 'var(--text-secondary)', fontSize: 12, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <td style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-sm)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {v.channel_name || '—'}
                       </td>
                       <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--text-primary)' }}>
@@ -182,13 +179,13 @@ export default function VideosPage() {
                             {v.tags.slice(0, 3).map((t: string) => (
                               <span key={t} className="badge badge-purple">{t}</span>
                             ))}
-                            {v.tags.length > 3 && <span style={{ fontSize: 10, color: '#94A3B8' }}>+{v.tags.length - 3}</span>}
+                            {v.tags.length > 3 && <span style={{ fontSize: 'var(--fs-micro)', color: 'var(--text-muted)' }}>+{v.tags.length - 3}</span>}
                           </div>
                         ) : (
                           <span className="badge badge-orange">Untagged</span>
                         )}
                       </td>
-                      <td style={{ color: 'var(--text-muted)', fontSize: 12, whiteSpace: 'nowrap' }}>
+                      <td style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-sm)', whiteSpace: 'nowrap' }}>
                         {fmtDate(v.first_seen_at)}
                       </td>
                       <td>
@@ -213,7 +210,7 @@ export default function VideosPage() {
               >
                 <ChevronLeft size={14} />
               </button>
-              <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 600 }}>
+              <span style={{ fontSize: 'var(--fs-body)', color: 'var(--text-secondary)', fontWeight: 600 }}>
                 Page {page} of {totalPages}
               </span>
               <button

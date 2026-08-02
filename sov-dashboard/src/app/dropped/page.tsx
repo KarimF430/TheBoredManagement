@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Search, AlertCircle, Loader2, TrendingDown, Clock, Info } from 'lucide-react'
+import { Search, TrendingDown, Clock, Info } from 'lucide-react'
 import { useCampaignStore } from '@/lib/store'
+import { LoadingState, EmptyState } from '@/components/StateViews'
 
 interface DroppedVideo {
   youtube_id: string
@@ -54,19 +55,12 @@ export default function DroppedPage() {
     v.channel_name.toLowerCase().includes(search.toLowerCase())
   )
 
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', flexDirection: 'column', gap: 12 }}>
-      <Loader2 size={32} style={{ color: '#1A73E8', animation: 'spin 1s linear infinite' }} />
-      <div style={{ fontSize: 13.5, color: '#64748B', fontWeight: 600 }}>Loading dropped video list…</div>
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-    </div>
-  )
+  if (loading) return <LoadingState title="Loading dropped video list…" />
 
   const hasData = filtered.length > 0
 
   return (
     <div className="anim-fade-up">
-      <style>{`@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } } @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
 
       {/* Page Header */}
       <div className="page-header">
@@ -76,11 +70,11 @@ export default function DroppedPage() {
         </div>
         {hasData && (
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8,
-            background: source === 'history' ? 'rgba(16,185,129,0.08)' : 'rgba(245,158,11,0.08)',
-            border: `1px solid ${source === 'history' ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)'}`,
-            fontSize: 11.5, fontWeight: 600,
-            color: source === 'history' ? '#10B981' : '#D97706',
+            display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 'var(--radius-md)',
+            background: source === 'history' ? 'var(--success-dim)' : 'var(--warning-dim)',
+            border: `1px solid ${source === 'history' ? 'var(--success-border)' : 'var(--warning-border)'}`,
+            fontSize: 'var(--fs-label)', fontWeight: 600,
+            color: source === 'history' ? 'var(--success-text)' : 'var(--warning-text)',
           }}>
             {source === 'history' ? (
               <><TrendingDown size={13} /> Week-over-week drops detected</>
@@ -94,11 +88,11 @@ export default function DroppedPage() {
       {/* Info banner for fallback mode */}
       {hasData && source === 'fallback' && (
         <div style={{
-          display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 16px', borderRadius: 10, marginBottom: 16,
-          background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)',
-          fontSize: 12, color: '#92400E', lineHeight: 1.5,
+          display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 16px', borderRadius: 'var(--radius-md)', marginBottom: 16,
+          background: 'var(--warning-dim)', border: '1px solid var(--warning-border)',
+          fontSize: 'var(--fs-sm)', color: 'var(--warning-text)', lineHeight: 1.5,
         }}>
-          <Info size={15} style={{ flexShrink: 0, marginTop: 1, color: '#D97706' }} />
+          <Info size={15} style={{ flexShrink: 0, marginTop: 1, color: 'var(--warning-text)' }} />
           <div>
             <strong>Note:</strong> Showing videos that were replaced in subsequent scrapes for the same keywords.
             True week-over-week drop comparison requires at least <strong>2 scrape runs</strong> with the Monday full refresh enabled.
@@ -122,18 +116,20 @@ export default function DroppedPage() {
       </div>
 
       {!hasData ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 280, gap: 16, background: '#FFFFFF', borderRadius: 14, border: '1px solid #F1F5F9' }}>
-          <TrendingDown size={40} style={{ color: '#CBD5E1' }} />
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#1E293B' }}>No Dropped Videos Detected</div>
-          <div style={{ fontSize: 12.5, color: '#64748B', textAlign: 'center', maxWidth: 440, lineHeight: 1.6 }}>
-            Videos appear here after they were ranking in the top 10 for a keyword in a previous scrape
-            but dropped out in a subsequent scrape. Run at least <strong>2 scrape jobs</strong> for the same keywords
-            to start seeing dropout detection.
-          </div>
-        </div>
+        <EmptyState
+          icon={<TrendingDown size={20} strokeWidth={1.75} />}
+          title="No Dropped Videos Detected"
+          body={
+            <>
+              Videos appear here after they were ranking in the top 10 for a keyword in a previous scrape
+              but dropped out in a subsequent scrape. Run at least <strong>2 scrape jobs</strong> for the same keywords
+              to start seeing dropout detection.
+            </>
+          }
+        />
       ) : (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ overflowX: 'auto' }}>
+          <div className="table-wrap">
             <table className="data-table">
               <thead>
                 <tr>
@@ -157,7 +153,7 @@ export default function DroppedPage() {
                           href={`https://youtube.com/watch?v=${video.youtube_id}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{ flexShrink: 0, display: 'block', width: 80, height: 46, borderRadius: 6, background: '#F1F5F9', overflow: 'hidden' }}
+                          style={{ flexShrink: 0, display: 'block', width: 80, height: 46, borderRadius: 'var(--radius-sm)', background: 'var(--bg-hover)', overflow: 'hidden' }}
                         >
                           <img
                             src={video.thumbnail_url || `https://img.youtube.com/vi/${video.youtube_id}/mqdefault.jpg`}
@@ -172,7 +168,7 @@ export default function DroppedPage() {
                             target="_blank"
                             rel="noopener noreferrer"
                             style={{
-                              fontSize: 12, fontWeight: 600, color: 'var(--text-primary)',
+                              fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-primary)',
                               textDecoration: 'none', lineHeight: 1.4,
                               display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
                             } as React.CSSProperties}
@@ -182,7 +178,7 @@ export default function DroppedPage() {
                         </div>
                       </div>
                     </td>
-                    <td style={{ whiteSpace: 'nowrap', fontSize: 12, fontWeight: 500, color: '#334155' }}>
+                    <td style={{ whiteSpace: 'nowrap', fontSize: 'var(--fs-sm)', fontWeight: 500, color: 'var(--text-secondary)' }}>
                       {video.channel_name}
                     </td>
                     <td>
@@ -197,15 +193,15 @@ export default function DroppedPage() {
                             }}>{b}</span>
                           ))
                         ) : (
-                          <span style={{ color: '#CBD5E1', fontSize: 11 }}>—</span>
+                          <span style={{ color: 'var(--neutral-300)', fontSize: 'var(--fs-label)' }}>—</span>
                         )}
                       </div>
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <span style={{
                         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                        width: 32, height: 26, borderRadius: 7, fontWeight: 800, fontSize: 13,
-                        background: 'rgba(239,68,68,0.08)', color: '#EF4444',
+                        width: 32, height: 26, borderRadius: 7, fontWeight: 800, fontSize: 'var(--fs-body)',
+                        background: 'var(--danger-dim)', color: 'var(--danger)',
                       }}>
                         #{video.last_rank}
                       </span>
@@ -217,12 +213,12 @@ export default function DroppedPage() {
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, maxWidth: 200 }}>
                         {video.keywords_appeared.slice(0, 4).map((k: string) => (
                           <span key={k} style={{
-                            fontSize: 9.5, padding: '2px 6px', borderRadius: 4,
-                            background: '#F1F5F9', border: '1px solid #E2E8F0', color: '#475569', fontWeight: 500,
+                            fontSize: 'var(--fs-micro)', padding: '2px 6px', borderRadius: 'var(--radius-xs)',
+                            background: 'var(--bg-hover)', border: '1px solid var(--border-medium)', color: 'var(--text-secondary)', fontWeight: 500,
                           }}>{k}</span>
                         ))}
                         {video.keywords_appeared.length > 4 && (
-                          <span style={{ fontSize: 9, color: '#94A3B8', alignSelf: 'center', fontWeight: 600 }}>
+                          <span style={{ fontSize: 'var(--fs-micro)', color: 'var(--text-muted)', alignSelf: 'center', fontWeight: 600 }}>
                             +{video.keywords_appeared.length - 4} more
                           </span>
                         )}
@@ -238,7 +234,7 @@ export default function DroppedPage() {
                         {video.drop_reason === 'pushed_out' ? 'Pushed Out' : 'Removed'}
                       </span>
                     </td>
-                    <td style={{ fontSize: 11, color: '#94A3B8', whiteSpace: 'nowrap' }}>
+                    <td style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                       {new Date(video.last_seen_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}
                     </td>
                   </tr>
