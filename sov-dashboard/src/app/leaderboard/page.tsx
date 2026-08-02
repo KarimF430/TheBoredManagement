@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import AnalysisProgress, { type AnalysisState } from '@/components/AnalysisProgress'
+import { EmptyState, LoadingState } from '@/components/StateViews'
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink, Download, ChevronUp, ChevronDown, Search, AlertCircle, Plus, X, Tag, Brain, Loader2 } from 'lucide-react'
 import { useCampaignStore } from '@/lib/store'
@@ -59,18 +60,14 @@ function KeywordRankBreakdown({ ranks }: { ranks?: KeywordRank[] }) {
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4, alignItems: 'center' }}>
       {show.map((r, i) => (
-        <span key={i} style={{ 
-          fontSize: 9.5, padding: '2px 6px', borderRadius: 4, 
-          background: 'rgba(26,115,232,0.06)', border: '1px solid rgba(26,115,232,0.15)',
-          color: '#1A73E8', fontWeight: 600
-        }}>
+        <span key={i} className="badge badge-blue">
           {r.keyword_text}: <strong>#{r.rank}</strong>
         </span>
       ))}
       {!expanded && remaining > 0 && (
         <button 
           onClick={() => setExpanded(true)} 
-          style={{ background: 'none', border: 'none', color: '#1A73E8', fontSize: 9, fontWeight: 700, cursor: 'pointer', padding: '2px 4px', display: 'inline-flex', alignItems: 'center', gap: 1 }}
+          style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 'var(--fs-micro)', fontWeight: 700, cursor: 'pointer', padding: '2px 4px', display: 'inline-flex', alignItems: 'center', gap: 1 }}
         >
           +{remaining} more <ChevronDown size={8} />
         </button>
@@ -78,7 +75,7 @@ function KeywordRankBreakdown({ ranks }: { ranks?: KeywordRank[] }) {
       {expanded && (
         <button 
           onClick={() => setExpanded(false)} 
-          style={{ background: 'none', border: 'none', color: '#64748B', fontSize: 9, fontWeight: 700, cursor: 'pointer', padding: '2px 4px', display: 'inline-flex', alignItems: 'center', gap: 1 }}
+          style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 'var(--fs-micro)', fontWeight: 700, cursor: 'pointer', padding: '2px 4px', display: 'inline-flex', alignItems: 'center', gap: 1 }}
         >
           Less <ChevronUp size={8} />
         </button>
@@ -332,15 +329,12 @@ function LeaderboardContent() {
 
   if (leaderboardQuery.isLoading) {
     return (
-      <div className="anim-fade-up" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200, color: '#94A3B8' }}>
-        Loading leaderboard...
-      </div>
+      <LoadingState title="Loading leaderboard..." />
     )
   }
 
   return (
     <div className="anim-fade-up">
-      <style>{`@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } } @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       
       {/* Page Header */}
       <div className="page-header">
@@ -379,9 +373,9 @@ function LeaderboardContent() {
             onClick={handleBatchAnalyze}
             disabled={batchAnalyzing}
             style={{
-              background: batchAnalyzing ? 'var(--bg-hover)' : 'var(--violet-dim)',
-              border: `1px solid ${batchAnalyzing ? 'var(--border-2)' : 'rgba(124,58,237,0.25)'}`,
-              color: 'var(--violet)',
+              background: batchAnalyzing ? 'var(--bg-hover)' : 'var(--info-dim)',
+              border: `1px solid ${batchAnalyzing ? 'var(--border-2)' : 'var(--info-border)'}`,
+              color: 'var(--info)',
               fontWeight: 700,
             }}
           >
@@ -428,14 +422,11 @@ function LeaderboardContent() {
 
       {/* Main Table */}
       {videos.length === 0 ? (
-        <div style={{
-          display: 'flex', gap: 12, padding: 28, borderRadius: 14, background: '#FFFFFF',
-          border: '1px solid #F1F5F9', alignItems: 'center', justifyContent: 'center', flexDirection: 'column'
-        }}>
-          <AlertCircle size={32} style={{ color: '#94A3B8', marginBottom: 8 }} />
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#1E293B' }}>No Leaderboard Entries Found</div>
-          <div style={{ fontSize: 12, color: '#64748B' }}>Add keywords and fire scrape jobs in Campaign Control to populate listings.</div>
-        </div>
+        <EmptyState
+          icon={<AlertCircle size={32} strokeWidth={1.5} />}
+          title="No Leaderboard Entries Found"
+          body="Add keywords and fire scrape jobs in Campaign Control to populate listings."
+        />
       ) : (
         <div className="card" style={{ padding: 0, overflow: 'hidden', position: 'relative' }}>
           {isPageLoading && (
@@ -444,17 +435,17 @@ function LeaderboardContent() {
               background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(2px)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 8, background: '#0F172A', color: '#FFF', fontSize: 12, fontWeight: 600 }}>
-                <div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#FFF', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 'var(--radius-md)', background: 'var(--text-bright)', color: 'var(--surface)', fontSize: 'var(--fs-sm)', fontWeight: 600 }}>
+                <div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.2)', borderTopColor: 'var(--surface)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                 Loading page…
               </div>
             </div>
           )}
-          <div style={{ overflowX: 'auto' }}>
+          <div className="table-wrap">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th style={{ width: 68, textAlign: 'center', fontSize: 10, color: '#94A3B8' }}>
+                  <th style={{ width: 68, textAlign: 'center' }}>
                     Row
                   </th>
                   <th>Video</th>
@@ -479,10 +470,10 @@ function LeaderboardContent() {
                     <tr key={video.youtube_id}>
                       <td style={{ textAlign: 'center' }}>
                         <div style={{
-                          width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: globalRank <= 3 ? 'rgba(26,115,232,0.12)' : 'transparent',
-                          color: globalRank <= 3 ? '#1A73E8' : 'var(--text-muted)',
-                          fontWeight: 800, fontSize: 12, margin: '0 auto',
+                          width: 32, height: 32, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: globalRank <= 3 ? 'var(--accent-dim)' : 'transparent',
+                          color: globalRank <= 3 ? 'var(--accent)' : 'var(--text-muted)',
+                          fontWeight: 800, fontSize: 'var(--fs-sm)', margin: '0 auto',
                         }}>
                           {globalRank}
                         </div>
@@ -491,7 +482,7 @@ function LeaderboardContent() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                           <Link
                             href={`/video/${video.youtube_id}`}
-                            style={{ flexShrink: 0, display: 'block', width: 72, height: 40, borderRadius: 6, background: '#F1F5F9', overflow: 'hidden' }}
+                            style={{ flexShrink: 0, display: 'block', width: 72, height: 40, borderRadius: 'var(--radius-sm)', background: 'var(--bg-hover)', overflow: 'hidden' }}
                           >
                             <img
                               src={`https://img.youtube.com/vi/${video.youtube_id}/mqdefault.jpg`}
@@ -501,7 +492,7 @@ function LeaderboardContent() {
                           </Link>
                           <div style={{ minWidth: 0, flex: 1 }}>
                             <div style={{ display: 'flex', gap: 4, marginBottom: 3 }}>
-                              {video.is_new && <span className="badge badge-green" style={{ fontSize: 9 }}>NEW</span>}
+                              {video.is_new && <span className="badge badge-green">NEW</span>}
                             </div>
                             <Link
                               href={`/video/${video.youtube_id}`}
@@ -527,18 +518,7 @@ function LeaderboardContent() {
                                 {shown.map((kr, idx) => (
                                   <span
                                     key={`kw-${idx}`}
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: 3,
-                                      fontSize: 9.5,
-                                      padding: '2px 6px',
-                                      borderRadius: 4,
-                                      background: 'rgba(26,115,232,0.06)',
-                                      border: '1px solid rgba(26,115,232,0.15)',
-                                      color: '#1A73E8',
-                                      fontWeight: 600,
-                                    }}
+                                    className="badge badge-blue"
                                   >
                                     {kr.keyword_text.length > 18 ? kr.keyword_text.slice(0, 18) + '…' : kr.keyword_text}: <strong>#{kr.rank}</strong>
                                   </span>
@@ -547,7 +527,7 @@ function LeaderboardContent() {
                                   <button
                                     onClick={() => setExpandedKeywords(prev => new Set(prev).add(video.youtube_id))}
                                     style={{
-                                      background: 'none', border: 'none', color: '#1A73E8', fontSize: 9,
+                                      background: 'none', border: 'none', color: 'var(--accent)', fontSize: 'var(--fs-micro)',
                                       fontWeight: 700, cursor: 'pointer', padding: '2px 4px', display: 'inline-flex',
                                       alignItems: 'center', gap: 1,
                                     }}
@@ -559,7 +539,7 @@ function LeaderboardContent() {
                                   <button
                                     onClick={() => setExpandedKeywords(prev => { const n = new Set(prev); n.delete(video.youtube_id); return n })}
                                     style={{
-                                      background: 'none', border: 'none', color: '#64748B', fontSize: 9,
+                                      background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 'var(--fs-micro)',
                                       fontWeight: 700, cursor: 'pointer', padding: '2px 4px', display: 'inline-flex',
                                       alignItems: 'center', gap: 1,
                                     }}
@@ -570,7 +550,7 @@ function LeaderboardContent() {
                               </>
                             )
                           })() : (
-                            <span style={{ fontSize: 11, color: '#CBD5E1' }}>—</span>
+                            <span style={{ fontSize: 'var(--fs-label)', color: 'var(--neutral-300)' }}>—</span>
                           )}
                         </div>
                       </td>
@@ -579,23 +559,12 @@ function LeaderboardContent() {
                           {allBrandChips.map(tag => (
                             <span
                               key={tag}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 3,
-                                fontSize: 10.5,
-                                padding: '2px 8px',
-                                borderRadius: 6,
-                                background: 'rgba(26,115,232,0.06)',
-                                border: '1px solid rgba(26,115,232,0.15)',
-                                color: '#1A73E8',
-                                fontWeight: 700,
-                              }}
+                              className="badge badge-blue"
                             >
                               {tag}
                               <button
                                 onClick={() => handleUpdateTags(video.youtube_id, allBrandChips.filter(t => t !== tag))}
-                                style={{ background: 'none', border: 'none', color: '#1A73E8', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
+                                style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
                               >
                                 <X size={10} />
                               </button>
@@ -611,11 +580,11 @@ function LeaderboardContent() {
                               alignItems: 'center',
                               gap: 3,
                               padding: '2px 8px',
-                              borderRadius: 6,
-                              background: analyzingId === video.youtube_id ? '#F1F5F9' : 'rgba(124,58,237,0.06)',
-                              border: `1px solid ${analyzingId === video.youtube_id ? '#E2E8F0' : 'rgba(124,58,237,0.2)'}`,
-                              color: '#7C3AED',
-                              fontSize: 10,
+                              borderRadius: 'var(--radius-sm)',
+                              background: analyzingId === video.youtube_id ? 'var(--bg-hover)' : 'var(--info-dim)',
+                              border: `1px solid ${analyzingId === video.youtube_id ? 'var(--border-2)' : 'var(--info-border)'}`,
+                              color: 'var(--info)',
+                              fontSize: 'var(--fs-caption)',
                               fontWeight: 700,
                               cursor: analyzingId === video.youtube_id ? 'not-allowed' : 'pointer',
                               opacity: analyzingId === video.youtube_id ? 0.6 : 1,
@@ -642,11 +611,11 @@ function LeaderboardContent() {
                               justifyContent: 'center',
                               width: 20,
                               height: 20,
-                              borderRadius: 4,
-                              background: '#F1F5F9',
-                              border: '1px solid #E2E8F0',
+                              borderRadius: 'var(--radius-xs)',
+                              background: 'var(--bg-hover)',
+                              border: '1px solid var(--border-2)',
                               cursor: 'pointer',
-                              color: '#64748B',
+                              color: 'var(--text-secondary)',
                             }}
                             title="Add / edit product tags"
                           >
@@ -661,19 +630,19 @@ function LeaderboardContent() {
                             top: '100%',
                             left: 0,
                             zIndex: 90,
-                            background: '#FFFFFF',
-                            border: '1px solid #E2E8F0',
-                            borderRadius: 8,
+                            background: 'var(--surface)',
+                            border: '1px solid var(--border-2)',
+                            borderRadius: 'var(--radius-md)',
                             padding: 10,
                             width: 220,
-                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                            boxShadow: 'var(--shadow-md)',
                             marginTop: 4,
                           }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, borderBottom: '1px solid #F1F5F9', paddingBottom: 4 }}>
-                              <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>Select Brand/Product</span>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, borderBottom: '1px solid var(--border-light)', paddingBottom: 4 }}>
+                              <span style={{ fontSize: 'var(--fs-label)', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Select Brand/Product</span>
                               <button
                                 onClick={() => setEditingVideoId(null)}
-                                style={{ background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: 0 }}
+                                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
                               >
                                 <X size={12} />
                               </button>
@@ -682,12 +651,12 @@ function LeaderboardContent() {
                             {/* Campaign Brands list */}
                             <div style={{ maxHeight: 110, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 8 }}>
                               {campaignBrands.length === 0 ? (
-                                <span style={{ fontSize: 11, color: '#94A3B8', fontStyle: 'italic' }}>No campaign brands defined. Add them in Control tab.</span>
+                                <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', fontStyle: 'italic' }}>No campaign brands defined. Add them in Control tab.</span>
                               ) : (
                                 campaignBrands.map(brand => {
                                   const hasTag = allBrandChips.includes(brand)
                                   return (
-                                    <label key={brand} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, cursor: 'pointer', color: '#334155' }}>
+                                    <label key={brand} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--fs-sm)', cursor: 'pointer', color: 'var(--text-secondary)' }}>
                                       <input
                                         type="checkbox"
                                         checked={hasTag}
@@ -709,7 +678,7 @@ function LeaderboardContent() {
                             <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
                               <input
                                 className="input"
-                                style={{ padding: '4px 8px', fontSize: 11 }}
+                                style={{ padding: '4px 8px', fontSize: 'var(--fs-label)' }}
                                 placeholder="Custom tag name..."
                                 value={customTagInput}
                                 onChange={e => setCustomTagInput(e.target.value)}
@@ -734,12 +703,12 @@ function LeaderboardContent() {
                                   }
                                 }}
                                 style={{
-                                  background: '#1A73E8',
-                                  color: '#FFFFFF',
+                                  background: 'var(--accent)',
+                                  color: 'var(--on-accent)',
                                   border: 'none',
-                                  borderRadius: 4,
+                                  borderRadius: 'var(--radius-xs)',
                                   padding: '4px 8px',
-                                  fontSize: 11,
+                                  fontSize: 'var(--fs-label)',
                                   fontWeight: 600,
                                   cursor: 'pointer',
                                 }}
@@ -750,19 +719,19 @@ function LeaderboardContent() {
                           </div>
                         )}
                       </td>
-                      <td style={{ whiteSpace: 'nowrap', fontSize: 12 }}>{video.channel_name}</td>
+                      <td style={{ whiteSpace: 'nowrap', fontSize: 'var(--fs-sm)' }}>{video.channel_name}</td>
                       <td style={{ textAlign: 'right' }}>
-                        <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                        <span style={{ fontWeight: 700, fontSize: 'var(--fs-body)', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
                           {fmt(video.view_count)}
                         </span>
                       </td>
                       <td style={{ textAlign: 'right' }}>
-                        <span style={{ fontWeight: 600, fontSize: 13, color: '#1A73E8' }}>
+                        <span style={{ fontWeight: 600, fontSize: 'var(--fs-body)', color: 'var(--accent)' }}>
                           #{video.best_rank}
                         </span>
                       </td>
                       <td style={{ textAlign: 'center' }}>
-                        <span style={{ fontWeight: 600, fontSize: 13 }}>
+                        <span style={{ fontWeight: 600, fontSize: 'var(--fs-body)' }}>
                           {video.keyword_count}
                         </span>
                       </td>
@@ -771,10 +740,10 @@ function LeaderboardContent() {
                           onClick={() => handleToggleOwnership(video)}
                           style={{
                             display: 'inline-flex', alignItems: 'center', gap: 4,
-                            padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700,
-                            border: `1.5px solid ${video.is_ours ? '#10B981' : '#E2E8F0'}`,
-                            background: video.is_ours ? '#ECFDF5' : '#FFFFFF',
-                            color: video.is_ours ? '#059669' : '#94A3B8',
+                            padding: '4px 12px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--fs-label)', fontWeight: 700,
+                            border: `1.5px solid ${video.is_ours ? 'var(--success)' : 'var(--border-2)'}`,
+                            background: video.is_ours ? 'var(--success-dim)' : 'var(--surface)',
+                            color: video.is_ours ? 'var(--success-text)' : 'var(--text-muted)',
                             cursor: 'pointer', transition: 'all 0.15s ease',
                           }}
                           title={video.is_ours ? 'Mark as not ours' : 'Mark as our video'}
@@ -782,7 +751,7 @@ function LeaderboardContent() {
                           {video.is_ours ? 'Yes' : 'No'}
                         </button>
                       </td>
-                      <td style={{ whiteSpace: 'nowrap', fontSize: 11, color: 'var(--text-muted)' }}>
+                      <td style={{ whiteSpace: 'nowrap', fontSize: 'var(--fs-label)', color: 'var(--text-muted)' }}>
                         {new Date(video.discovered_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
                       </td>
                     </tr>
@@ -798,7 +767,7 @@ function LeaderboardContent() {
             padding: '14px 20px', borderTop: '1px solid var(--border-1)',
             background: 'var(--bg-surface)',
           }}>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
               Showing <strong style={{ color: 'var(--text-secondary)' }}>
                 {(page - 1) * PER_PAGE + 1}–{Math.min(page * PER_PAGE, total)}
               </strong> of <strong style={{ color: 'var(--text-secondary)' }}>{total}</strong> videos
@@ -823,7 +792,7 @@ function LeaderboardContent() {
 
 export default function LeaderboardPage() {
   return (
-    <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200, color: '#94A3B8' }}>Loading leaderboard...</div>}>
+    <Suspense fallback={<LoadingState title="Loading leaderboard..." />}>
       <LeaderboardContent />
     </Suspense>
   )

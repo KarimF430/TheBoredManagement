@@ -37,9 +37,9 @@ function CustomTooltip({ active, payload }: any) {
   return (
     <div className="tooltip-box">
       <div style={{ fontWeight: 700, color: 'var(--text-bright)', marginBottom: 4 }}>{d.name}</div>
-      <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>SOV: <strong style={{ color: 'var(--text-primary)' }}>{d.sov_percent?.toFixed(1)}%</strong></div>
-      <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>Views: <strong style={{ color: 'var(--text-primary)' }}>{fmt(d.total_views)}</strong></div>
-      <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>Videos: <strong style={{ color: 'var(--text-primary)' }}>{d.video_count}</strong></div>
+      <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)' }}>SOV: <strong style={{ color: 'var(--text-primary)' }}>{d.sov_percent?.toFixed(1)}%</strong></div>
+      <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)' }}>Views: <strong style={{ color: 'var(--text-primary)' }}>{fmt(d.total_views)}</strong></div>
+      <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)' }}>Videos: <strong style={{ color: 'var(--text-primary)' }}>{d.video_count}</strong></div>
     </div>
   )
 }
@@ -80,7 +80,6 @@ export default function BrandIntelligencePage() {
 
   return (
     <div className="anim-fade-up">
-      <style>{`@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }`}</style>
 
       <div className="page-header">
         <div>
@@ -104,7 +103,7 @@ export default function BrandIntelligencePage() {
         <PageSkeleton cols={4} rows={5} />
       ) : sortedBrands.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 48 }}>
-          <Award size={36} style={{ color: '#CBD5E1', marginBottom: 12 }} />
+          <Award size={36} style={{ color: 'var(--neutral-300)', marginBottom: 12 }} />
           <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-bright)', marginBottom: 4 }}>No Brands Found</div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Tag videos with brands in the leaderboard to see intelligence data.</div>
         </div>
@@ -113,29 +112,29 @@ export default function BrandIntelligencePage() {
           {/* Market Leader + Growth Opportunity */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
             {marketLeader && (
-              <div style={{ background: 'linear-gradient(135deg, #ECFDF5, #F0FDF4)', borderRadius: 14, padding: '20px 24px', border: '1px solid #A7F3D0' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Market Leader</div>
+              <div style={{ background: 'linear-gradient(135deg, var(--success-dim), rgba(34,197,94,0.03))', borderRadius: 'var(--radius-xl)', padding: '20px 24px', border: '1px solid var(--success-border)' }}>
+                <div style={{ fontSize: 'var(--fs-caption)', fontWeight: 700, color: 'var(--success-text)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Market Leader</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Award size={20} color="#FFF" />
+                  <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-md)', background: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Award size={20} color="var(--surface)" />
                   </div>
                   <div>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: '#065F46' }}>{marketLeader.name}</div>
-                    <div style={{ fontSize: 13, color: '#059669', fontWeight: 600 }}>{marketLeader.sov_percent?.toFixed(1)}% view SOV · {fmt(marketLeader.total_views)} views</div>
+                    <div style={{ fontSize: 'var(--fs-h1)', fontWeight: 800, color: 'var(--success-text)' }}>{marketLeader.name}</div>
+                    <div style={{ fontSize: 'var(--fs-body)', color: 'var(--success-text)', fontWeight: 600 }}>{marketLeader.sov_percent?.toFixed(1)}% view SOV · {fmt(marketLeader.total_views)} views</div>
                   </div>
                 </div>
               </div>
             )}
             {growthOpp && growthOpp !== marketLeader && (
-              <div style={{ background: 'linear-gradient(135deg, #FFF7ED, #FFFBEB)', borderRadius: 14, padding: '20px 24px', border: '1px solid #FDE68A' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#D97706', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Growth Opportunity</div>
+              <div style={{ background: 'linear-gradient(135deg, var(--warning-dim), rgba(245,158,11,0.03))', borderRadius: 'var(--radius-xl)', padding: '20px 24px', border: '1px solid var(--warning-border)' }}>
+                <div style={{ fontSize: 'var(--fs-caption)', fontWeight: 700, color: 'var(--warning-text)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Growth Opportunity</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: '#F59E0B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <TrendingUp size={20} color="#FFF" />
+                  <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-md)', background: 'var(--warning)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <TrendingUp size={20} color="var(--surface)" />
                   </div>
                   <div>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: '#92400E' }}>{growthOpp.name}</div>
-                    <div style={{ fontSize: 13, color: '#D97706', fontWeight: 600 }}>{growthOpp.sov_percent?.toFixed(1)}% view SOV · {growthOpp.video_count} videos</div>
+                    <div style={{ fontSize: 'var(--fs-h1)', fontWeight: 800, color: 'var(--warning-text)' }}>{growthOpp.name}</div>
+                    <div style={{ fontSize: 'var(--fs-body)', color: 'var(--warning-text)', fontWeight: 600 }}>{growthOpp.sov_percent?.toFixed(1)}% view SOV · {growthOpp.video_count} videos</div>
                   </div>
                 </div>
               </div>
@@ -147,15 +146,15 @@ export default function BrandIntelligencePage() {
             {/* Horizontal Bar Chart */}
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
               <div style={{ padding: '18px 22px 0' }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-bright)' }}>SOV by Brand</div>
-                <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2 }}>Share of Voice — top {Math.min(sortedBrands.length, 8)} brands</div>
+                <div className="chart-title">SOV by Brand</div>
+                <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', marginTop: 2 }}>Share of Voice — top {Math.min(sortedBrands.length, 8)} brands</div>
               </div>
               <div style={{ padding: '8px 12px 12px', height: 320 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData} layout="vertical" margin={{ top: 8, right: 40, left: 80, bottom: 0 }}>
-                    <XAxis type="number" tickFormatter={v => v + '%'} tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-                    <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: '#475569', fontWeight: 600 }} axisLine={false} tickLine={false} width={75} />
-                    <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(26,115,232,0.04)' }} />
+                    <XAxis type="number" tickFormatter={v => v + '%'} tick={{ fontSize: 'var(--fs-label)', fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 'var(--fs-sm)', fill: 'var(--text-secondary)', fontWeight: 600 }} axisLine={false} tickLine={false} width={75} />
+                    <Tooltip content={<CustomTooltip />} />
                     <Bar dataKey="sov_percent" radius={[0, 6, 6, 0]} barSize={24}>
                       {chartData.map((d, i) => <Cell key={i} fill={brandColor(d.name, i)} />)}
                     </Bar>
@@ -168,7 +167,7 @@ export default function BrandIntelligencePage() {
             {pieData.length > 0 && (
               <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                 <div style={{ padding: '18px 22px 0' }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-bright)' }}>SOV Distribution</div>
+                  <div className="chart-title">SOV Distribution</div>
                 </div>
                 <div style={{ padding: '8px 12px 12px', height: 320, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <ResponsiveContainer width="100%" height="100%">
@@ -186,11 +185,11 @@ export default function BrandIntelligencePage() {
 
           {/* Brand Rankings Table */}
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '18px 22px 14px', borderBottom: '1px solid rgba(26,115,232,0.08)' }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-bright)' }}>Brand Rankings</div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2 }}>All brands sorted by {sortBy === 'views' ? 'view share' : 'keyword frequency'}</div>
+            <div style={{ padding: '18px 22px 14px', borderBottom: '1px solid var(--border-light)' }}>
+              <div className="chart-title">Brand Rankings</div>
+              <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', marginTop: 2 }}>All brands sorted by {sortBy === 'views' ? 'view share' : 'keyword frequency'}</div>
             </div>
-            <div style={{ overflowX: 'auto' }}>
+            <div className="table-wrap">
               <table className="data-table">
                 <thead>
                   <tr>
@@ -208,10 +207,10 @@ export default function BrandIntelligencePage() {
                     <tr key={`${b.name}_${i}`}>
                       <td style={{ textAlign: 'center' }}>
                         <div style={{
-                          width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: i < 3 ? 'rgba(26,115,232,0.12)' : 'transparent',
-                          color: i < 3 ? '#1A73E8' : 'var(--text-muted)',
-                          fontWeight: 800, fontSize: 12, margin: '0 auto',
+                          width: 28, height: 28, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: i < 3 ? 'var(--accent-dim)' : 'transparent',
+                          color: i < 3 ? 'var(--accent)' : 'var(--text-muted)',
+                          fontWeight: 800, fontSize: 'var(--fs-sm)', margin: '0 auto',
                         }}>
                           {i + 1}
                         </div>
