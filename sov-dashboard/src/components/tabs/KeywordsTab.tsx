@@ -17,7 +17,7 @@ type SortKey = 'name' | 'videos' | 'views' | 'frequency' | 'last_scraped' | 'sta
 import { useDashboard } from '@/lib/dashboard-context'
 import { useFilterStore } from '@/lib/filter-store'
 
-const C = ['#4C78A8','#54A24B','#E45756','#72B7B2','#EECA3B','#B279A2','#FF9DA6','#9D755D','#BAB0AC','#D67195']
+const C = ['#4C78A8','#54A24B','#E45756','#2F7D7A','#B45309','#7E4D74','#C94A5E','#9D755D','#6B645C','#A8476F']
 const TYPE_COLORS: Record<string, string> = { generic: '#1A73E8', branded: '#DC2626', comparison: '#F59E0B' }
 const LANG_LABELS: Record<string, string> = {
   en: 'English', hi: 'Hindi', ta: 'Tamil', te: 'Telugu', ml: 'Malayalam',

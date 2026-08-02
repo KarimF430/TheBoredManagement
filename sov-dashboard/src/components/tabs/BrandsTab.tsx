@@ -493,7 +493,7 @@ export default function BrandsTab() {
                           {d.name}
                           <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: '#334155', color: '#94A3B8' }}>#{d.rank}</span>
                         </div>
-                        <div style={{ fontSize: 11, color: '#94A3B8' }}>View SOV: <strong style={{ color: '#38BDF8' }}>{d.viewSOV?.toFixed(1)}%</strong> · KW Reach: <strong style={{ color: '#34D399' }}>{d.freqSOV?.toFixed(1)}%</strong></div>
+                        <div style={{ fontSize: 11, color: '#94A3B8' }}>View SOV: <strong style={{ color: '#0284C7' }}>{d.viewSOV?.toFixed(1)}%</strong> · KW Reach: <strong style={{ color: '#059669' }}>{d.freqSOV?.toFixed(1)}%</strong></div>
                         <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>Efficiency: <strong style={{ color: '#FBBF24' }}>{fmt(d.efficiency)}</strong> views/kw</div>
                       </div>
                     )

@@ -21,9 +21,9 @@ import { brandColor } from '@/lib/brand-colors'
 import { EmptyState } from '@/components/StateViews'
 
 const C = [
-  '#4C78A8', '#54A24B', '#E45756', '#72B7B2', '#EECA3B',
-  '#B279A2', '#FF9DA6', '#9D755D', '#BAB0AC', '#D67195',
-  '#F58518', '#38BDF8', '#10B981', '#F59E0B', '#8B5CF6',
+  '#4C78A8', '#54A24B', '#E45756', '#2F7D7A', '#B45309',
+  '#7E4D74', '#C94A5E', '#9D755D', '#6B645C', '#A8476F',
+  '#CC5800', '#0284C7', '#10B981', '#D97706', '#8B5CF6',
 ]
 function bc(name: string, _i: number) { return brandColor(name) || C[Math.abs([...name].reduce((h, c) => (h << 5) - h + c.charCodeAt(0) | 0, 0)) % C.length] }
 

@@ -22,10 +22,10 @@ import { languageRegions } from '@/lib/india-regions'
 import IndiaMap from '@/components/IndiaMap'
 
 const C = [
-  '#4C78A8', '#54A24B', '#E45756', '#72B7B2', '#EECA3B',
-  '#B279A2', '#FF9DA6', '#9D755D', '#BAB0AC', '#D67195',
-  '#F58518', '#4C78A8', '#54A24B', '#E45756', '#72B7B2',
-  '#79B8FF', '#A8D8B9', '#F4A582', '#CAB2D6', '#FFFFB3',
+  '#4C78A8', '#54A24B', '#E45756', '#2F7D7A', '#B45309',
+  '#7E4D74', '#C94A5E', '#9D755D', '#6B645C', '#A8476F',
+  '#CC5800', '#4C78A8', '#54A24B', '#E45756', '#2F7D7A',
+  '#1D6BD6', '#3E8E5F', '#C4643A', '#8A63A8', '#A16207',
 ]
 
 function brandColor(name: string): string {
@@ -442,7 +442,7 @@ export default function OverviewTab() {
                 <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px', color: '#64748B' }}>Language Region</div>
                 <div style={{ fontSize: 13, fontWeight: 800, margin: '2px 0 6px' }}>{hoveredRegion.name}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 11.5 }}>
-                  <div>Language: <strong style={{ color: '#38BDF8' }}>{hoveredRegion.langCode.toUpperCase()}</strong></div>
+                  <div>Language: <strong style={{ color: '#0284C7' }}>{hoveredRegion.langCode.toUpperCase()}</strong></div>
                   {hoveredRegion.active ? (<>
                     <div>Views: <strong>{fmt(hoveredRegion.views)}</strong></div>
                     <div>Videos: <strong>{hoveredRegion.videosCount}</strong></div>

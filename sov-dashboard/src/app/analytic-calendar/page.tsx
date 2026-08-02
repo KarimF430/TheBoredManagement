@@ -13,8 +13,8 @@ import { EmptyState } from '@/components/StateViews'
 import Link from 'next/link'
 
 const BRAND_COLORS = [
-  '#4C78A8', '#54A24B', '#E45756', '#72B7B2', '#EECA3B',
-  '#B279A2', '#FF9DA6', '#9D755D', '#BAB0AC', '#D67195',
+  '#4C78A8', '#54A24B', '#E45756', '#2F7D7A', '#B45309',
+  '#7E4D74', '#C94A5E', '#9D755D', '#6B645C', '#A8476F',
 ]
 
 function brandColor(name: string): string {
@@ -202,7 +202,7 @@ export default function AnalyticCalendarPage() {
               { label: 'Total Views', value: fmtIndian(summary.totalViews), icon: Eye, color: '#4C78A8', sub: summary.viewsGrowth !== 0 ? `${summary.viewsGrowth > 0 ? '+' : ''}${summary.viewsGrowth}% vs prev` : null },
               { label: 'New Videos', value: fmtFull(summary.totalVideos), icon: Video, color: '#54A24B', sub: null },
               { label: 'Avg Daily Views', value: fmtIndian(summary.avgDailyViews), icon: BarChart2, color: '#E45756', sub: null },
-              { label: 'Rank Changes', value: fmtFull(summary.totalRankingChanges), icon: TrendingUp, color: '#72B7B2', sub: null },
+              { label: 'Rank Changes', value: fmtFull(summary.totalRankingChanges), icon: TrendingUp, color: '#2F7D7A', sub: null },
             ].map((kpi) => (
               <div key={kpi.label} style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', padding: '10px 16px', border: '1px solid var(--border-light)', display: 'flex', gap: 10, alignItems: 'center', minWidth: 150 }}>
                 <div style={{ width: 32, height: 32, borderRadius: 'var(--radius-md)', background: `${kpi.color}10`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>

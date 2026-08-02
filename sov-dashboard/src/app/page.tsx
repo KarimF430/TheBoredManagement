@@ -28,10 +28,10 @@ const RankingsTab = lazy(() => import('@/components/tabs/RankingsTab'))
 import OverviewTab from '@/components/tabs/OverviewTab'
 
 const C = [
-  '#4C78A8', '#54A24B', '#E45756', '#72B7B2', '#EECA3B',
-  '#B279A2', '#FF9DA6', '#9D755D', '#BAB0AC', '#D67195',
-  '#F58518', '#4C78A8', '#54A24B', '#E45756', '#72B7B2',
-  '#79B8FF', '#A8D8B9', '#F4A582', '#CAB2D6', '#FFFFB3',
+  '#4C78A8', '#54A24B', '#E45756', '#2F7D7A', '#B45309',
+  '#7E4D74', '#C94A5E', '#9D755D', '#6B645C', '#A8476F',
+  '#CC5800', '#4C78A8', '#54A24B', '#E45756', '#2F7D7A',
+  '#1D6BD6', '#3E8E5F', '#C4643A', '#8A63A8', '#A16207',
 ]
 
 function brandColor(name: string): string {
