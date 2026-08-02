@@ -11,17 +11,17 @@ function Section({ icon: Icon, iconColor, title, children }: {
     <section style={{ marginBottom: 32 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
         <div style={{
-          width: 36, height: 36, borderRadius: 9, flexShrink: 0,
+          width: 36, height: 36, borderRadius: 'var(--radius-md)', flexShrink: 0,
           background: `${iconColor}14`, border: `1px solid ${iconColor}30`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           <Icon size={16} style={{ color: iconColor }} />
         </div>
-        <h2 style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-bright)' }}>{title}</h2>
+        <h2 style={{ fontSize: 'var(--fs-h2)', fontWeight: 800, color: 'var(--text-bright)' }}>{title}</h2>
       </div>
       <div style={{
         paddingLeft: 48,
-        fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.8,
+        fontSize: 'var(--fs-body)', color: 'var(--text-secondary)', lineHeight: 1.8,
       }}>
         {children}
       </div>
@@ -47,7 +47,7 @@ export default function PrivacyPolicyPage() {
     <div className="anim-fade-up">
       {/* ── Hero Header ── */}
       <div style={{
-        background: 'linear-gradient(135deg, rgba(255,159,28,0.08) 0%, rgba(79,156,249,0.06) 100%)',
+        background: 'linear-gradient(135deg, var(--warning-dim) 0%, var(--accent-dim) 100%)',
         border: '1px solid var(--border-1)',
         borderRadius: 16,
         padding: '32px 36px',
@@ -63,20 +63,20 @@ export default function PrivacyPolicyPage() {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: '0 8px 24px rgba(255,159,28,0.35)',
         }}>
-          <Shield size={28} color="#0A0F1A" strokeWidth={2.5} />
+          <Shield size={28} color="var(--text-bright)" strokeWidth={2.5} />
         </div>
         <div style={{ flex: 1 }}>
           <h1 className="page-title">Privacy <span className="accent">Policy</span></h1>
-          <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginTop: 6, lineHeight: 1.6 }}>
+          <p style={{ fontSize: 'var(--fs-body)', color: 'var(--text-secondary)', marginTop: 6, lineHeight: 1.6 }}>
             SOV Panel — YouTube Share-of-Voice Analytics Platform by TheBoredMonkey<br />
             <strong style={{ color: 'var(--text-muted)' }}>TheBoredMonkey</strong>
           </p>
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Last Updated</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginTop: 3 }}>{LAST_UPDATED}</div>
+          <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Last Updated</div>
+          <div style={{ fontSize: 'var(--fs-h2)', fontWeight: 700, color: 'var(--text-primary)', marginTop: 3 }}>{LAST_UPDATED}</div>
           <div style={{ marginTop: 8 }}>
-            <span className="badge badge-green" style={{ fontSize: 10 }}>
+            <span className="badge badge-green" style={{ fontSize: 'var(--fs-micro)' }}>
               <CheckCircle size={10} /> YouTube API Compliant
             </span>
           </div>
@@ -85,17 +85,17 @@ export default function PrivacyPolicyPage() {
 
       {/* ── YouTube API Compliance Notice ── */}
       <div style={{
-        background: 'linear-gradient(135deg, rgba(255,0,0,0.06) 0%, rgba(255,0,0,0.02) 100%)',
-        border: '1px solid rgba(255,70,70,0.25)',
-        borderRadius: 12,
+        background: 'var(--danger-dim)',
+        border: '1px solid var(--danger-border)',
+        borderRadius: 'var(--radius-lg)',
         padding: '16px 20px',
         marginBottom: 28,
         display: 'flex',
         gap: 12,
         alignItems: 'flex-start',
       }}>
-        <PlayCircle size={20} style={{ color: '#FF4444', flexShrink: 0, marginTop: 1 }} />
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+        <PlayCircle size={20} style={{ color: 'var(--danger)', flexShrink: 0, marginTop: 1 }} />
+        <div style={{ fontSize: 'var(--fs-body)', color: 'var(--text-secondary)', lineHeight: 1.7 }}>
           <strong style={{ color: 'var(--text-primary)' }}>YouTube API Services Notice:</strong> SOV Panel uses the YouTube Data API v3.
           By using this service, you also agree to Google's{' '}
           <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer"
@@ -134,9 +134,9 @@ export default function PrivacyPolicyPage() {
             'Recording daily view count snapshots for trend analysis and growth calculations.',
             'Collecting transcript/caption data (where publicly available) for AI-powered brand mention analysis.',
           ]} />
-          <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(255,159,28,0.06)', borderRadius: 9, border: '1px solid var(--orange-border)' }}>
-            <strong style={{ color: 'var(--orange)', fontSize: 13 }}>Important:</strong>
-            <span style={{ fontSize: 13, color: 'var(--text-secondary)', marginLeft: 8 }}>
+          <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--warning-dim)', borderRadius: 'var(--radius-md)', border: '1px solid var(--orange-border)' }}>
+            <strong style={{ color: 'var(--orange)', fontSize: 'var(--fs-body)' }}>Important:</strong>
+            <span style={{ fontSize: 'var(--fs-body)', color: 'var(--text-secondary)', marginLeft: 8 }}>
               SOV Panel does <em>not</em> access private user data, YouTube account information, watch history, or any personally identifiable viewer information.
               All data collected is publicly available on YouTube.
             </span>
@@ -182,9 +182,9 @@ export default function PrivacyPolicyPage() {
             'Maintain audit logs for data accuracy and scraping job monitoring.',
             'Improve platform performance and user experience.',
           ]} />
-          <div style={{ marginTop: 14, padding: '12px 16px', background: 'var(--bg-elevated)', borderRadius: 9, border: '1px solid var(--border-1)' }}>
-            <strong style={{ color: 'var(--text-primary)', fontSize: 13 }}>We do NOT:</strong>
-            <ul style={{ listStyle: 'disc', paddingLeft: 20, marginTop: 8, color: 'var(--text-secondary)', fontSize: 13, lineHeight: 2 }}>
+          <div style={{ marginTop: 14, padding: '12px 16px', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-1)' }}>
+            <strong style={{ color: 'var(--text-primary)', fontSize: 'var(--fs-body)' }}>We do NOT:</strong>
+            <ul style={{ listStyle: 'disc', paddingLeft: 20, marginTop: 8, color: 'var(--text-secondary)', fontSize: 'var(--fs-body)', lineHeight: 2 }}>
               <li>Sell, rent, or share user data with third parties for advertising</li>
               <li>Use YouTube data to identify individual viewers or users</li>
               <li>Access or store any YouTube user authentication tokens</li>
@@ -203,9 +203,9 @@ export default function PrivacyPolicyPage() {
             'We conduct regular security audits and penetration testing.',
           ]} />
 
-          <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(155,114,245,0.06)', borderRadius: 9, border: '1px solid rgba(155,114,245,0.2)' }}>
-            <strong style={{ color: '#9B72F5', fontSize: 13 }}>API Quota Compliance:</strong>
-            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 6, lineHeight: 1.7 }}>
+          <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--info-dim)', borderRadius: 'var(--radius-md)', border: '1px solid var(--info-border)' }}>
+            <strong style={{ color: 'var(--info)', fontSize: 'var(--fs-body)' }}>API Quota Compliance:</strong>
+            <p style={{ fontSize: 'var(--fs-body)', color: 'var(--text-secondary)', marginTop: 6, lineHeight: 1.7 }}>
               SOV Panel implements a 2-bucket API key rotation system to stay within YouTube's 10,000 unit daily quota per project.
               We never exceed authorized usage limits. If a project reaches its daily quota, the system automatically rotates to the next available key in the pool.
             </p>
@@ -214,12 +214,12 @@ export default function PrivacyPolicyPage() {
 
         <Section icon={Trash2} iconColor="#F04759" title="6. Data Retention & Deletion">
           <p style={{ marginBottom: 14 }}>Data is retained according to the following schedule:</p>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <div className="table-wrap">
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-body)' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border-2)' }}>
                   {['Data Type', 'Retention Period', 'Deletion Method'].map(h => (
-                    <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', background: 'var(--bg-elevated)' }}>
+                    <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 'var(--fs-label)', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', background: 'var(--bg-elevated)' }}>
                       {h}
                     </th>
                   ))}
@@ -272,20 +272,20 @@ export default function PrivacyPolicyPage() {
               },
             ].map(svc => (
               <div key={svc.name} style={{
-                padding: '14px 16px', borderRadius: 10,
+                padding: '14px 16px', borderRadius: 'var(--radius-md)',
                 background: 'var(--bg-elevated)', border: '1px solid var(--border-1)',
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 6 }}>
                   <div>
                     <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 3 }}>{svc.name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{svc.company}</div>
+                    <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{svc.company}</div>
                   </div>
                   <a href={svc.link} target="_blank" rel="noopener noreferrer"
-                    style={{ fontSize: 12, color: 'var(--orange)', textDecoration: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    style={{ fontSize: 'var(--fs-sm)', color: 'var(--orange)', textDecoration: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
                     {svc.linkLabel} <ExternalLink size={11} />
                   </a>
                 </div>
-                <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 8 }}>{svc.purpose}</div>
+                <div style={{ fontSize: 'var(--fs-body)', color: 'var(--text-secondary)', marginTop: 8 }}>{svc.purpose}</div>
               </div>
             ))}
           </div>
@@ -311,9 +311,9 @@ export default function PrivacyPolicyPage() {
               rel="noopener noreferrer"
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
-                marginTop: 8, padding: '9px 16px', borderRadius: 8,
-                background: 'rgba(255,159,28,0.08)', border: '1px solid var(--orange-border)',
-                color: 'var(--orange)', textDecoration: 'none', fontWeight: 600, fontSize: 13,
+                marginTop: 8, padding: '9px 16px', borderRadius: 'var(--radius-md)',
+                background: 'var(--warning-dim)', border: '1px solid var(--orange-border)',
+                color: 'var(--orange)', textDecoration: 'none', fontWeight: 600, fontSize: 'var(--fs-body)',
               }}
             >
               <ExternalLink size={13} />
@@ -327,12 +327,12 @@ export default function PrivacyPolicyPage() {
             For privacy-related questions, data requests, or to report concerns:
           </p>
           <div style={{
-            padding: '20px 24px', borderRadius: 12,
-            background: 'linear-gradient(135deg, rgba(16,185,129,0.06) 0%, rgba(16,185,129,0.02) 100%)',
-            border: '1px solid rgba(16,185,129,0.2)',
+            padding: '20px 24px', borderRadius: 'var(--radius-lg)',
+            background: 'var(--success-dim)',
+            border: '1px solid var(--success-border)',
           }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 10 }}>TheBoredMonkey</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: 'var(--text-secondary)' }}>
+            <div style={{ fontSize: 'var(--fs-h2)', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 10 }}>TheBoredMonkey</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 'var(--fs-body)', color: 'var(--text-secondary)' }}>
               <div>📧 Email: <a href="mailto:privacy@theboredmonkey.com" style={{ color: 'var(--orange)', textDecoration: 'none' }}>privacy@theboredmonkey.com</a></div>
               <div>🌐 Website: <a href="https://theboredmonkey.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--orange)', textDecoration: 'none' }}>theboredmonkey.com</a></div>
               <div>⏱ Response time: Within 5 business days for privacy requests</div>
@@ -345,20 +345,20 @@ export default function PrivacyPolicyPage() {
           marginTop: 32, paddingTop: 24, borderTop: '1px solid var(--border-1)',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12,
         }}>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
             © {new Date().getFullYear()} TheBoredMonkey · SOV Panel v2.0 · All rights reserved.
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer"
-              style={{ fontSize: 12, color: 'var(--orange)', textDecoration: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+              style={{ fontSize: 'var(--fs-sm)', color: 'var(--orange)', textDecoration: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
               Google Privacy Policy <ExternalLink size={10} />
             </a>
             <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer"
-              style={{ fontSize: 12, color: 'var(--orange)', textDecoration: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+              style={{ fontSize: 'var(--fs-sm)', color: 'var(--orange)', textDecoration: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
               YouTube Terms <ExternalLink size={10} />
             </a>
             <a href="https://developers.google.com/youtube/terms/api-services-terms-of-service" target="_blank" rel="noopener noreferrer"
-              style={{ fontSize: 12, color: 'var(--orange)', textDecoration: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+              style={{ fontSize: 'var(--fs-sm)', color: 'var(--orange)', textDecoration: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
               API ToS <ExternalLink size={10} />
             </a>
           </div>

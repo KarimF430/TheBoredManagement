@@ -452,7 +452,7 @@ export default function OverviewPage() {
                   <CsvButton onClick={() => downloadCSV('Daily_Performance', ['Date', 'Views', 'Daily Videos', 'Keywords Added'], timeline.map(t => [t.date, String(t.views), String(t.videos), String(t.keywords ?? 0)]))} label="CSV Export" />
                 </div>
                 <div style={{ border: '1px solid var(--border-2)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-sm)' }}>
                     <thead>
                       <tr style={{ background: 'var(--neutral-50)', borderBottom: '1px solid var(--border-2)' }}>
                         <th style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text-secondary)' }}>Date</th>
@@ -494,7 +494,7 @@ export default function OverviewPage() {
                           <span style={{ fontSize: 'var(--fs-body)', fontWeight: 800, color: 'var(--text-bright)' }}>{b.name}</span>
                           <span className="num" style={{ fontSize: 'var(--fs-label)', fontWeight: 700, color: b.color, background: `${b.color}10`, padding: '2px 8px', borderRadius: 'var(--radius-xs)' }}>{b.pct.toFixed(1)}% View SOV</span>
                         </div>
-                        <div className="num" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, fontSize: 11.5 }}>
+                        <div className="num" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, fontSize: 'var(--fs-label)' }}>
                           <div><div style={{ color: 'var(--text-muted)', fontWeight: 600 }}>VIEWS</div><div style={{ fontWeight: 700, color: 'var(--text-secondary)', marginTop: 1 }}>{fmt(b.value)}</div></div>
                           <div><div style={{ color: 'var(--text-muted)', fontWeight: 600 }}>RANKINGS</div><div style={{ fontWeight: 700, color: 'var(--text-secondary)', marginTop: 1 }}>{f?.value ?? 0} ({f?.pct?.toFixed(1) ?? 0}%)</div></div>
                           <div><div style={{ color: 'var(--text-muted)', fontWeight: 600 }}>VIDEOS</div><div style={{ fontWeight: 700, color: 'var(--text-secondary)', marginTop: 1 }}>{b.videoCount}</div></div>
