@@ -166,18 +166,34 @@ export default function OverviewPage() {
     setIsRefreshingViews(true)
     setViewsRefreshMsg(null)
     try {
-      const r = await fetch('/api/views/refresh', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ campaign_id: activeCampaignId }),
-      })
-      const d = await r.json()
-      if (!r.ok) {
-        setViewsRefreshMsg({ text: d.error || 'Views refresh failed', type: 'error' })
-      } else if (d.partial) {
-        setViewsRefreshMsg({ text: `Refreshed ${d.updated} of ${d.total} videos — ${d.remaining} left, run again to continue`, type: 'warn' })
-      } else {
-        setViewsRefreshMsg({ text: `Refreshed ${d.updated} video${d.updated === 1 ? '' : 's'} from YouTube`, type: 'ok' })
+      // The route is resumable (persists an offset per campaign), so looping
+      // here until completed:true finishes the whole pool in one click
+      // instead of requiring the user to press the button repeatedly —
+      // each call only covers what fits in its own time budget.
+      let totalUpdated = 0
+      let totalOfPool = 0
+      let safetyRounds = 0
+      while (safetyRounds < 100) {
+        safetyRounds++
+        const r = await fetch('/api/views/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ campaign_id: activeCampaignId }),
+        })
+        const d = await r.json()
+        if (!r.ok) {
+          setViewsRefreshMsg({ text: d.error || 'Views refresh failed', type: 'error' })
+          break
+        }
+        totalUpdated += d.updated || 0
+        totalOfPool = d.total || totalOfPool
+        setViewsRefreshMsg({
+          text: d.completed
+            ? `Refreshed ${totalUpdated} video${totalUpdated === 1 ? '' : 's'} from YouTube`
+            : `Refreshing... ${d.next_offset ?? 0} of ${totalOfPool} videos so far`,
+          type: d.completed ? 'ok' : 'warn',
+        })
+        if (d.completed || d.processed === 0) break
       }
       await dashboardQuery.refetch()
     } catch (e) {

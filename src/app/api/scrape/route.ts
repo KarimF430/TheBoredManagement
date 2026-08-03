@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
       )
 
       try {
-        const result = await scrapeKeyword(campaign_id, kw.id, kw.text)
+        const result = await scrapeKeyword(campaign_id, kw.id, kw.text, { archiveBefore: true })
         await queryAll(
           `UPDATE scrape_jobs SET status = 'completed', results_count = $1, quota_used = $2, completed_at = $3 WHERE id = $4`,
           [result.ranked, result.quota_cost, new Date().toISOString(), jobId]

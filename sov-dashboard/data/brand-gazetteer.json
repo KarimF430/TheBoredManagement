@@ -4289,7 +4289,8 @@
       "aliases": [
         "preethi",
         "preethi mixer",
-        "preethi mixer grinder"
+        "preethi mixer grinder",
+        "preethi kitchen appliances"
       ],
       "category": "Appliances",
       "subCategory": "Kitchen & Home Appliances"
@@ -4389,7 +4390,7 @@
       "subCategory": "Kitchen & Home Appliances"
     },
     {
-      "canonical": "Agaro",
+      "canonical": "AGARO",
       "aliases": [
         "agaro",
         "agaro kitchen"
@@ -4439,7 +4440,8 @@
       "canonical": "Maharaja Whiteline",
       "aliases": [
         "maharaja whiteline",
-        "maharajawhiteline"
+        "maharajawhiteline",
+        "maharaja"
       ],
       "category": "Appliances",
       "subCategory": "Kitchen & Home Appliances"
@@ -4605,7 +4607,8 @@
     {
       "canonical": "Atomberg",
       "aliases": [
-        "atomberg"
+        "atomberg",
+        "atomberg technologies"
       ],
       "category": "Appliances",
       "subCategory": "Heating & Cooling Appliances"
@@ -4630,7 +4633,7 @@
       "subCategory": "Heating & Cooling Appliances"
     },
     {
-      "canonical": "Agaro",
+      "canonical": "AGARO",
       "aliases": [
         "agaro",
         "agaro kitchen"

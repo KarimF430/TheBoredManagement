@@ -74,20 +74,28 @@ async function fetchVideoAnalytics(cid: string, format: string | null, isOurs: s
       ORDER BY v.view_count DESC NULLS LAST
     `, [cid]),
 
-    // Transcript coverage
+    // Transcript coverage — scoped to the same format the other stats on this
+    // page use, so toggling Long/Short doesn't leave this one stat unchanged
+    // while everything around it moves.
     queryAll<{ covered: number }>(`
-      SELECT COUNT(*)::INT as covered
+      SELECT COUNT(DISTINCT vt.video_id)::INT as covered
       FROM video_transcripts vt
       JOIN campaign_videos cv ON cv.video_id = vt.video_id
+      JOIN videos v ON v.id = cv.video_id
       WHERE cv.campaign_id = $1 AND vt.fetch_status = 'success'
+        ${format === 'long' ? `AND (v.duration_sec IS NULL OR v.duration_sec > 60 OR v.id IN (SELECT DISTINCT video_id FROM keyword_videos WHERE campaign_id = $1))` : ''}
+        ${format === 'short' ? `AND ((v.duration_sec IS NOT NULL AND v.duration_sec <= 60) OR v.id IN (SELECT DISTINCT video_id FROM keyword_shorts WHERE campaign_id = $1))` : ''}
     `, [cid]),
 
-    // Multi-keyword video count (2+ keywords)
+    // Multi-keyword video count (2+ keywords) — long-form and short-form
+    // rankings are tracked in separate tables, so "format" here means
+    // "which table to count from", not a WHERE clause on a shared column.
     queryAll<{ cnt: number }>(`
       SELECT COUNT(DISTINCT video_id)::INT as cnt
       FROM (
         SELECT video_id, COUNT(DISTINCT keyword_id) as kw_cnt
-        FROM keyword_videos WHERE campaign_id = $1
+        FROM ${format === 'short' ? 'keyword_shorts' : format === 'long' ? 'keyword_videos' : '(SELECT video_id, keyword_id FROM keyword_videos WHERE campaign_id = $1 UNION ALL SELECT video_id, keyword_id FROM keyword_shorts WHERE campaign_id = $1) t2'}
+        ${format === 'long' || format === 'short' ? 'WHERE campaign_id = $1' : ''}
         GROUP BY video_id
         HAVING COUNT(DISTINCT keyword_id) >= 2
       ) t
@@ -95,8 +103,12 @@ async function fetchVideoAnalytics(cid: string, format: string | null, isOurs: s
 
     // Tagged video count
     queryAll<{ cnt: number }>(`
-      SELECT COUNT(DISTINCT video_id)::INT as cnt
-      FROM brand_tags WHERE campaign_id = $1
+      SELECT COUNT(DISTINCT bt.video_id)::INT as cnt
+      FROM brand_tags bt
+      JOIN videos v ON v.id = bt.video_id
+      WHERE bt.campaign_id = $1
+        ${format === 'long' ? `AND (v.duration_sec IS NULL OR v.duration_sec > 60 OR v.id IN (SELECT DISTINCT video_id FROM keyword_videos WHERE campaign_id = $1))` : ''}
+        ${format === 'short' ? `AND ((v.duration_sec IS NOT NULL AND v.duration_sec <= 60) OR v.id IN (SELECT DISTINCT video_id FROM keyword_shorts WHERE campaign_id = $1))` : ''}
     `, [cid]),
 
     // Top 10 channels by video count
@@ -123,18 +135,24 @@ async function fetchVideoAnalytics(cid: string, format: string | null, isOurs: s
     queryAll<{ cnt: number }>(`
       SELECT COUNT(DISTINCT cv.video_id)::INT as cnt
       FROM campaign_videos cv
+      JOIN videos v ON v.id = cv.video_id
       WHERE cv.campaign_id = $1 AND cv.first_seen_at >= $2
+        ${format === 'long' ? `AND (v.duration_sec IS NULL OR v.duration_sec > 60 OR v.id IN (SELECT DISTINCT video_id FROM keyword_videos WHERE campaign_id = $1))` : ''}
+        ${format === 'short' ? `AND ((v.duration_sec IS NOT NULL AND v.duration_sec <= 60) OR v.id IN (SELECT DISTINCT video_id FROM keyword_shorts WHERE campaign_id = $1))` : ''}
     `, [cid, new Date(Date.now() - 7 * 86400000).toISOString()]),
 
     // Discovery timeline: videos discovered per week for last 12 weeks
     queryAll<{ week: string; count: number }>(`
       SELECT
-        DATE_TRUNC('week', first_seen_at)::TEXT as week,
-        COUNT(DISTINCT video_id)::INT as count
-      FROM campaign_videos
-      WHERE campaign_id = $1 AND first_seen_at >= $2
-      GROUP BY DATE_TRUNC('week', first_seen_at)
-      ORDER BY DATE_TRUNC('week', first_seen_at) ASC
+        DATE_TRUNC('week', cv.first_seen_at)::TEXT as week,
+        COUNT(DISTINCT cv.video_id)::INT as count
+      FROM campaign_videos cv
+      JOIN videos v ON v.id = cv.video_id
+      WHERE cv.campaign_id = $1 AND cv.first_seen_at >= $2
+        ${format === 'long' ? `AND (v.duration_sec IS NULL OR v.duration_sec > 60 OR v.id IN (SELECT DISTINCT video_id FROM keyword_videos WHERE campaign_id = $1))` : ''}
+        ${format === 'short' ? `AND ((v.duration_sec IS NOT NULL AND v.duration_sec <= 60) OR v.id IN (SELECT DISTINCT video_id FROM keyword_shorts WHERE campaign_id = $1))` : ''}
+      GROUP BY DATE_TRUNC('week', cv.first_seen_at)
+      ORDER BY DATE_TRUNC('week', cv.first_seen_at) ASC
     `, [cid, twelveWks]),
 
     // Aggregate summary stats in a single query

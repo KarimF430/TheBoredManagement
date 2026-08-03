@@ -197,15 +197,23 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
           ) t
         `, [cid]),
 
-    // Untagged videos count
+    // Untagged videos count — unique videos, scoped to the same format/language
+    // filters as the other pool stats (Total/Unique Videos). This previously
+    // ignored the format filter entirely, so "Pending Tagging" always showed
+    // the whole-campaign count regardless of which tab (All/Long/Short) was
+    // selected, and used COUNT(*) instead of a unique-video count.
     queryAll<{ cnt: number }>(`
-      SELECT COUNT(*)::INT as cnt
+      SELECT COUNT(DISTINCT cv.video_id)::INT as cnt
       FROM campaign_videos cv
+      JOIN videos v ON v.id = cv.video_id
       WHERE cv.campaign_id = $1
         AND NOT EXISTS (
           SELECT 1 FROM brand_tags bt
           WHERE bt.video_id = cv.video_id AND bt.campaign_id = $1
         )
+        ${format === 'long' ? `AND ((v.duration_sec IS NULL OR v.duration_sec > 60) OR cv.video_id IN (SELECT video_id FROM keyword_videos WHERE campaign_id = $1))` : ''}
+        ${format === 'short' ? `AND ((v.duration_sec IS NOT NULL AND v.duration_sec <= 60) OR cv.video_id IN (SELECT video_id FROM keyword_shorts WHERE campaign_id = $1))` : ''}
+        ${langVideoIdFilter('cv.video_id')}
     `, [cid]),
 
     // Sum of viewership for top-10 videos (Today, 1d, 7d, 30d) — scoped by language if set
@@ -266,24 +274,25 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
       GROUP BY k.language
     `, [cid]),
 
-    // Daily views group by — scoped to top-10 ranked videos per keyword (matches queryViewSumSQL)
+    // Daily views group by — every unique video ever ranked for this campaign,
+    // not just today's current top-10. Rank-scoping this made the total
+    // retroactive: any re-scrape that changed the top-10 roster silently
+    // rewrote every past date's sum too (a video dropping out of today's
+    // top-10 removed its views from ALL historical totals, even dates
+    // before it ever dropped), producing huge, meaningless swings that had
+    // nothing to do with real view growth. Scoping to the full unique-video
+    // pool instead makes each date's total stable once written.
     queryAll<{ snapshot_date: string; total_views: number }>(`
       SELECT
         vs.snapshot_date::TEXT,
         SUM(vs.view_count)::BIGINT AS total_views
       FROM view_snapshots vs
       JOIN (
-        SELECT DISTINCT video_id
-        FROM (
-          SELECT video_id, ROW_NUMBER() OVER (PARTITION BY keyword_id ORDER BY rank ASC) as rn
-          FROM keyword_videos WHERE campaign_id = $1 ${langKeywordFilter}
-          UNION ALL
-          SELECT video_id, ROW_NUMBER() OVER (PARTITION BY keyword_id ORDER BY rank ASC) as rn
-          FROM keyword_shorts WHERE campaign_id = $1 ${langKeywordFilter}
-        ) t
-        WHERE rn <= 10
-        ${format === 'long' ? 'AND video_id IN (SELECT video_id FROM keyword_videos WHERE campaign_id = $1)' : ''}
-        ${format === 'short' ? 'AND video_id IN (SELECT video_id FROM keyword_shorts WHERE campaign_id = $1)' : ''}
+        SELECT DISTINCT video_id FROM keyword_videos WHERE campaign_id = $1 ${langKeywordFilter}
+        ${format === 'short' ? 'AND FALSE' : ''}
+        UNION
+        SELECT DISTINCT video_id FROM keyword_shorts WHERE campaign_id = $1 ${langKeywordFilter}
+        ${format === 'long' ? 'AND FALSE' : ''}
       ) uv ON uv.video_id = vs.video_id
       WHERE vs.campaign_id = $1
         AND vs.snapshot_date >= $2::date
@@ -379,21 +388,39 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
       )`
     : ''
 
-  const videoRows = await queryAll<any>(`
-    SELECT
-      v.id, v.youtube_id, v.title, v.channel_name, v.channel_id,
-      v.view_count, v.thumbnail_url, v.is_ours, v.tags,
-      cv.first_seen_at
-    FROM campaign_videos cv
-    JOIN videos v ON v.id = cv.video_id
-    WHERE cv.campaign_id = $1
-      ${ownerFilter}
-      ${formatVideoFilter}
-      ${languageFilter}
-      AND v.is_deleted = FALSE
-    ORDER BY v.view_count DESC NULLS LAST
-    LIMIT 200
-  `, [cid])
+  const [videoRows, uniqueChannelsRow] = await Promise.all([
+    queryAll<any>(`
+      SELECT
+        v.id, v.youtube_id, v.title, v.channel_name, v.channel_id,
+        v.view_count, v.thumbnail_url, v.is_ours, v.tags,
+        cv.first_seen_at
+      FROM campaign_videos cv
+      JOIN videos v ON v.id = cv.video_id
+      WHERE cv.campaign_id = $1
+        ${ownerFilter}
+        ${formatVideoFilter}
+        ${languageFilter}
+        AND v.is_deleted = FALSE
+      ORDER BY v.view_count DESC NULLS LAST
+      LIMIT 200
+    `, [cid]),
+    // Active Creators must count every channel in the filtered pool, not just
+    // the top-200-by-views sample above — that sample skews hard by format
+    // (Shorts spread across far more small channels than long-form does),
+    // so deriving "unique channels" from it made the number swing in
+    // directions that had nothing to do with the real total.
+    queryAll<{ cnt: number }>(`
+      SELECT COUNT(DISTINCT v.channel_name)::INT as cnt
+      FROM campaign_videos cv
+      JOIN videos v ON v.id = cv.video_id
+      WHERE cv.campaign_id = $1
+        ${ownerFilter}
+        ${formatVideoFilter}
+        ${languageFilter}
+        AND v.is_deleted = FALSE
+        AND v.channel_name IS NOT NULL AND v.channel_name != ''
+    `, [cid]),
+  ])
 
   const top200Ids = videoRows.map((v: any) => v.id)
   const videoKeywordsMap = new Map<string, string[]>()
@@ -479,8 +506,7 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
     }
   }
 
-  // Calculate unique channels count
-  const channelNames = new Set(videoRows.map((v: any) => v.channel_name).filter(Boolean))
+  const uniqueChannels = uniqueChannelsRow[0]?.cnt ?? 0
 
   const transcriptCoverage = totalVideos > 0
     ? Math.round(((transcriptRow[0]?.covered ?? 0) / totalVideos) * 100)
@@ -497,7 +523,7 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
       totalViewership,
       uniqueVideos:         rankedVideos,
       uniqueVideoViewership: totalViewership,
-      uniqueChannels:       channelNames.size,
+      uniqueChannels:       uniqueChannels,
       mostRankingChannel:   topChannelMV?.data
         ? { name: topChannelMV.data.channel_name, totalFrequency: topChannelMV.data.total_frequency }
         : null,
@@ -540,22 +566,18 @@ async function queryViewSumSQL(cid: string, date: string, format?: string | null
         )`
       : ''
 
+    // Same fix as the Views Tracker daily totals: scope to every unique
+    // ranked video, not just today's current top-10 applied retroactively
+    // to past dates (which made growth % swing on ranking churn, not real
+    // view changes).
     return await queryAll<{ total_views: number }>(`
       SELECT SUM(vs.view_count)::BIGINT as total_views
       FROM (
-        SELECT DISTINCT video_id
-        FROM (
-          SELECT video_id, ROW_NUMBER() OVER (PARTITION BY keyword_id ORDER BY rank ASC) as rn
-          FROM keyword_videos
-          WHERE campaign_id = $1
-          UNION ALL
-          SELECT video_id, ROW_NUMBER() OVER (PARTITION BY keyword_id ORDER BY rank ASC) as rn
-          FROM keyword_shorts
-          WHERE campaign_id = $1
-        ) t
-        WHERE rn <= 10
-        ${format === 'long' ? 'AND video_id IN (SELECT video_id FROM keyword_videos WHERE campaign_id = $1)' : ''}
-        ${format === 'short' ? 'AND video_id IN (SELECT video_id FROM keyword_shorts WHERE campaign_id = $1)' : ''}
+        SELECT DISTINCT video_id FROM keyword_videos WHERE campaign_id = $1
+        ${format === 'short' ? 'AND FALSE' : ''}
+        UNION
+        SELECT DISTINCT video_id FROM keyword_shorts WHERE campaign_id = $1
+        ${format === 'long' ? 'AND FALSE' : ''}
       ) uv
       JOIN view_snapshots vs ON vs.video_id = uv.video_id
       WHERE vs.snapshot_date = $2::date AND vs.campaign_id = $1

@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 
 import { loadGazetteer, getBrandsForWhisper, type Gazetteer } from './brand-gazetteer'
+import { matchBrandsFromTranscript, type CandidateSpan } from './brand-matcher'
 
 // Built on first use, not at import time. The OpenAI constructor throws when no
 // key is configured, and this module sits in the import chain of the whole scrape
@@ -76,7 +77,8 @@ function buildFullExtractionPrompt(
   channelName: string,
   description: string,
   pinnedComment: string | null,
-  campaignBrands: string[]
+  campaignBrands: string[],
+  candidateBrands: string[] = []
 ): string {
   return `You are TBM's senior market intelligence analyst. You've manually watched thousands of Indian YouTube videos and written brand notes for client pitch decks. Your notes go straight into client-facing reports, so precision matters more than coverage.
 
@@ -88,6 +90,8 @@ PINNED COMMENT: ${pinnedComment || '(none available)'}
 TRANSCRIPT: ${transcript}
 
 BRANDS THIS CLIENT CARES ABOUT (prioritize detecting these if genuinely present — do not force-fit them if absent): ${campaignBrands.length > 0 ? campaignBrands.join(', ') : '(none specified)'}
+
+CANDIDATE BRANDS FOUND BY TEXT SEARCH (a fast scan matched these names verbatim somewhere in the source — verify each one is a genuine, discussed brand mention before including it, and use this list to catch correct spellings of brands you might otherwise miss; do not include a name just because it's here): ${candidateBrands.length > 0 ? candidateBrands.join(', ') : '(none found)'}
 
 ═══ RULES ═══
 - Retail platforms (Amazon, Flipkart, Meesho, etc.) are NEVER brands
@@ -308,6 +312,51 @@ function recoverMissedCampaignBrands(
   return [...detections, ...recovered].sort((a, b) => b.confidence - a.confidence)
 }
 
+/**
+ * Second recall safety net, this time from the deterministic gazetteer
+ * matcher rather than the campaign's own brand list. An exact Aho-Corasick
+ * hit is by construction a literal, word-bounded match — the model
+ * occasionally drops a brand it has no obvious reason to omit (a background
+ * mention, a spelling it didn't recognise as the same brand). This only adds
+ * brands the fast matcher found with an *exact* match; fuzzy candidates are
+ * left to the model's own judgement since a low-confidence edit-distance
+ * match is exactly the kind of thing worth a second opinion, not an
+ * auto-include.
+ */
+function recoverMissedGazetteerBrands(
+  detections: BrandDetection[],
+  fastCandidates: CandidateSpan[],
+  sourceText: string
+): BrandDetection[] {
+  if (fastCandidates.length === 0) return detections
+
+  const found = new Set(detections.map(d => d.brand_name.toLowerCase()))
+  const recovered: BrandDetection[] = []
+  const addedThisPass = new Set<string>()
+
+  for (const candidate of fastCandidates) {
+    if (candidate.matchType !== 'exact') continue
+
+    const canonical = candidate.brand.canonical
+    const key = canonical.toLowerCase()
+    if (found.has(key) || addedThisPass.has(key)) continue
+    if (isRetailPlatform(canonical)) continue
+    if (!passesAmbiguityGuard(canonical, sourceText)) continue
+
+    addedThisPass.add(key)
+    recovered.push({
+      brand_name: canonical,
+      confidence: 0.5,
+      mention_type: 'mentioned',
+      context_quotes: [candidate.contextWindow].filter(Boolean),
+      why_it_matters: 'Exact brand-name match found by text search but not surfaced by the model',
+      match_type: 'exact',
+    })
+  }
+
+  return [...detections, ...recovered].sort((a, b) => b.confidence - a.confidence)
+}
+
 /** Parse the model's JSON, tolerating code fences and leading prose. */
 function parseAnalysisJson(text: string): BrandAnalysisResult | null {
   if (!text) return null
@@ -332,7 +381,8 @@ async function extractBrandNotes(
   channelName: string,
   description: string,
   pinnedComment: string | null,
-  campaignBrands: string[]
+  campaignBrands: string[],
+  candidateBrands: string[] = []
 ): Promise<BrandAnalysisResult | null> {
   const prompt = buildFullExtractionPrompt(
     transcript,
@@ -340,7 +390,8 @@ async function extractBrandNotes(
     channelName,
     description,
     pinnedComment,
-    campaignBrands
+    campaignBrands,
+    candidateBrands
   )
 
   const completion = await getOpenAI().chat.completions.create({
@@ -388,10 +439,24 @@ export async function analyzeBrandsFromTranscript(
     .filter(Boolean)
     .join('\n')
 
+  // Fast, free, deterministic pre-pass (Aho-Corasick + fuzzy) against the
+  // full brand gazetteer. Its exact matches feed the prompt as a hint — grounds
+  // the model against real substring hits and catches spelling variants it
+  // might not recognise as the same brand — and back a recall safety net
+  // below, mirroring recoverMissedCampaignBrands but for any gazetteer brand,
+  // not just this campaign's. It never gates or skips the LLM call: the
+  // gazetteer doesn't cover every category, so it can only add, never remove.
+  const fastMatch = matchBrandsFromTranscript(truncatedTranscript, knownBrands)
+  const candidateBrands = [...new Set(
+    fastMatch.candidates
+      .filter(c => c.matchType === 'exact')
+      .map(c => c.brand.canonical)
+  )]
+
   let extraction: BrandAnalysisResult | null = null
   try {
     extraction = await extractBrandNotes(
-      truncatedTranscript, videoTitle, channelName, truncatedDesc, pinnedComment, knownBrands
+      truncatedTranscript, videoTitle, channelName, truncatedDesc, pinnedComment, knownBrands, candidateBrands
     )
   } catch (err) {
     console.error(`Brand extraction failed for "${videoTitle}":`, err)
@@ -409,7 +474,8 @@ export async function analyzeBrandsFromTranscript(
     videoFormat: extraction.video_format,
   })
 
-  return recoverMissedCampaignBrands(detections, knownBrands, sourceText)
+  const withCampaignRecall = recoverMissedCampaignBrands(detections, knownBrands, sourceText)
+  return recoverMissedGazetteerBrands(withCampaignRecall, fastMatch.candidates, sourceText)
 }
 
 export async function analyzeVideoBatch(

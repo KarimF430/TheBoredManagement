@@ -10,13 +10,14 @@ export async function GET(req: NextRequest) {
     const campaignId = req.nextUrl.searchParams.get('campaign_id')
     const isOurs = req.nextUrl.searchParams.get('is_ours')
     const format = req.nextUrl.searchParams.get('format') // 'all' | 'long' | 'short'
+    const language = req.nextUrl.searchParams.get('language')
 
     const { authorized, error } = await authorizeCampaignAccess(req, campaignId)
     if (!authorized) return error
     if (!campaignId) return NextResponse.json({ data: [], has_scrape_data: false })
 
-    const key = `${cacheKey.brands(campaignId)}:${isOurs || 'all'}:${format || 'all'}`
-    const data = await getCached(key, () => fetchBrands(campaignId, isOurs, format), CACHE_TTL.brands_overview)
+    const key = `${cacheKey.brands(campaignId)}:${isOurs || 'all'}:${format || 'all'}:${language || 'all'}`
+    const data = await getCached(key, () => fetchBrands(campaignId, isOurs, format, language), CACHE_TTL.brands_overview)
     return NextResponse.json(data)
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unknown error'
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-async function fetchBrands(campaignId: string, isOurs?: string | null, format?: string | null) {
+async function fetchBrands(campaignId: string, isOurs?: string | null, format?: string | null, language?: string | null) {
   // Get brand names from brand_tags (the source of truth)
   let { data: btRows } = await supabase.from('brand_tags').select('brand_name, video_id').eq('campaign_id', campaignId)
 
@@ -50,6 +51,27 @@ async function fetchBrands(campaignId: string, isOurs?: string | null, format?: 
     const { data: kvRows } = await supabase.from(table).select('video_id').eq('campaign_id', campaignId)
     const validVideoIds = new Set((kvRows || []).map((r: any) => r.video_id))
     btRows = btRows.filter((bt: any) => validVideoIds.has(bt.video_id))
+  }
+
+  // Filter by language if specified. The frontend previously tried to do this
+  // client-side against a `langBreakdown`/`language` field that this API never
+  // returned — every brand's language ended up undefined, so selecting any
+  // specific language emptied the whole list to zero brands. Filtering here
+  // instead, before the aggregation below, means sov_percent/total_views are
+  // genuinely recomputed for the language-scoped subset, not the whole
+  // campaign's totals sitting next to a shorter list.
+  if (language && language !== 'all') {
+    const [kvLang, ksLang] = await Promise.all([
+      supabase.from('keyword_videos').select('video_id, keywords!inner(language)')
+        .eq('campaign_id', campaignId).eq('keywords.language', language),
+      supabase.from('keyword_shorts').select('video_id, keywords!inner(language)')
+        .eq('campaign_id', campaignId).eq('keywords.language', language),
+    ])
+    const langVideoIds = new Set([
+      ...((kvLang.data || []) as any[]).map(r => r.video_id),
+      ...((ksLang.data || []) as any[]).map(r => r.video_id),
+    ])
+    btRows = btRows.filter((bt: any) => langVideoIds.has(bt.video_id))
   }
 
   if (btRows.length === 0) {

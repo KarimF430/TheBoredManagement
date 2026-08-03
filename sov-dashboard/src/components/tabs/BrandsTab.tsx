@@ -94,11 +94,12 @@ export default function BrandsTab() {
   }, [expandedBrand, activeCampaignId, format, ownership])
 
   const brandsQuery = useQuery({
-    queryKey: ['brands-tab', activeCampaignId, format, ownership],
+    queryKey: ['brands-tab', activeCampaignId, format, ownership, brandSOVLang],
     queryFn: async () => {
       const params = new URLSearchParams({ campaign_id: activeCampaignId! })
       if (format !== 'all') params.set('format', format)
       if (ownership !== 'all') params.set('is_ours', ownership === 'ours' ? 'true' : 'false')
+      if (brandSOVLang !== 'all') params.set('language', brandSOVLang)
       const res = await fetch(`/api/brands?${params}`)
       return res.json()
     },
@@ -109,12 +110,10 @@ export default function BrandsTab() {
   const loading = brandsQuery.isLoading
 
   const analytics = useMemo(() => {
-    let filtered = brandsData
-    if (brandSOVLang !== 'all') {
-      filtered = filtered.filter((b: any) => {
-        return b.langBreakdown?.some((l: any) => l.language === brandSOVLang) || b.language === brandSOVLang
-      })
-    }
+    // Language filtering now happens server-side (see brandsQuery above) so
+    // sov_percent/total_views are recomputed for the selected language, not
+    // just a client-side list-shrink over whole-campaign totals.
+    const filtered = brandsData
 
     const topViews = filtered.map((b: any) => ({
       name: b.name,

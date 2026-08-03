@@ -384,6 +384,44 @@ async function fetchSearchPage(
 }
 
 /** Video details for any number of ids, in 50-id batches. Never throws. */
+/**
+ * Reuse already-known video rows instead of re-spending a videos.list call on
+ * them. Title, description, duration and channel are effectively static —
+ * the one field that genuinely goes stale, view_count, is kept fresh
+ * independently by the daily views job, which runs across every campaign's
+ * full video pool regardless of ranking scans. A weekly or manual re-scrape
+ * therefore only needs videos.list for youtube_ids it has never seen before.
+ */
+async function loadKnownVideos(youtubeIds: string[]): Promise<Map<string, YouTubeVideo>> {
+  const known = new Map<string, YouTubeVideo>()
+  if (youtubeIds.length === 0) return known
+
+  const rows = await queryAll<any>(
+    `SELECT youtube_id, title, description, channel_name, channel_id, view_count,
+            published_at, thumbnail_url, duration, duration_sec, tags
+     FROM videos WHERE youtube_id = ANY($1)`,
+    [youtubeIds]
+  )
+
+  for (const r of rows) {
+    known.set(r.youtube_id, {
+      youtube_id: r.youtube_id,
+      title: r.title || '',
+      description: r.description || '',
+      channel_name: r.channel_name || '',
+      channel_id: r.channel_id || '',
+      view_count: r.view_count || 0,
+      published_at: r.published_at || '',
+      thumbnail_url: r.thumbnail_url || '',
+      duration: r.duration || '',
+      duration_sec: r.duration_sec || 0,
+      tags: Array.isArray(r.tags) ? r.tags : [],
+    })
+  }
+
+  return known
+}
+
 async function fetchDetailsForAll(
   youtubeIds: string[]
 ): Promise<{ videos: Map<string, YouTubeVideo>; quotaCost: number }> {
@@ -510,10 +548,14 @@ export async function scrapeKeyword(
       else rejectedBrand++
     }
 
-    // 3. Duration decides format, so details are required for every survivor.
-    const { videos: details, quotaCost: detailQuota } =
-      await fetchDetailsForAll(eligible.map(h => h.youtube_id))
+    // 3. Duration decides format, so details are required for every survivor —
+    // but reuse already-known rows instead of re-spending a videos.list call
+    // on videos this campaign (or any campaign) has ranked before.
+    const known = await loadKnownVideos(eligible.map(h => h.youtube_id))
+    const unknownIds = eligible.map(h => h.youtube_id).filter(id => !known.has(id))
+    const { videos: fetched, quotaCost: detailQuota } = await fetchDetailsForAll(unknownIds)
     pageQuota += detailQuota
+    const details = new Map([...known, ...fetched])
 
     for (const hit of eligible) {
       const video = details.get(hit.youtube_id)

@@ -723,6 +723,16 @@ body {
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 2px;
+  /* Fixed height, sized above the ~34px content row with room to spare.
+     overflow-x:auto only draws a scrollbar (Windows: non-overlay, occupies
+     real space) once content is wide enough to need it — e.g. when the
+     active-filter badge + Reset button appear. Without a fixed height that
+     scrollbar's arrival changes the element's rendered height, pushing
+     everything below it down the moment a filter is selected. Reserving
+     the space unconditionally means the scrollbar appearing or not never
+     changes the row's footprint. */
+  height: 44px;
+  box-sizing: border-box;
 }
 .filter-bar .input { padding: 6px 12px; font-size: 12px; }
 .filter-bar select.input { padding-right: 32px; }

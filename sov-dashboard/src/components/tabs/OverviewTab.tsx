@@ -555,6 +555,13 @@ export default function OverviewTab() {
           const gainMin = chartViewMode === 'daily_gain' ? Math.min(...chartData.map((d: any) => d.gain || 0)) : 0
           const gainMax = chartViewMode === 'daily_gain' ? Math.max(...chartData.map((d: any) => d.gain || 0)) : 0
           const gainRange = gainMax - gainMin || 1
+          // Recharts anchors bars to the axis domain's floor, not to zero —
+          // if 0 isn't inside [gainDomainMin, gainDomainMax], every bar
+          // floats from that arbitrary floor instead of growing up from a
+          // real baseline. Clamping both ends at 0 keeps 0 in the domain
+          // whether gains are all-positive, all-negative, or mixed.
+          const gainDomainMin = Math.min(0, gainMin - gainRange * 0.15)
+          const gainDomainMax = Math.max(0, gainMax + gainRange * 0.2)
 
           const minVal = Math.min(...data.map((t: any) => t.views))
           const maxVal = Math.max(...data.map((t: any) => t.views))
@@ -626,7 +633,7 @@ export default function OverviewTab() {
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
                       <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-                      <YAxis domain={chartViewMode === 'daily_gain' ? [gainMin - gainRange * 0.15, gainMax + gainRange * 0.2] : [yMin, yMax]} tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} tickFormatter={(v: any) => fmt(v)} />
+                      <YAxis domain={chartViewMode === 'daily_gain' ? [gainDomainMin, gainDomainMax] : [yMin, yMax]} tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} tickFormatter={(v: any) => fmt(v)} />
                       <RechartsTooltip content={renderTooltip} cursor={{ fill: 'rgba(139,92,246,0.06)' }} />
                       <Bar dataKey={chartViewMode === 'daily_gain' ? 'gain' : 'views'} radius={[5, 5, 0, 0]} fill="url(#barGrad)" />
                     </BarChart>
