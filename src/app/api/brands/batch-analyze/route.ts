@@ -33,8 +33,8 @@ export function getJobStatus(jobId: string) {
   return activeJobs.get(jobId) || null
 }
 
-const CONCURRENCY = 5  // Parallel LLM calls (safe for OpenAI Tier 1: 500 RPM)
-const BATCH_DELAY_MS = 200  // Small delay between batches to avoid hammering
+const CONCURRENCY = 10  // Parallel LLM calls (safe for OpenAI Tier 1: 500 RPM)
+const BATCH_DELAY_MS = 100  // Small delay between batches
 
 export async function POST(req: NextRequest) {
   try {
