@@ -3,6 +3,7 @@ import { queryAll, queryOne } from '@/lib/supabase'
 import { fetchTranscript } from '@/lib/transcript'
 import { analyzeBrandsFromTranscript, analyzeBrandsFromMetadata } from '@/lib/brand-analyzer'
 import { RateLimiter } from '@/lib/retry'
+import { invalidateCampaign } from '@/lib/cache'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -80,8 +81,8 @@ async function analyzeOneVideo(
   force: boolean
 ): Promise<AnalyzeResult> {
   if (!force) {
-    const existing = await queryOne('SELECT brand_analysis_checked_at FROM videos WHERE id = $1', [video.id])
-    if (existing?.brand_analysis_checked_at) {
+    const existing = await queryOne('SELECT 1 FROM brand_analysis WHERE video_id = $1 LIMIT 1', [video.id])
+    if (existing) {
       return { youtube_id: video.youtube_id, status: 'already_analyzed' }
     }
   }
@@ -177,6 +178,9 @@ export async function POST(req: NextRequest) {
     }
 
     const remaining = videos.length - i
+
+    // Invalidate campaign cache so leaderboard & overview reflect new brand tags immediately
+    await invalidateCampaign(campaign_id)
 
     return NextResponse.json({
       results,

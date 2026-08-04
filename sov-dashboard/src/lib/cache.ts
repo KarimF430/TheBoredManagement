@@ -178,14 +178,17 @@ export const cacheKey = {
 }
 
 export async function invalidateCampaign(campaignId: string) {
-  invalidateL1(`campaign:${campaignId}`)
-  invalidateL1('campaigns:all')
+  invalidateL1()
   try {
     if (redis) {
-      const keys = await redis.keys(`campaign:${campaignId}:*`)
-      if (keys.length > 0) await redis.del(...keys)
+      const keys = await redis.keys(`*${campaignId}*`)
+      const lbKeys = await redis.keys(`lb:*`)
+      const allKeys = Array.from(new Set([...keys, ...lbKeys]))
+      if (allKeys.length > 0) await redis.del(...allKeys)
       await redis.del(cacheKey.campaigns())
       await redis.del(cacheKey.metadata())
     }
-  } catch {}
+  } catch (e) {
+    console.error('Failed to invalidate campaign cache:', e)
+  }
 }

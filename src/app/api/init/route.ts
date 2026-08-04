@@ -8,7 +8,9 @@ export async function GET(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get('secret')
   const expected = process.env.CRON_SECRET
 
-  if (expected && secret !== expected) {
+  // Allow unauthenticated access for pre-warm (GET without secret)
+  // CRON_SECRET only required for authenticated cron operations
+  if (secret && expected && secret !== expected) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

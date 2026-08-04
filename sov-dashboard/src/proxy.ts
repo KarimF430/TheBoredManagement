@@ -13,6 +13,7 @@ export async function proxy(req: NextRequest) {
     path.startsWith('/login') ||
     path.startsWith('/api/auth') ||
     path.startsWith('/api/brands/analyze') ||
+    path.startsWith('/api/videos/ids') ||
     path.startsWith('/api/warm') ||
     path.startsWith('/api/cron') ||
     path.startsWith('/api/creators')

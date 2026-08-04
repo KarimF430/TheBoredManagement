@@ -196,13 +196,10 @@ function LeaderboardContent() {
       const res = await fetch('/api/brands/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ video_ids: [youtubeId], campaign_id: activeCampaignId, force: false }),
+        body: JSON.stringify({ video_ids: [youtubeId], campaign_id: activeCampaignId, force: true }),
       })
       const result = await res.json()
-      const analysis = result.results?.[0]
-      if (analysis?.status === 'analyzed' && analysis.high_confidence_brands?.length > 0) {
-        leaderboardQuery.refetch()
-      }
+      leaderboardQuery.refetch()
     } catch (e) {
       console.error('Auto analysis failed:', e)
     } finally {
@@ -271,13 +268,13 @@ function LeaderboardContent() {
           const res = await fetch('/api/brands/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ video_ids: batch.map(v => v.youtube_id), campaign_id: activeCampaignId, force: false }),
+            body: JSON.stringify({ video_ids: batch.map(v => v.youtube_id), campaign_id: activeCampaignId, force: true }),
           })
           const result = await res.json()
 
           for (const r of (result.results || [])) {
             processed++
-            if (r.status === 'analyzed') {
+            if (r.status === 'analyzed' || r.status === 'already_analyzed') {
               const brands = r.high_confidence_brands?.length || r.brands_detected || 0
               if (brands > 0) success++; else skipped++
             } else if (r.status === 'error') {
@@ -297,7 +294,7 @@ function LeaderboardContent() {
 
         setAnalysis(snapshot({}))
         // Newly detected brands land in the table as the run proceeds.
-        if (success > 0) leaderboardQuery.refetch()
+        leaderboardQuery.refetch()
       }
 
       const stopped = cancelRef.current

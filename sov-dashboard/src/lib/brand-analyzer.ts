@@ -11,18 +11,29 @@ let _openai: OpenAI | null = null
 
 function getOpenAI(): OpenAI {
   if (!_openai) {
-    // A missing key surfaces as a caught call-time error, not an import-time crash.
-    _openai = new OpenAI({
-      baseURL: 'https://openrouter.ai/api/v1',
-      apiKey: process.env.OPENROUTER_API_KEY || '',
-    })
+    if (process.env.OPENAI_API_KEY) {
+      // Use direct OpenAI API if key is provided
+      _openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      })
+    } else {
+      // Fallback to OpenRouter
+      _openai = new OpenAI({
+        baseURL: 'https://openrouter.ai/api/v1',
+        apiKey: process.env.OPENROUTER_API_KEY || '',
+      })
+    }
   }
   return _openai
 }
 
 /** True when brand analysis can run — callers use it to skip LLM work cleanly. */
 export function isBrandAnalysisConfigured(): boolean {
-  return Boolean(process.env.OPENROUTER_API_KEY)
+  return Boolean(process.env.OPENAI_API_KEY || process.env.OPENROUTER_API_KEY)
+}
+
+function getModelName() {
+  return process.env.OPENAI_API_KEY ? 'gpt-4o-mini' : 'openai/gpt-4o-mini'
 }
 
 export type VideoFormat =
@@ -395,7 +406,7 @@ async function extractBrandNotes(
   )
 
   const completion = await getOpenAI().chat.completions.create({
-    model: 'openai/gpt-4o-mini',
+    model: getModelName(),
     messages: [{ role: 'user', content: prompt }],
     temperature: 0.1,
     max_tokens: 2000,
@@ -608,29 +619,29 @@ export async function detectIrrelevantVideo(
 
   // Heuristic: Music video indicators
   if (titleLower.includes('official music video') || titleLower.includes('song') ||
-      titleLower.includes('album') || titleLower.includes('lyrics') ||
-      titleLower.includes('audio') || titleLower.includes('remix')) {
+    titleLower.includes('album') || titleLower.includes('lyrics') ||
+    titleLower.includes('audio') || titleLower.includes('remix')) {
     return { is_irrelevant: true, reason: 'Music content detected', score: 0.95, category: 'music' }
   }
 
   // Heuristic: Gaming indicators
   if (titleLower.includes('gameplay') || titleLower.includes('let\'s play') ||
-      titleLower.includes('minecraft') || titleLower.includes('gta') ||
-      titleLower.includes('free fire') || titleLower.includes('bgmi') ||
-      titleLower.includes('pubg')) {
+    titleLower.includes('minecraft') || titleLower.includes('gta') ||
+    titleLower.includes('free fire') || titleLower.includes('bgmi') ||
+    titleLower.includes('pubg')) {
     return { is_irrelevant: true, reason: 'Gaming content detected', score: 0.9, category: 'gaming' }
   }
 
   // Heuristic: Live stream indicators
   if (titleLower.includes('live') || titleLower.includes('stream') ||
-      titleLower.includes('podcast') || titleLower.includes('interview')) {
+    titleLower.includes('podcast') || titleLower.includes('interview')) {
     return { is_irrelevant: true, reason: 'Live stream/podcast detected', score: 0.8, category: 'live_stream' }
   }
 
   // If heuristics don't catch it, use LLM
   try {
     const completion = await getOpenAI().chat.completions.create({
-      model: 'openai/gpt-4o-mini',
+      model: getModelName(),
       messages: [{ role: 'user', content: buildIrrelevancePrompt(title, channelName, description) }],
       temperature: 0.1,
       max_tokens: 300,

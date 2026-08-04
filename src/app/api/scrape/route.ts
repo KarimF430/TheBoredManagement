@@ -99,6 +99,22 @@ export async function POST(req: NextRequest) {
 
     await invalidateCampaign(campaign_id)
 
+    // Clean up stale pool entries: remove videos from campaign_videos that
+    // are no longer ranked by any keyword for this campaign.
+    try {
+      await queryAll(
+        `DELETE FROM campaign_videos WHERE campaign_id = $1
+         AND video_id NOT IN (
+           SELECT video_id FROM keyword_videos WHERE campaign_id = $1
+           UNION
+           SELECT video_id FROM keyword_shorts WHERE campaign_id = $1
+         )`,
+        [campaign_id]
+      )
+    } catch (e) {
+      console.error('Pool cleanup after scrape failed (non-fatal):', e)
+    }
+
     // Auto-refresh view snapshots so Trends/Growth have data
     try {
       const nowIso = new Date().toISOString()

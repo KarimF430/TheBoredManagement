@@ -93,7 +93,8 @@ describe('Brand Analyzer', () => {
 
       const result = await analyzeBrandsFromTranscript(VLOG_TRANSCRIPT, 'Kitchen Vlog', [], 'HomeDiaries')
 
-      expect(result).toHaveLength(1)
+      // Prestige is from mock; Butterfly and Philips are recovered by gazetteer (real brands in transcript)
+      expect(result.length).toBeGreaterThanOrEqual(1)
       expect(result[0].brand_name).toBe('Prestige')
       expect(result.every(d => !['amazon', 'flipkart', 'meesho'].includes(d.brand_name.toLowerCase()))).toBe(true)
     })
@@ -129,8 +130,11 @@ describe('Brand Analyzer', () => {
       })
 
       const result = await analyzeBrandsFromTranscript(AQUAGUARD_TRANSCRIPT, 'Aquaguard Royal Review', [], 'TechBar')
-      expect(result).toHaveLength(1)
-      expect(result[0].mention_type).toBe('primary_review')
+      // Gazetteer recovery may add other brands (KENT, Livpure, etc.) but Aquaguard is highest confidence
+      expect(result.length).toBeGreaterThanOrEqual(1)
+      const aquaguard = result.find(d => d.brand_name === 'Aquaguard')
+      expect(aquaguard).toBeDefined()
+      expect(aquaguard!.mention_type).toBe('primary_review')
     })
 
     it('should detect comparison format', async () => {
@@ -143,8 +147,14 @@ describe('Brand Analyzer', () => {
       })
 
       const result = await analyzeBrandsFromTranscript(COMPARISON_TRANSCRIPT, 'Samsung vs iPhone', [], 'TechChannel')
-      expect(result).toHaveLength(2)
-      expect(result.every(d => d.mention_type === 'comparison')).toBe(true)
+      // Gazetteer recovery may add other brands (OnePlus, Xiaomi) but Samsung/Apple are highest confidence
+      expect(result.length).toBeGreaterThanOrEqual(2)
+      const samsung = result.find(d => d.brand_name === 'Samsung')
+      const apple = result.find(d => d.brand_name === 'Apple')
+      expect(samsung).toBeDefined()
+      expect(apple).toBeDefined()
+      expect(samsung!.mention_type).toBe('comparison')
+      expect(apple!.mention_type).toBe('comparison')
     })
 
     it('should detect roundup format', async () => {
@@ -279,10 +289,10 @@ describe('Brand Analyzer', () => {
       const elapsed = Date.now() - start
 
       expect(result.size).toBe(2)
-      expect(result.get('v1')).toHaveLength(1)
-      expect(result.get('v2')).toHaveLength(1)
-      // Should have waited at least 2s between videos for rate limiting
-      expect(elapsed).toBeGreaterThanOrEqual(1800)
+      expect(result.get('v1')!.length).toBeGreaterThanOrEqual(1)
+      expect(result.get('v2')!.length).toBeGreaterThanOrEqual(1)
+      // 2 videos = 1 delay of 200ms; verify rate-limiting delay occurred
+      expect(elapsed).toBeGreaterThanOrEqual(150)
     })
   })
 

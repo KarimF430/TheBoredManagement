@@ -96,6 +96,22 @@ export async function POST(req: NextRequest) {
     const totalRanked = results.reduce((s, r) => s + r.ranked, 0)
     const totalQuota = results.reduce((s, r) => s + r.quota_cost, 0)
 
+    // Clean up stale pool entries: remove videos from campaign_videos that
+    // are no longer ranked by any keyword for this campaign.
+    try {
+      await queryAll(
+        `DELETE FROM campaign_videos WHERE campaign_id = $1
+         AND video_id NOT IN (
+           SELECT video_id FROM keyword_videos WHERE campaign_id = $1
+           UNION
+           SELECT video_id FROM keyword_shorts WHERE campaign_id = $1
+         )`,
+        [campaign_id]
+      )
+    } catch (e) {
+      console.error('Pool cleanup after scrape failed (non-fatal):', e)
+    }
+
     return NextResponse.json({
       ok: true,
       message: remaining > 0
