@@ -309,8 +309,8 @@ const TARGET_PER_FORMAT = 10
  * (default 100 calls/day/project), which is the real constraint — not units.
  */
 function maxSearchPages(): number {
-  const raw = parseInt(process.env.YOUTUBE_MAX_SEARCH_PAGES ?? '1', 10)
-  if (!Number.isFinite(raw)) return 1
+  const raw = parseInt(process.env.YOUTUBE_MAX_SEARCH_PAGES ?? '3', 10)
+  if (!Number.isFinite(raw)) return 3
   return Math.min(Math.max(raw, 1), 5)
 }
 
@@ -616,11 +616,13 @@ export async function scrapeKeyword(
     }
   }
 
-  // Nothing usable from the API (quota exhausted, outage) — fall back to the
-  // campaign pool so the keyword keeps a ranking instead of going blank.
-  if (longForm.length === 0 && shortForm.length === 0) {
+  // Supplement from the campaign pool when either format is below target.
+  // This covers: (a) quota exhausted / API outage — both empty; (b) channel
+  // filtering removed too many results — one or both formats short.
+  if (longForm.length < TARGET_PER_FORMAT || shortForm.length < TARGET_PER_FORMAT) {
     usedFallback = true
-    const fallback = await loadKeywordRelevantPoolVideos(campaignId, keywordText, 50)
+    const shortfall = (TARGET_PER_FORMAT - longForm.length) + (TARGET_PER_FORMAT - shortForm.length)
+    const fallback = await loadKeywordRelevantPoolVideos(campaignId, keywordText, Math.max(shortfall * 3, 50))
     let position = 0
     for (const video of fallback) {
       position++

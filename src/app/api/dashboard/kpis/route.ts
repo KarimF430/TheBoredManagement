@@ -60,6 +60,8 @@ async function fetchKpis(cid: string, format?: string | null) {
     cvRes,        // total video count (format-filtered)
     cvNewRes,     // new videos (7 days, format-filtered)
     btRes,        // tagged video count
+    rankedRes,    // unique ranked videos count
+    appearancesRes, // total ranking appearances count
     top5Views,    // brand SOV by views (materialized view)
     top5Freq,     // brand SOV by freq (materialized view)
     topChannel,   // most ranking channel (materialized view)
@@ -119,6 +121,26 @@ async function fetchKpis(cid: string, format?: string | null) {
     supabase.from('brand_tags')
       .select('video_id', { count: 'exact', head: true })
       .eq('campaign_id', cid),
+
+    // Ranked videos unique count (distinct video_ids in keyword_videos + keyword_shorts)
+    queryAll<{ cnt: number }>(`
+      SELECT COUNT(DISTINCT video_id)::INT as cnt
+      FROM (
+        SELECT video_id FROM keyword_videos WHERE campaign_id = $1
+        UNION ALL
+        SELECT video_id FROM keyword_shorts WHERE campaign_id = $1
+      ) t
+    `, [cid]),
+
+    // Total ranking appearances count (non-unique — a video on 40 keywords = 40)
+    queryAll<{ cnt: number }>(`
+      SELECT COUNT(*)::INT as cnt
+      FROM (
+        SELECT video_id FROM keyword_videos WHERE campaign_id = $1
+        UNION ALL
+        SELECT video_id FROM keyword_shorts WHERE campaign_id = $1
+      ) t
+    `, [cid]),
 
     // Materialized views: pre-computed, instant
     supabase.from('brand_sov_mv')
@@ -189,10 +211,11 @@ async function fetchKpis(cid: string, format?: string | null) {
     lastUpdatedRanking: meta['last_ranking_refresh'] ?? null,
     totalKeywords:       kwRes.count ?? 0,
     totalVideos,
-    rankedVideos:        0,
+    totalRankingAppearances: Array.isArray(appearancesRes) ? (appearancesRes[0]?.cnt ?? 0) : 0,
+    rankedVideos:        Array.isArray(rankedRes) ? (rankedRes[0]?.cnt ?? 0) : 0,
     rankedVideoCount:    0,
     totalViewership:     vsToday || vs1d || 0,
-    uniqueVideos:        0,
+    uniqueVideos:        Array.isArray(rankedRes) ? (rankedRes[0]?.cnt ?? 0) : 0,
     uniqueVideoViewership: vsToday || vs1d || 0,
     uniqueChannels:      0,
     mostRankingChannel:  topChannel?.data

@@ -69,11 +69,16 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
     topChannelMV,
     top10Rows,
     rankedVideosCountRow,
+    rankedAppearancesCountRow,
     untaggedVideosCountRow,
     vsTodayRow,
     vs1dRow,
     vs7dRow,
     vs30dRow,
+    vsTodayTotalRow,
+    vs1dTotalRow,
+    vs7dTotalRow,
+    vs30dTotalRow,
     kwVideoCounts,
     regionalStatsRows,
     dailyViewsRows,
@@ -180,6 +185,29 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
           ) t
         `, [cid]),
 
+    // Total ranking appearances count (non-unique — a video on 40 keywords = 40)
+    languageKeywordIds
+      ? queryAll<{ cnt: number }>(`
+          SELECT COUNT(*)::INT as cnt
+          FROM (
+            SELECT video_id, keyword_id FROM keyword_videos WHERE campaign_id = $1 AND keyword_id = ANY($2)
+            UNION ALL
+            SELECT video_id, keyword_id FROM keyword_shorts WHERE campaign_id = $1 AND keyword_id = ANY($2)
+          ) t
+        `, [cid, languageKeywordIds])
+      : format === 'long'
+      ? queryAll<{ cnt: number }>(`SELECT COUNT(*)::INT as cnt FROM keyword_videos WHERE campaign_id = $1`, [cid])
+      : format === 'short'
+      ? queryAll<{ cnt: number }>(`SELECT COUNT(*)::INT as cnt FROM keyword_shorts WHERE campaign_id = $1`, [cid])
+      : queryAll<{ cnt: number }>(`
+          SELECT COUNT(*)::INT as cnt
+          FROM (
+            SELECT video_id FROM keyword_videos WHERE campaign_id = $1
+            UNION ALL
+            SELECT video_id FROM keyword_shorts WHERE campaign_id = $1
+          ) t
+        `, [cid]),
+
     // Untagged videos count
     queryAll<{ cnt: number }>(`
       SELECT COUNT(*)::INT as cnt
@@ -191,11 +219,17 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
         )
     `, [cid]),
 
-    // Sum of viewership for top-10 videos (Today, 1d, 7d, 30d)
+    // Sum of viewership for top-10 videos (Today, 1d, 7d, 30d) — unique (deduplicated)
     queryViewSumSQL(cid, today, format),
     queryViewSumSQL(cid, d1, format),
     queryViewSumSQL(cid, d7, format),
     queryViewSumSQL(cid, d30, format),
+
+    // Sum of viewership for top-10 videos (Today, 1d, 7d, 30d) — total (non-unique, every appearance counted)
+    queryViewSumTotalSQL(cid, today, format),
+    queryViewSumTotalSQL(cid, d1, format),
+    queryViewSumTotalSQL(cid, d7, format),
+    queryViewSumTotalSQL(cid, d30, format),
 
     // Keyword long/short counts
     queryAll<{ keyword_id: string; long_count: number; short_count: number }>(`
@@ -339,7 +373,14 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
   const vs1d    = vs1dRow[0]?.total_views ?? 0
   const vs7d    = vs7dRow[0]?.total_views ?? 0
   const vs30d   = vs30dRow[0]?.total_views ?? 0
-  const totalViewership = vsToday || vs1d || vs7d || 0
+  const uniqueVideoViewership = vsToday || vs1d || vs7d || 0
+
+  // Non-unique totals: each keyword appearance counted separately
+  const vsTodayTotal = vsTodayTotalRow[0]?.total_views ?? 0
+  const vs1dTotal    = vs1dTotalRow[0]?.total_views ?? 0
+  const vs7dTotal    = vs7dTotalRow[0]?.total_views ?? 0
+  const vs30dTotal   = vs30dTotalRow[0]?.total_views ?? 0
+  const totalViewership = vsTodayTotal || vs1dTotal || vs7dTotal || 0
 
   // ── Top 200 videos JOIN query — filtered by format ──────────────────────────
   const ownerFilter = isOurs === 'true'  ? 'AND v.is_ours = TRUE'
@@ -460,11 +501,12 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
       lastUpdatedRanking:   lastRanking,
       totalKeywords:        keywords.length,
       totalVideos,
+      totalRankingAppearances: rankedAppearancesCountRow[0]?.cnt ?? 0,
       rankedVideos,
       rankedVideoCount:     top10Rows.length,
       totalViewership,
       uniqueVideos:         rankedVideos,
-      uniqueVideoViewership: totalViewership,
+      uniqueVideoViewership,
       uniqueChannels:       channelNames.size,
       mostRankingChannel:   topChannelMV?.data
         ? { name: topChannelMV.data.channel_name, totalFrequency: topChannelMV.data.total_frequency }
@@ -515,6 +557,34 @@ async function queryViewSumSQL(cid: string, date: string, format?: string | null
       ) uv
       JOIN view_snapshots vs ON vs.video_id = uv.video_id
       WHERE vs.snapshot_date = $2::date AND vs.campaign_id = $1
+    `, [cid, date])
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Total view sum across ALL ranking rows (non-unique).
+ * A video ranking on 40 keywords contributes its views 40 times.
+ */
+async function queryViewSumTotalSQL(cid: string, date: string, format?: string | null): Promise<{ total_views: number }[]> {
+  try {
+    return await queryAll<{ total_views: number }>(`
+      SELECT SUM(vs.view_count)::BIGINT as total_views
+      FROM (
+        SELECT video_id, ROW_NUMBER() OVER (PARTITION BY keyword_id ORDER BY rank ASC) as rn
+        FROM keyword_videos
+        WHERE campaign_id = $1
+        UNION ALL
+        SELECT video_id, ROW_NUMBER() OVER (PARTITION BY keyword_id ORDER BY rank ASC) as rn
+        FROM keyword_shorts
+        WHERE campaign_id = $1
+      ) ranked
+      JOIN view_snapshots vs ON vs.video_id = ranked.video_id
+      WHERE ranked.rn <= 10
+        AND vs.snapshot_date = $2::date AND vs.campaign_id = $1
+        ${format === 'long' ? 'AND ranked.video_id IN (SELECT video_id FROM keyword_videos WHERE campaign_id = $1)' : ''}
+        ${format === 'short' ? 'AND ranked.video_id IN (SELECT video_id FROM keyword_shorts WHERE campaign_id = $1)' : ''}
     `, [cid, date])
   } catch {
     return []

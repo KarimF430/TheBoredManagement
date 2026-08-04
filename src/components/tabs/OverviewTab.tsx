@@ -344,8 +344,8 @@ export default function OverviewTab() {
         {/* 2. Total Videos + Views + Growth */}
         <div style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', border: '1px solid #F1F5F9', display: 'flex', flexDirection: 'column', height: '100%', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Video size={14} style={{ color: '#8B5CF6' }} /><span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.3px' }}>TOTAL VIDEOS</span></div>
-            <span title="All videos discovered across all keywords." style={{ cursor: 'help' }}><Info size={12} style={{ color: '#CBD5E1' }} /></span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Video size={14} style={{ color: '#8B5CF6' }} /><span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.3px' }}>DISCOVERED VIDEOS</span></div>
+            <span title="Unique videos found across all keyword searches (the campaign pool)." style={{ cursor: 'help' }}><Info size={12} style={{ color: '#CBD5E1' }} /></span>
           </div>
           <div style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', fontFamily: "'JetBrains Mono', monospace", lineHeight: 1, marginTop: 8 }}>{fmt(overview?.totalVideos ?? 0)}</div>
           <div style={{ fontSize: 12, fontWeight: 600, color: '#94A3B8', marginTop: 4 }}>{fmtIndian(data?.totalRegionalViews ?? 0)} views</div>
@@ -359,14 +359,29 @@ export default function OverviewTab() {
         {/* 3. Unique Videos + Views + Growth */}
         <div style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', border: '1px solid #F1F5F9', display: 'flex', flexDirection: 'column', height: '100%', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Video size={14} style={{ color: '#06B6D4' }} /><span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.3px' }}>UNIQUE VIDEOS</span></div>
-            <span title="Deduplicated videos ranking in top 10." style={{ cursor: 'help' }}><Info size={12} style={{ color: '#CBD5E1' }} /></span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Video size={14} style={{ color: '#06B6D4' }} /><span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.3px' }}>RANKED VIDEOS</span></div>
+            <span title="Deduplicated videos ranking in top 10 for at least one keyword." style={{ cursor: 'help' }}><Info size={12} style={{ color: '#CBD5E1' }} /></span>
           </div>
           <div style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', fontFamily: "'JetBrains Mono', monospace", lineHeight: 1, marginTop: 8 }}>{fmt(overview?.uniqueVideos ?? 0)}</div>
           <div style={{ fontSize: 12, fontWeight: 600, color: '#94A3B8', marginTop: 4 }}>{fmtIndian(overview?.uniqueVideoViewership ?? overview?.totalViewership ?? 0)} views</div>
           <div style={{ marginTop: 'auto', paddingTop: 8 }}>
             <div style={{ fontSize: 12, fontWeight: 800, color: growthValue >= 0 ? '#10B981' : '#EF4444', fontFamily: "'JetBrains Mono', monospace" }}>
               {formatGrowth(growthValue)}
+            </div>
+          </div>
+        </div>
+
+        {/* 3b. Ranking Appearances + Views */}
+        <div style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', border: '1px solid #F1F5F9', display: 'flex', flexDirection: 'column', height: '100%', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Search size={14} style={{ color: '#F59E0B' }} /><span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.3px' }}>RANKING APPEARANCES</span></div>
+            <span title="Total keyword-video ranking slots. A video on 40 keywords = 40 appearances." style={{ cursor: 'help' }}><Info size={12} style={{ color: '#CBD5E1' }} /></span>
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: '#0F172A', fontFamily: "'JetBrains Mono', monospace", lineHeight: 1, marginTop: 8 }}>{fmt(overview?.totalRankingAppearances ?? 0)}</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#94A3B8', marginTop: 4 }}>{fmtIndian(overview?.totalViewership ?? 0)} views</div>
+          <div style={{ marginTop: 'auto', paddingTop: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#94A3B8' }}>
+              {overview?.uniqueVideos ? `${Math.round(((overview.totalRankingAppearances ?? 0) / (overview.uniqueVideos ?? 1)) * 10) / 10}x per video` : '—'}
             </div>
           </div>
         </div>

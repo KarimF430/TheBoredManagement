@@ -192,6 +192,7 @@ async function fetchOverview(cid: string) {
       lastUpdatedRanking: lastRanking,
       totalKeywords,
       totalVideos,
+      totalRankingAppearances: rankedVideos,
       rankedVideos,
       totalViewership,
       uniqueVideos: uniqueRankedIds.size,
