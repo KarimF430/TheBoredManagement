@@ -578,7 +578,7 @@ export default function ControlPage() {
                         </span>
                       )}
                       {item.status === 'failed' && item.message && (
-                        <span style={{ fontSize: 9, color: '#FF2D55', fontWeight: 500, textAlign: 'right', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: 9, color: '#FF2D55', fontWeight: 500, textAlign: 'right', maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {item.message}
                         </span>
                       )}

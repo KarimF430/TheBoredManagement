@@ -36,7 +36,7 @@ The **SOV Panel** is an enterprise-grade YouTube competitive intelligence dashbo
 - **Track keyword rankings** across YouTube search results (long-form + Shorts) for 50+ keywords
 - **Monitor daily view counts** for 500+ videos with growth analytics
 - **Analyze brand share-of-voice** — what percentage of audience attention each competitor commands
-- **Detect brand mentions** in video transcripts via AI (Gemini/Gemma)
+- **Detect brand mentions** in video transcripts via AI (GPT-4o-mini via OpenRouter)
 - **Identify creators and partnership opportunities** via channel analytics
 - **Track dropped rankings** and multi-keyword ranking videos
 - **Regional language analytics** across 10 Indian language markets
@@ -131,9 +131,10 @@ The system follows a **decoupled, event-driven** architecture with four primary 
 ### AI & ML
 | Library | Purpose |
 |---|---|
-| @google/generative-ai | Gemini transcript analysis |
-| openai | OpenRouter API client (Gemma) |
+| openai | OpenRouter API client (GPT-4o-mini for brand analysis) |
+| @google/generative-ai | Gemini (used in n8n WF5 pipeline only, not main app) |
 | youtube-transcript | Caption fetching |
+| ahocorasick | Aho-Corasick string matching for brand detection |
 
 ### Auth & Security
 | Library | Purpose |
@@ -675,35 +676,58 @@ Three-strategy fallback system:
 
 ### 11.2 Brand Mention Detection (`brand-analyzer.ts`)
 
-**AI Model:** OpenRouter Gemma (via OpenAI-compatible API)
+**AI Model:** `openai/gpt-4o-mini` via OpenRouter (NOT Gemma — updated from earlier design)
+
+**Architecture:**
+- Aho-Corasick exact matching (1,915 brand aliases) → ~13ms per video
+- Levenshtein fuzzy matching (catches ASR errors) → prefix-indexed, max edit distance 2
+- LLM full extraction with candidate brands from text search
+- Post-processing: grounding check, canonicalization, dedup, recall safety nets
 
 **Analysis scope per video:**
-- Transcript text (primary)
-- Title
-- Video description
-- Channel name
-- Top pinned comment
+- Transcript text (primary, truncated to 15,000 chars)
+- Title, channel name, description (truncated to 3,000 chars)
+- Pinned comment (if available)
+- Campaign brands (client-specific brands to prioritize)
+- Candidate brands found by Aho-Corasick text search
 
 **Prompt design:**
-- Few-shot calibration examples with scoring rubric
-- Retail platform exclusion list (Amazon, Flipkart, etc.)
-- Output: JSON array of `{brand_name, confidence (0-1), reason, context_quote, tag_type, video_format}`
+- Role: "TBM's senior market intelligence analyst"
+- Full extraction: finds brands + classifies + explains why they matter
+- JSON output: `{video_format, brand_notes[{brand_name, why_it_matters, confidence, context_quotes}]}`
 
-**Post-processing:**
-- Confidence ≥ 0.6 → auto tag integration
-- Batch processing with 2s rate limiting
-- Fallback: `analyzeBrandsFromMetadata()` for transcript-less videos (analyzes title + description only)
+**Post-processing pipeline:**
+1. Grounding check — verifies brand appears in source text (prevents hallucinations)
+2. Retail platform exclusion — Amazon, Flipkart, Meesho, etc. always filtered
+3. Ambiguity guard — common words (AND, MAX, W) need exact brand casing
+4. Canonicalization — maps to master list spelling ("boat" → "boAt")
+5. Deduplication — merged by canonical name, highest confidence kept
+6. Campaign brand recall — missed campaign brands recovered at 0.55 confidence
+7. Gazetteer brand recall — missed exact matches recovered at 0.50 confidence
+
+**Performance:**
+- 1,000 videos: ~13s matching + LLM calls
+- Cost per video: ~$0.00064
+- Cost per 1,000 videos: ~$0.64
+
+**LLM Usage Tracking (`llm-usage-monitor.ts`):**
+- Every LLM call logged to `llm_usage` table
+- Tracks: tokens (input/output/cached), cost (USD), latency (ms), per-video and per-campaign
+- Similar to YouTube API quota monitoring (`quota-monitor.ts`)
+
+**Fallback:** `analyzeBrandsFromMetadata()` for transcript-less videos (analyzes title + description only)
 
 ### 11.3 Gemini Integration (via `@google/generative-ai`)
 
 - Alternative AI provider for transcript analysis
-- Used in the n8n WF5 pipeline
-- Integrated via OpenRouter for cost efficiency
+- Used in the n8n WF5 pipeline (external workflow)
+- NOT used in the main Next.js brand analysis flow
+- The primary brand detection uses GPT-4o-mini via OpenRouter
 
 ### 11.4 Multi-Keyword Phrase Extraction (`video_phrase_summary` table)
 
 - Extracts common terms/phrases across titles and descriptions of multi-keyword-ranking videos
-- Uses AI to identify why videos rank broadly
+- Uses GPT-4o-mini to identify why videos rank broadly
 - Results stored in `video_phrase_summary.extracted_phrases[]`
 
 ---
@@ -848,7 +872,7 @@ The BullMQ worker runs as a **separate Node.js process**:
 | Upstash Redis | BullMQ queue + L2 cache | Yes (256MB) |
 | Vercel | Frontend + API hosting | Yes (pro plan recommended) |
 | YouTube Data API | Search + video data | 10K units/day default |
-| OpenRouter | AI brand analysis | Pay-as-you-go |
+| OpenRouter | AI brand analysis (GPT-4o-mini) | Pay-as-you-go |
 | Groq | Whisper STT (transcript fallback) | Free tier available |
 
 ### 15.4 Database Migration
@@ -888,8 +912,8 @@ YOUTUBE_REDIRECT_URI=http://localhost:3000/api/auth/youtube/callback
 API_KEY_ENCRYPTION_SECRET=your-32-char-secret-minimum
 
 # AI
-OPENROUTER_API_KEY=sk-or-...              # Brand analysis
-GROQ_API_KEY=gsk_...                      # Whisper STT
+OPENROUTER_API_KEY=sk-or-...              # Brand analysis (GPT-4o-mini)
+GROQ_API_KEY=gsk_...                      # Whisper STT (transcript fallback)
 
 # Cron
 CRON_SECRET=your-cron-secret
@@ -932,7 +956,7 @@ JWT_SECRET=sov_dashboard_secret_key_minimum_32_characters
 **Status:** Implemented as a **filter dropdown** (5+ / 10+ / 15+), not a hardcoded value. The dropdown drives a `gte('keyword_count', minKeywords)` query.
 
 ### 17.5 Common Terminology Summary (Open Question #5)
-**Status:** Implemented via AI-powered phrase extraction. The `brand-analyzer.ts` prompt includes phrase extraction logic, and results are stored in `video_phrase_summary.extracted_phrases[]`. Reuses the existing Gemma analysis pipeline rather than a dedicated NLP layer.
+**Status:** Implemented via AI-powered phrase extraction. Uses GPT-4o-mini (via OpenRouter) to identify common terms/phrases across multi-keyword-ranking videos. Results stored in `video_phrase_summary.extracted_phrases[]`.
 
 ### 17.6 "Most Ranking Channel" Definition (Open Question #6)
 **Status:** Defined as **channel with the highest cumulative frequency count** across all its videos (not channel with most videos ranking). Implemented via `channel_rank_mv` materialized view ordered by `total_frequency DESC`.
@@ -959,6 +983,8 @@ JWT_SECRET=sov_dashboard_secret_key_minimum_32_characters
 6. **Dual DB maintenance burden** — Schema must be kept in sync across SQLite and PostgreSQL
 7. **No rate-limit UI** — YouTube quota status visible via API but not exposed in dashboard UI
 8. **Limited test coverage** — Only brand analyzer has unit tests (Vitest)
+9. **Full extraction mode** — LLM still does extraction + classification (classification-only mode designed but not implemented)
+10. **No LLM cost dashboard** — Usage tracking exists in database but no UI for cost monitoring
 
 ---
 

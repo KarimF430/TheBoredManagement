@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabase, queryAll, batchUpsert } from '@/lib/supabase'
 import { refreshMaterializedViews, setSystemMetadata, getSystemMetadata } from '@/lib/migrations'
 import { getViewCountsOAuth } from '@/lib/youtube-oauth'
 import { verifyToken } from '@/lib/auth'
@@ -126,28 +126,32 @@ interface CvRow {
   } | null
 }
 
-/** PostgREST caps a select at 1000 rows — page through the whole table. */
+/**
+ * Load only RANKED videos (from keyword_videos + keyword_shorts), not all pool videos.
+ * This avoids wasting API quota on videos not currently in any keyword's top 10.
+ * PostgREST caps a select at 1000 rows — use raw SQL to get all ranked videos.
+ */
 async function loadAllCampaignVideos(campaignId?: string): Promise<CvRow[]> {
-  const PAGE = 1000
-  const all: CvRow[] = []
+  const campaignFilter = campaignId ? `AND kv.campaign_id = $1` : ''
+  const params = campaignId ? [campaignId] : []
 
-  for (let from = 0; ; from += PAGE) {
-    let q = supabase
-      .from('campaign_videos')
-      .select('video_id, campaign_id, videos(id, youtube_id, is_deleted)')
-      .order('video_id', { ascending: true })
-      .range(from, from + PAGE - 1)
-    if (campaignId) q = q.eq('campaign_id', campaignId)
+  const rows = await queryAll<{ video_id: string; campaign_id: string; youtube_id: string | null; is_deleted: boolean }>(
+    `SELECT DISTINCT kv.video_id, kv.campaign_id, v.youtube_id, v.is_deleted
+     FROM (
+       SELECT video_id, campaign_id FROM keyword_videos WHERE true ${campaignFilter}
+       UNION
+       SELECT video_id, campaign_id FROM keyword_shorts WHERE true ${campaignFilter}
+     ) kv
+     INNER JOIN videos v ON v.id = kv.video_id
+     WHERE v.is_deleted = FALSE AND v.youtube_id IS NOT NULL`,
+    params
+  )
 
-    const { data, error } = await q
-    if (error) throw new Error(`Failed to load campaign_videos: ${error.message}`)
-    if (!data || data.length === 0) break
-
-    all.push(...(data as unknown as CvRow[]))
-    if (data.length < PAGE) break
-  }
-
-  return all
+  return rows.map(r => ({
+    video_id: r.video_id,
+    campaign_id: r.campaign_id,
+    videos: { id: r.video_id, youtube_id: r.youtube_id, is_deleted: r.is_deleted },
+  }))
 }
 
 async function runDailyViewsAll(req: NextRequest) {
@@ -155,7 +159,7 @@ async function runDailyViewsAll(req: NextRequest) {
   const startTime = Date.now()
   const today = new Date().toISOString().split('T')[0]
 
-  await setSystemMetadata('daily_views_start', new Date().toISOString())
+  try { await setSystemMetadata('daily_views_start', new Date().toISOString()) } catch {}
 
   const cvRows = await loadAllCampaignVideos(campaignId)
 
@@ -223,22 +227,29 @@ async function runDailyViewsAll(req: NextRequest) {
         else viewMap.set(stat.youtube_id, stat.view_count)
       }
 
+      // Batch update: mark deleted videos
       if (deletedIds.length > 0) {
-        await supabase.from('videos').update({ is_deleted: true }).in('youtube_id', deletedIds)
+        await queryAll(`UPDATE videos SET is_deleted = TRUE WHERE youtube_id = ANY($1)`, [deletedIds])
         deleted += deletedIds.length
       }
 
-      for (const [ytId, vc] of viewMap) {
-        const { error } = await supabase.from('videos').update({ view_count: vc }).eq('youtube_id', ytId)
-        if (!error) updated++
+      // Batch update: set view counts with CASE/WHEN (single SQL statement)
+      if (viewMap.size > 0) {
+        const entries = Array.from(viewMap.entries())
+        const sqlParams: (string | number)[] = []
+        const cases = entries.map(([id, count], idx) => {
+          sqlParams.push(id, count)
+          return `WHEN youtube_id = $${idx * 2 + 1} THEN $${idx * 2 + 2}`
+        }).join(' ')
+        await queryAll(
+          `UPDATE videos SET view_count = CASE ${cases} ELSE view_count END WHERE youtube_id = ANY($${sqlParams.length + 1})`,
+          [...sqlParams, entries.map(e => e[0])]
+        )
+        updated += viewMap.size
       }
 
-      const vsRows: Array<{
-        video_id: string
-        campaign_id: string
-        view_count: number
-        snapshot_date: string
-      }> = []
+      // Batch upsert: view_snapshots (one row per video/campaign pair)
+      const vsRows: Record<string, any>[] = []
       for (const ytId of batchYtIds) {
         const vc = viewMap.get(ytId)
         if (vc === undefined) continue
@@ -246,18 +257,8 @@ async function runDailyViewsAll(req: NextRequest) {
           vsRows.push({ video_id: entry.video_id, campaign_id: entry.campaign_id, view_count: vc, snapshot_date: today })
         }
       }
-
       if (vsRows.length > 0) {
-        const { error: upsertErr } = await supabase
-          .from('view_snapshots')
-          .upsert(vsRows, { onConflict: 'video_id,campaign_id,snapshot_date', ignoreDuplicates: false })
-        if (upsertErr) {
-          // Older databases have a PK without campaign_id.
-          const { error: fallbackErr } = await supabase
-            .from('view_snapshots')
-            .upsert(vsRows, { onConflict: 'video_id,snapshot_date', ignoreDuplicates: false })
-          if (fallbackErr) throw fallbackErr
-        }
+        await batchUpsert('view_snapshots', vsRows, 'video_id,campaign_id,snapshot_date')
       }
 
       processed += batchYtIds.length
@@ -268,7 +269,7 @@ async function runDailyViewsAll(req: NextRequest) {
       console.error(`Daily views batch at offset ${offset} failed:`, batchErr)
     }
 
-    await setSystemMetadata('daily_views_resume_offset', String(offset + batchYtIds.length))
+    try { await setSystemMetadata('daily_views_resume_offset', String(offset + batchYtIds.length)) } catch {}
   }
 
   const nextOffset = Math.min(offset, uniqueYtIds.length)
@@ -276,7 +277,7 @@ async function runDailyViewsAll(req: NextRequest) {
 
   if (completed) {
     await supabase.from('system_metadata').delete().eq('key', 'daily_views_resume_offset')
-    await setSystemMetadata('last_views_refresh', new Date().toISOString())
+    try { await setSystemMetadata('last_views_refresh', new Date().toISOString()) } catch {}
 
     try {
       await refreshMaterializedViews()

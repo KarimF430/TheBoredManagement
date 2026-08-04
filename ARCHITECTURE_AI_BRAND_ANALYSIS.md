@@ -1,33 +1,12 @@
 # AI Brand Analysis — Architecture Document
 
-## Problem Statement
+## Overview
 
-Detect brand and product mentions from YouTube video transcripts with high precision and recall, using a CSV master list of ~800+ brands across 12 categories. The system must handle:
-
-- ASR (Automatic Speech Recognition) errors: "Gymshark" → "gym shark", "Häagen-Dazs" → "hogan dahs"
-- Brand aliases: "Coke" → Coca-Cola, "Air Jordans" → Nike, "Pixel" → Google
-- Homonyms: "Apple" (fruit) vs "Apple" (company)
-- Indian language code-mixing: "Aquaguard le liya", "Samsung ka naya phone"
-- Mention classification: sponsor read vs organic mention vs comparison
+This document describes the **implemented** AI brand detection system used in SOV Panel 101. The system detects brand mentions in YouTube video transcripts using a hybrid approach: deterministic text matching (Aho-Corasick + Levenshtein) combined with LLM classification (GPT-4o-mini via OpenRouter).
 
 ---
 
-## Current System (Before)
-
-```
-Transcript → LLM (Gemma via OpenRouter) → BrandDetection[]
-```
-
-**Problems:**
-1. LLM does extraction + classification in one shot — noisy precision
-2. No pre-filtering — wastes tokens on brands findable via matching
-3. ASR errors cause missed detections
-4. No alias support
-5. No category-aware matching
-
----
-
-## Proposed System (After)
+## System Architecture
 
 ```
                          ┌─────────────────────┐
@@ -37,16 +16,16 @@ Transcript → LLM (Gemma via OpenRouter) → BrandDetection[]
                                     │
                          ┌──────────▼──────────┐
                          │  Brand Gazetteer     │
-                         │  - Aliases           │
-                         │  - Categories        │
-                         │  - Phonetics         │
+                         │  - 1,561 brands      │
+                         │  - 1,915 aliases     │
+                         │  - 500+ hand-curated │
                          └──────────┬──────────┘
                                     │
               ┌─────────────────────┼─────────────────────┐
               │                     │                     │
    ┌──────────▼──────────┐ ┌───────▼────────┐ ┌─────────▼────────┐
-   │  Aho-Corasick Index │ │  Fuzzy Index   │ │  Whisper Prompt  │
-   │  (Exact Matching)   │ │  (RapidFuzz)   │ │  (Brand Seeds)   │
+   │  Aho-Corasick Index │ │  Levenshtein   │ │  Whisper Prompt  │
+   │  (Exact Matching)   │ │  (Fuzzy)       │ │  (Brand Seeds)   │
    └──────────┬──────────┘ └───────┬────────┘ └─────────┬────────┘
               │                     │                     │
               └──────────┬──────────┘                     │
@@ -57,14 +36,27 @@ Transcript → LLM (Gemma via OpenRouter) → BrandDetection[]
               └──────────┬──────────┘
                          │
               ┌──────────▼──────────┐
-              │  LLM Classifier     │
-              │  (Classification    │
-              │   Only, Not Search) │
+              │  LLM Full Extract   │
+              │  (GPT-4o-mini)      │
+              │  via OpenRouter     │
+              └──────────┬──────────┘
+                         │
+              ┌──────────▼──────────┐
+              │  Post-Processing    │
+              │  - Grounding check  │
+              │  - Canonicalization │
+              │  - Dedup            │
+              │  - Recall nets      │
               └──────────┬──────────┘
                          │
               ┌──────────▼──────────┐
               │  BrandDetection[]   │
               │  (Final Output)     │
+              └──────────┬──────────┘
+                         │
+              ┌──────────▼──────────┐
+              │  LLM Usage Logger   │
+              │  (tokens, cost)     │
               └─────────────────────┘
 ```
 
@@ -94,33 +86,18 @@ interface Gazetteer {
 }
 ```
 
-**CSV Parsing Logic:**
+**CSV Parsing:**
 - Parse `Category,Sub-Category,Brand` columns
 - Handle quoted fields with commas: `"Mobiles, Tablets & More"`
-- Extract parent brand from parenthetical: `"Google (Pixel)"` → parent="Google", display="Pixel"
-- Auto-generate aliases:
-  - Lowercase canonical name
-  - Split multi-word brands: "Air Jordans" → ["air jordans", "airjordan", "jordan"]
-  - Common abbreviations: "OnePlus" → ["one plus", "oneplus", "op"]
-  - Indian pronunciations: "Xiaomi" → ["xiaomi", "shiaomi", "mi"]
+- Extract parent brand from parenthetical: `"Google (Pixel)"` → parent="Google", display="Ali"
 
-**Built-in Alias Rules:**
-```typescript
-const ALIAS_RULES: Record<string, string[]> = {
-  // Brand → additional aliases
-  "Coca-Cola": ["coke", "coca cola", "thums up", "sprite", "fanta"],
-  "Nike": ["air jordan", "jordan", "airmax", "air max"],
-  "Apple": ["iphone", "ipad", "macbook", "airpods", "apple watch"],
-  "Samsung": ["galaxy", "one ui"],
-  "Google": ["pixel", "nest", "chromecast"],
-  "OnePlus": ["one plus", "op", "oxygen os"],
-  "Xiaomi": ["mi", "redmi", "poco", "miui"],
-  "boAt": ["boat", "bo at", "boat lifestyle"],
-  // ... more rules
-}
-```
-
-**Output:** JSON file at `src/data/brand-gazetteer.json` built at build time or on first access.
+**Alias Generation:**
+1. CSV brand names → lowercase canonical form
+2. Parent brand extraction from parenthetical
+3. `MANUAL_ALIASES` map → 500+ hand-curated aliases:
+   - Product lines: `galaxy → Samsung`, `iphone → Apple`, `pixel → Google`
+   - Indian spellings: `boat → boAt`, `realme → Realme`
+   - Common ASR errors: `jio phone → Jio`, `redmi → Xiaomi`
 
 ---
 
@@ -132,217 +109,164 @@ const ALIAS_RULES: Record<string, string[]> = {
 
 **Why Aho-Corasick:**
 - Single O(n) pass through transcript regardless of brand list size
-- Handles overlapping matches (e.g., "Samsung Galaxy" matches both "Samsung" and "Galaxy")
+- Handles overlapping matches (e.g., "Samsung Galaxy" matches both)
 - ~100x faster than regex for large pattern sets
 
-**Implementation:**
 ```typescript
-import ahocorasick from 'ahocorasick'  // or pyahocorasick equivalent
-
-const ac = new ahocorasick()
+const ac = new AhoCorasick()
 for (const entry of gazetteer.brands) {
   ac.add(entry.canonical.toLowerCase(), entry)
   for (const alias of entry.aliases) {
     ac.add(alias.toLowerCase(), entry)
   }
 }
-
-// Search transcript
 const matches = ac.search(transcriptLower)
-// Returns: [{ start: 45, end: 52, value: BrandEntry }, ...]
 ```
 
-**Handles:**
-- Exact brand names: "Samsung", "Nike", "boAt"
-- Exact aliases: "Coke", "Pixel", "Galaxy"
-- Multi-word matches: "Air Jordans", "Red Mi"
+**Word boundary validation:** Prevents false positives like "w" matching inside "weather".
 
-#### Layer 2: RapidFuzz Fuzzy Matching
+#### Layer 2: Levenshtein Fuzzy Matching
 
-**Why RapidFuzz:**
+**Why Levenshtein:**
 - Catches ASR errors that exact matching misses
-- ~10x faster than fuzzywuzzy
-- Token sort ratio handles word reordering
-
-**Strategy:**
-1. Extract n-grams (2-5 words) from transcript sliding window
-2. For each n-gram, compute fuzzy match score against all brand names
-3. Threshold: 85% similarity (configurable)
-4. Skip n-grams already matched by Aho-Corasick
+- Prefix-indexed: groups aliases by first 2 chars → reduces search space 10x
+- Max edit distance: 2 characters
 
 ```typescript
-import { tokenSortRatio } from 'rapidfuzz'
-
-function fuzzyMatchCandidates(
-  transcript: string,
-  exactMatches: Set<string>,
-  threshold: number = 85
-): FuzzyMatch[] {
-  const candidates: FuzzyMatch[] = []
-  const words = transcript.split(/\s+/)
-  
-  for (let n = 2; n <= 5; n++) {  // 2-5 word n-grams
-    for (let i = 0; i <= words.length - n; i++) {
-      const gram = words.slice(i, i + n).join(' ')
-      if (exactMatches.has(gram.toLowerCase())) continue
-      
-      for (const entry of gazetteer.brands) {
-        const score = tokenSortRatio(gram, entry.canonical)
-        if (score >= threshold) {
-          candidates.push({ entry, score, start: i, end: i + n })
-        }
-      }
-    }
-  }
-  
-  return candidates
+const prefix = word.slice(0, 2)
+const bucket = fuzzyIndex.get(prefix)
+for (const { alias, brand } of bucket) {
+  const dist = editDistance(word, alias)
+  if (dist <= 2) results.push({ brand, distance: dist })
 }
 ```
 
 **ASR Error Patterns Handled:**
 - Word splitting: "gymshark" → "gym shark"
 - Word merging: "red mi" → "redmi"
-- Phonetics: "hogan dahs" → "haagen dazs"
 - Misspelling: "samsang" → "samsung"
 
-#### Layer 3: Context Window Extraction
+#### Performance
 
-For each matched candidate, extract surrounding context for LLM classification:
-
-```typescript
-interface CandidateSpan {
-  brand: BrandEntry
-  matchType: 'exact' | 'fuzzy'
-  confidence: number        // match score
-  startOffset: number       // character offset in transcript
-  endOffset: number
-  contextWindow: string     // ±200 chars around match
-  mentionCount: number      // how many times mentioned
-}
-```
+| Transcript | Time | Candidates |
+|-----------|------|------------|
+| 25 words | 12ms | 5 |
+| 63 words | 11ms | 16 |
+| 259 words | 13ms | 49 |
+| **1000 videos** | **~13s** | varies |
 
 ---
 
-### 3. Whisper Initial Prompt Enhancement (`src/lib/transcript.ts`)
+### 3. Whisper Initial Prompt (`src/lib/transcript.ts`)
 
 **Purpose:** Improve transcription accuracy by seeding Whisper with brand names.
 
-**Current Code:**
 ```typescript
-formData.append('model', 'whisper-large-v3')
-```
-
-**New Code:**
-```typescript
-// Build category-relevant brand list for initial prompt
-const brandSeeds = categoryBrands
-  .slice(0, 50)  // limit to avoid prompt bloat
+const brandSeeds = getBrandsForWhisper()
+  .slice(0, 50)
   .map(b => b.canonical)
   .join(', ')
 
 formData.append('initial_prompt', 
   `Brand names mentioned: ${brandSeeds}. ` +
-  `Product names: ${brandSeeds.join(', ')}. ` +
+  `Product names: ${brandSeeds}. ` +
   `This is an Indian market review video.`
 )
 ```
 
-**Impact:** Whisper's `initial_prompt` biases the language model toward correct spelling of seed words. Measurably reduces misrecognition of brand names that aren't common English words.
+**Impact:** Whisper's `initial_prompt` biases the language model toward correct spelling of seed words.
 
 ---
 
-### 4. LLM Classifier (`src/lib/brand-analyzer.ts` — modified)
+### 4. LLM Classifier (`src/lib/brand-analyzer.ts`)
 
-**Purpose:** Classify pre-identified candidates (not extract from scratch).
+**Model:** `openai/gpt-4o-mini` via OpenRouter
 
-**Current Prompt:** ~1500 tokens asking LLM to find brands + classify + explain
-
-**New Prompt:** ~300 tokens asking LLM to classify only:
+**Prompt:** Full extraction mode — LLM receives transcript, title, channel, description, pinned comment, campaign brands, and candidate brands from text search. Returns JSON with video format and brand notes.
 
 ```typescript
-function buildClassificationPrompt(
-  candidates: CandidateSpan[],
-  videoTitle: string,
-  channelName: string,
-  description: string
-): string {
-  return `Classify each brand candidate as genuine mention or false positive.
-
-VIDEO: "${videoTitle}" by ${channelName}
-DESC: ${description.slice(0, 500)}
-
-CANDIDATES:
-${candidates.map((c, i) => `[${i}] "${c.brand.canonical}" — context: "${c.contextWindow}"`).join('\n')}
-
-For each candidate, output:
-- "genuine" if the brand is actually discussed/reviewed/compared
-- "false_positive" if it's a homonym (e.g., Apple the fruit) or incidental mention
-- "sponsor" if it's a paid promotion/sponsored segment
-
-Return JSON: { "classifications": [{ "index": 0, "label": "genuine|false_positive|sponsor", "confidence": 0.9 }] }`
-}
+const completion = await getOpenAI().chat.completions.create({
+  model: 'openai/gpt-4o-mini',
+  messages: [{ role: 'user', content: prompt }],
+  temperature: 0.1,
+  max_tokens: 2000,
+})
 ```
 
-**Why This is Better:**
-- 5x fewer tokens per call (300 vs 1500)
-- Higher accuracy (classification is easier than extraction)
-- Faster inference
-- Cheaper API calls
+**Post-Processing Pipeline:**
+1. **Grounding Check** — Verifies brand appears in source text
+2. **Retail Platform Exclusion** — Amazon, Flipkart, etc. always filtered
+3. **Ambiguity Guard** — Common words need exact brand casing
+4. **Canonicalization** — Maps to master list spelling
+5. **Deduplication** — Merged by canonical name
+
+**Recall Safety Nets:**
+1. Campaign brands recovered at 0.55 confidence if missed
+2. Gazetteer exact matches recovered at 0.50 confidence
 
 ---
 
-### 5. Integration: `analyzeBrandsFromTranscript()` (modified)
+### 5. LLM Usage Monitoring (`src/lib/llm-usage-monitor.ts`)
 
+**Purpose:** Track token usage, cost, and latency per video and per campaign.
+
+**How it works:**
+- Every LLM call logs to `llm_usage` table
+- Cost calculated from GPT-4o-mini pricing: $0.15/M input, $0.60/M output, $0.075/M cached
+- Fire-and-forget — never crashes main flow
+
+**Key Functions:**
 ```typescript
-export async function analyzeBrandsFromTranscript(
-  transcript: string,
-  videoTitle: string,
-  knownBrands: string[] = [],
-  channelName: string = '',
-  description: string = '',
-  pinnedComment: string | null = null
-): Promise<BrandDetection[]> {
-  // Step 1: Fast matching (< 1 second)
-  const exactMatches = matchExact(transcript, gazetteer)
-  const fuzzyMatches = matchFuzzy(transcript, gazetteer, exactMatches)
-  const allCandidates = mergeCandidates(exactMatches, fuzzyMatches)
-  
-  // Step 2: If no candidates found, skip LLM entirely
-  if (allCandidates.length === 0) return []
-  
-  // Step 3: LLM classification (only for candidates)
-  const classified = await classifyCandidates(
-    allCandidates,
-    videoTitle,
-    channelName,
-    description
-  )
-  
-  // Step 4: Convert to BrandDetection format
-  return classified
-    .filter(c => c.label !== 'false_positive')
-    .map(c => ({
-      brand_name: c.brand.canonical,
-      confidence: c.confidence,
-      mention_type: c.label === 'sponsor' ? 'primary_review' : 'mentioned',
-      context_quotes: [c.contextWindow],
-    }))
-}
+logLlmUsage(log)           // Log a single call
+getLlmUsageSummary(campaignId)  // Get usage summary
+getCampaignCostSummaries()      // All campaigns
+getVideoCostDetails(campaignId) // Per-video breakdown
+estimateAnalysisCost(1000)      // Estimate N videos
 ```
 
 ---
 
-## Performance Comparison
+## Cost Analysis
 
-| Metric | Current (LLM Only) | Proposed (Matcher + LLM) |
-|---|---|---|
-| **Time per video** | 15-30s (LLM call) | 1-3s (matching) + 5-10s (LLM) |
-| **API cost per video** | ~$0.002 (full prompt) | ~$0.0004 (classification only) |
-| **Recall (brands found)** | ~75% | ~92% (fuzzy catches ASR errors) |
-| **Precision (no false positives)** | ~65% | ~88% (pre-filtered candidates) |
-| **Tokens per video** | ~1500 | ~300 (5x reduction) |
-| **ASR error handling** | None | Fuzzy + phonetic matching |
-| **Alias support** | None | Full alias table |
+### GPT-4o-mini Pricing (OpenRouter)
+
+| Token Type | Price per 1M tokens |
+|------------|---------------------|
+| Input (cache miss) | $0.15 |
+| Input (cached) | $0.075 |
+| Output | $0.60 |
+
+### Per-Video Cost
+
+| Component | Input Tokens | Output Tokens | Cost |
+|-----------|-------------|---------------|------|
+| Brand analysis | ~1,500 | ~500 | $0.00053 |
+| Irrelevance detection | ~300 | ~100 | $0.00011 |
+| **Total** | **~1,800** | **~600** | **~$0.00064** |
+
+### Scale Costs
+
+| Videos | Current Cost | With Caching |
+|--------|-------------|--------------|
+| 1,000 | $0.64 | $0.45 |
+| 10,000 | $6.40 | $4.50 |
+| 50,000 | $32.00 | $22.50 |
+
+---
+
+## Accuracy Roadmap
+
+### Current (Estimated): ~75% recall, ~65% precision
+
+### Target: 90% recall, 90% precision
+
+| Phase | Change | Impact |
+|-------|--------|--------|
+| 1 | Classification-only mode (LLM classifies, not extracts) | +15% precision |
+| 2 | Whisper brand seeding (better ASR) | +10% recall |
+| 3 | Gazetteer expansion (missing brands) | +5% recall |
+| 4 | Confidence calibration (real data thresholds) | +10% precision |
+| 5 | A/B testing framework | Measure & iterate |
 
 ---
 
@@ -351,60 +275,74 @@ export async function analyzeBrandsFromTranscript(
 ```
 src/
   lib/
-    brand-gazetteer.ts      # NEW — CSV parser + gazetteer builder
-    brand-matcher.ts        # NEW — Aho-Corasick + RapidFuzz engine
-    brand-analyzer.ts       # MODIFIED — LLM classification only
-    transcript.ts           # MODIFIED — Whisper initial_prompt
+    brand-gazetteer.ts      # CSV parser + gazetteer builder
+    brand-matcher.ts        # Aho-Corasick + Levenshtein engine
+    brand-analyzer.ts       # LLM extraction + classification
+    llm-usage-monitor.ts    # Token tracking + cost logging
+    transcript.ts           # Transcript fetching (3 methods)
   data/
-    brand-gazetteer.json    # NEW — Pre-built brand index
+    brand-gazetteer.json    # Pre-built brand index (1561 brands)
   scripts/
-    build-gazetteer.ts      # NEW — Script to rebuild gazetteer from CSV
+    build-gazetteer.js      # Gazetteer build script
+  schema/
+    010_llm_usage_tracking.sql  # LLM usage tables
 ```
 
 ---
 
-## Dependencies to Add
+## Dependencies
 
-```bash
-npm install ahocorasick    # Aho-Corasick string matching
-npm install rapidfuzz      # Fuzzy string matching (C++ backed)
+```json
+{
+  "ahocorasick": "^2.0.0",
+  "openai": "^6.46.0",
+  "youtube-transcript": "^1.2.1"
+}
 ```
 
----
-
-## Testing Strategy
-
-1. **Unit tests for gazetteer:** CSV parsing, alias generation, category mapping
-2. **Unit tests for matcher:** Exact match, fuzzy match, ASR error patterns
-3. **Integration tests:** Full pipeline with sample transcripts
-4. **Regression tests:** Compare old vs new system on known videos
-5. **Benchmark:** Time per video, API cost, recall/precision metrics
+Note: Levenshtein is implemented in `brand-matcher.ts` (no external dependency). The `rapidfuzz` package mentioned in earlier design docs was NOT used — the system uses a custom Levenshtein implementation with prefix indexing.
 
 ---
 
-## Rollout Plan
+## Testing
 
-1. **Phase 1:** Build gazetteer from CSV, test matching layer standalone
-2. **Phase 2:** Integrate matcher with existing analyzer (LLM still does extraction)
-3. **Phase 3:** Switch LLM to classification-only mode
-4. **Phase 4:** Add Whisper initial_prompt enhancement
-5. **Phase 5:** A/B test old vs new system, measure accuracy improvement
-6. **Phase 6:** Full rollout, deprecate old extraction-only path
+### Unit Tests (existing)
+- `src/lib/brand-analyzer.test.ts` — Brand analyzer tests
+- `src/lib/brand-matcher.test.ts` — Brand matcher tests
+
+### Integration Testing
+- Full pipeline with sample transcripts
+- Regression tests comparing detection results
+
+### Accuracy Measurement
+- Human-labeled test set of 100+ known videos
+- Track precision/recall per confidence bucket
+- Compare old vs new detection on known videos
 
 ---
 
-## CSV File Format Expected
+## Deployment
 
-```csv
-Category,Sub-Category,Brand
-"Mobiles, Tablets & More",Mobile Phones,Samsung
-"Mobiles, Tablets & More",Mobile Phones,Apple
-"Mobiles, Tablets & More",Mobile Phones,OnePlus
-...
+### Vercel Configuration
+```json
+{
+  "functions": {
+    "src/app/api/brands/analyze/route.ts": {
+      "maxDuration": 120,
+      "memory": 2048
+    }
+  }
+}
 ```
 
-The gazetteer parser will:
-1. Handle quoted fields with commas
-2. Extract parent brands from parenthetical: `"Google (Pixel)"` → parent="Google"
-3. Auto-generate aliases for each brand
-4. Group brands by category for Whisper prompt seeding
+### Cold Start Performance
+| Component | Time |
+|-----------|------|
+| Gazetteer reload | ~50ms |
+| Aho-Corasick rebuild | ~50ms |
+| Fuzzy index build | ~20ms |
+| **Total** | **~120ms** |
+
+### Database Migrations Required
+1. `schema/006_brand_index_and_irrelevant.sql` — Brand analysis indexes + irrelevant video tables
+2. `schema/010_llm_usage_tracking.sql` — LLM usage tracking tables + views

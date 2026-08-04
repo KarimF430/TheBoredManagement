@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
         if (!transcript || !transcript.text) {
           console.log(`[BrandAnalyze] ${video.youtube_id} no transcript, using metadata fallback`)
           // Fallback: analyze using video metadata (title, channel, description)
-          const detections = await analyzeBrandsFromMetadata(video.title, video.channel_name || '', video.description || '', campaignBrands)
+          const detections = await analyzeBrandsFromMetadata(video.title, video.channel_name || '', video.description || '', campaignBrands, undefined, { videoId: video.id, campaignId: campaign_id })
 
           if (force) {
             await queryOne('DELETE FROM brand_analysis WHERE video_id = $1', [video.id])
@@ -115,7 +115,9 @@ export async function POST(req: NextRequest) {
           video.title,
           campaignBrands,
           video.channel_name || '',
-          video.description || ''
+          video.description || '',
+          undefined,
+          { videoId: video.id, campaignId: campaign_id }
         )
 
         // Store results

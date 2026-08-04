@@ -4,6 +4,10 @@
       "maxDuration": 120,
       "memory": 2048
     },
+    "src/app/api/brands/batch-analyze/route.ts": {
+      "maxDuration": 300,
+      "memory": 2048
+    },
     "src/app/api/cron/route.ts": {
       "maxDuration": 60
     },
@@ -20,6 +24,10 @@
     {
       "path": "/api/cron?job=daily_views",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron?job=weekly_refresh",
+      "schedule": "0 6 * * 1"
     },
     {
       "path": "/api/cron?job=sheets_sync",

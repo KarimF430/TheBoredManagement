@@ -24,7 +24,7 @@ export default function SettingsTab() {
     setSaving(true)
     try {
       const res = await fetch(`/api/campaigns/${activeCampaignId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
-      if (res.ok) { showToast('Campaign updated'); fetchCampaigns() } else showToast('Failed to update', 'error')
+      if (res.ok) { showToast('Campaign updated'); fetchCampaigns(true) } else showToast('Failed to update', 'error')
     } catch { showToast('Failed', 'error') } finally { setSaving(false) }
   }
 
@@ -32,7 +32,7 @@ export default function SettingsTab() {
     if (!activeCampaignId) return
     const newStatus = form.status === 'active' ? 'paused' : 'active'
     setForm(p => ({ ...p, status: newStatus }))
-    try { await fetch(`/api/campaigns/${activeCampaignId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus }) }); fetchCampaigns(); showToast(`Campaign ${newStatus}`) }
+    try { await fetch(`/api/campaigns/${activeCampaignId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus }) }); fetchCampaigns(true); showToast(`Campaign ${newStatus}`) }
     catch { showToast('Failed', 'error') }
   }
 
@@ -40,7 +40,7 @@ export default function SettingsTab() {
     if (!activeCampaignId) return
     if (!confirm('Delete this campaign? This cannot be undone.')) return
     setDeleting(true)
-    try { const res = await fetch(`/api/campaigns/${activeCampaignId}`, { method: 'DELETE' }); if (res.ok) { showToast('Deleted'); fetchCampaigns() } else showToast('Failed', 'error') }
+    try { const res = await fetch(`/api/campaigns/${activeCampaignId}`, { method: 'DELETE' }); if (res.ok) { showToast('Deleted'); fetchCampaigns(true) } else showToast('Failed', 'error') }
     catch { showToast('Failed', 'error') } finally { setDeleting(false) }
   }
 

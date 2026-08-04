@@ -179,10 +179,12 @@ export const cacheKey = {
 
 export async function invalidateCampaign(campaignId: string) {
   invalidateL1(`campaign:${campaignId}`)
+  invalidateL1('campaigns:all')
   try {
     if (redis) {
       const keys = await redis.keys(`campaign:${campaignId}:*`)
       if (keys.length > 0) await redis.del(...keys)
+      await redis.del(cacheKey.campaigns())
       await redis.del(cacheKey.metadata())
     }
   } catch {}

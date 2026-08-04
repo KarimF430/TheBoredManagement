@@ -50,9 +50,9 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Check for available API keys.
-    // A keyword scrape costs ~1-3 units now (search.list bills 1 call to the
-    // separate Search Queries bucket, not this units pool) — 5 units is a safe
-    // floor for one search page + channel/detail lookups, not the old 100.
+    const today = new Date().toISOString().split('T')[0]
+    await queryAll(`UPDATE api_keys SET units_used = 0, reset_date = $1 WHERE reset_date < $1 AND is_active = TRUE`, [today]).catch(() => {})
+
     const keys = await queryAll<any>(
       `SELECT id FROM api_keys WHERE is_active = TRUE AND (units_used + 5) <= units_limit`
     )

@@ -2,6 +2,7 @@ import OpenAI from 'openai'
 
 import { loadGazetteer, getBrandsForWhisper, type Gazetteer } from './brand-gazetteer'
 import { matchBrandsFromTranscript, type CandidateSpan } from './brand-matcher'
+import { logLlmUsage, type LlmUsageLog } from './llm-usage-monitor'
 
 // Built on first use, not at import time. The OpenAI constructor throws when no
 // key is configured, and this module sits in the import chain of the whole scrape
@@ -9,20 +10,48 @@ import { matchBrandsFromTranscript, type CandidateSpan } from './brand-matcher'
 // refresh in any environment without an LLM key, even though neither needs one.
 let _openai: OpenAI | null = null
 
+/**
+ * Returns the OpenAI client. Supports two modes:
+ * - OPENAI_API_KEY set → Direct OpenAI (best: Structured Outputs, no markup)
+ * - OPENROUTER_API_KEY set → OpenRouter (fallback: model flexibility)
+ *
+ * Direct OpenAI is recommended for production brand analysis because it
+ * supports Structured Outputs (100% JSON schema adherence).
+ */
 function getOpenAI(): OpenAI {
   if (!_openai) {
-    // A missing key surfaces as a caught call-time error, not an import-time crash.
-    _openai = new OpenAI({
-      baseURL: 'https://openrouter.ai/api/v1',
-      apiKey: process.env.OPENROUTER_API_KEY || '',
-    })
+    const directKey = process.env.OPENAI_API_KEY
+    const openrouterKey = process.env.OPENROUTER_API_KEY
+
+    if (directKey) {
+      // Direct OpenAI — best accuracy, Structured Outputs support, no markup
+      _openai = new OpenAI({
+        apiKey: directKey,
+      })
+    } else if (openrouterKey) {
+      // OpenRouter fallback — model flexibility, slight markup
+      _openai = new OpenAI({
+        baseURL: 'https://openrouter.ai/api/v1',
+        apiKey: openrouterKey,
+      })
+    } else {
+      // Missing key surfaces as a caught call-time error, not an import-time crash.
+      _openai = new OpenAI({
+        apiKey: '',
+      })
+    }
   }
   return _openai
 }
 
+/** Which provider is active — used for logging and model selection. */
+function getProvider(): 'openai_direct' | 'openrouter' {
+  return process.env.OPENAI_API_KEY ? 'openai_direct' : 'openrouter'
+}
+
 /** True when brand analysis can run — callers use it to skip LLM work cleanly. */
 export function isBrandAnalysisConfigured(): boolean {
-  return Boolean(process.env.OPENROUTER_API_KEY)
+  return Boolean(process.env.OPENAI_API_KEY || process.env.OPENROUTER_API_KEY)
 }
 
 export type VideoFormat =
@@ -358,6 +387,39 @@ function recoverMissedGazetteerBrands(
 }
 
 /** Parse the model's JSON, tolerating code fences and leading prose. */
+/**
+ * JSON Schema for Structured Outputs (direct OpenAI only).
+ * Guarantees the model returns exact JSON shape — no parse errors, no hallucinated fields.
+ */
+const BRAND_ANALYSIS_SCHEMA = {
+  type: 'object' as const,
+  properties: {
+    video_format: {
+      type: 'string' as const,
+      enum: ['single_review', 'comparison', 'roundup', 'haul_or_vlog', 'tutorial_or_howto', 'other'] as const,
+    },
+    brand_notes: {
+      type: 'array' as const,
+      items: {
+        type: 'object' as const,
+        properties: {
+          brand_name: { type: 'string' as const },
+          why_it_matters: { type: 'string' as const },
+          confidence: { type: 'number' as const },
+          context_quotes: {
+            type: 'array' as const,
+            items: { type: 'string' as const },
+          },
+        },
+        required: ['brand_name', 'why_it_matters', 'confidence', 'context_quotes'] as const,
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['video_format', 'brand_notes'] as const,
+  additionalProperties: false,
+}
+
 function parseAnalysisJson(text: string): BrandAnalysisResult | null {
   if (!text) return null
   const withoutFences = text.replace(/```(?:json)?/gi, '')
@@ -382,7 +444,8 @@ async function extractBrandNotes(
   description: string,
   pinnedComment: string | null,
   campaignBrands: string[],
-  candidateBrands: string[] = []
+  candidateBrands: string[] = [],
+  usageContext?: { videoId?: string; campaignId?: string }
 ): Promise<BrandAnalysisResult | null> {
   const prompt = buildFullExtractionPrompt(
     transcript,
@@ -394,14 +457,84 @@ async function extractBrandNotes(
     candidateBrands
   )
 
-  const completion = await getOpenAI().chat.completions.create({
-    model: 'openai/gpt-4o-mini',
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0.1,
-    max_tokens: 2000,
-  })
+  const provider = getProvider()
+  const isDirectOpenAI = provider === 'openai_direct'
+  const model = isDirectOpenAI ? 'gpt-4o-mini' : 'openai/gpt-4o-mini'
 
-  return parseAnalysisJson(completion.choices[0]?.message?.content?.trim() || '')
+  const startTime = Date.now()
+
+  let completion: any
+  if (isDirectOpenAI) {
+    // Direct OpenAI: Use Structured Outputs for 100% JSON schema adherence
+    completion = await getOpenAI().chat.completions.create({
+      model,
+      messages: [
+        {
+          role: 'system',
+          content: 'You are TBM\'s senior market intelligence analyst. Output brand analysis as structured JSON.',
+        },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.1,
+      max_tokens: 2000,
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'brand_analysis',
+          strict: true,
+          schema: BRAND_ANALYSIS_SCHEMA,
+        },
+      },
+    })
+  } else {
+    // OpenRouter: Regular JSON parsing (Structured Outputs not available)
+    completion = await getOpenAI().chat.completions.create({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.1,
+      max_tokens: 2000,
+    })
+  }
+
+  const latencyMs = Date.now() - startTime
+
+  // Log token usage
+  const usage = (completion as any).usage
+  if (usage) {
+    const usageLog: LlmUsageLog = {
+      videoId: usageContext?.videoId,
+      campaignId: usageContext?.campaignId,
+      callType: 'brand_analysis',
+      model,
+      provider,
+      inputTokens: usage.prompt_tokens || 0,
+      outputTokens: usage.completion_tokens || 0,
+      cachedTokens: usage.prompt_tokens_details?.cached_tokens || 0,
+      latencyMs,
+      transcriptLength: transcript.length,
+      candidateCount: candidateBrands.length,
+      success: true,
+    }
+    logLlmUsage(usageLog).catch(() => {})
+  }
+
+  const content = completion.choices[0]?.message?.content?.trim() || ''
+
+  // Direct OpenAI with Structured Outputs: content is guaranteed valid JSON
+  if (isDirectOpenAI) {
+    try {
+      const parsed = JSON.parse(content)
+      return {
+        video_format: parsed.video_format ?? 'other',
+        brand_notes: Array.isArray(parsed.brand_notes) ? parsed.brand_notes : [],
+      }
+    } catch {
+      return null
+    }
+  }
+
+  // OpenRouter fallback: parse with regex
+  return parseAnalysisJson(content)
 }
 
 /**
@@ -419,7 +552,8 @@ export async function analyzeBrandsFromTranscript(
   knownBrands: string[] = [],
   channelName: string = '',
   description: string = '',
-  pinnedComment: string | null = null
+  pinnedComment: string | null = null,
+  usageContext?: { videoId?: string; campaignId?: string }
 ): Promise<BrandDetection[]> {
   // Too short to be a real transcript — analyse the metadata instead, but carry
   // the fragment and the pinned comment through so nothing is thrown away.
@@ -456,7 +590,8 @@ export async function analyzeBrandsFromTranscript(
   let extraction: BrandAnalysisResult | null = null
   try {
     extraction = await extractBrandNotes(
-      truncatedTranscript, videoTitle, channelName, truncatedDesc, pinnedComment, knownBrands, candidateBrands
+      truncatedTranscript, videoTitle, channelName, truncatedDesc, pinnedComment, knownBrands, candidateBrands,
+      usageContext
     )
   } catch (err) {
     console.error(`Brand extraction failed for "${videoTitle}":`, err)
@@ -488,7 +623,7 @@ export async function analyzeVideoBatch(
     pinnedComment?: string | null
   }>,
   knownBrands: string[] = [],
-  delayMs: number = 2000
+  delayMs: number = 200
 ): Promise<Map<string, BrandDetection[]>> {
   const results = new Map<string, BrandDetection[]>()
 
@@ -528,7 +663,8 @@ export async function analyzeBrandsFromMetadata(
   channelName: string,
   description: string,
   knownBrands: string[] = [],
-  pinnedComment: string | null = null
+  pinnedComment: string | null = null,
+  usageContext?: { videoId?: string; campaignId?: string }
 ): Promise<BrandDetection[]> {
   const metadataText = [title, channelName, description].filter(Boolean).join(' ').slice(0, 5000)
   if (!metadataText) return []
@@ -536,7 +672,8 @@ export async function analyzeBrandsFromMetadata(
   let extraction: BrandAnalysisResult | null = null
   try {
     extraction = await extractBrandNotes(
-      metadataText, title, channelName, description || '', pinnedComment, knownBrands
+      metadataText, title, channelName, description || '', pinnedComment, knownBrands, [],
+      usageContext
     )
   } catch (err) {
     console.error(`Metadata brand extraction failed for "${title}":`, err)
@@ -629,12 +766,32 @@ export async function detectIrrelevantVideo(
 
   // If heuristics don't catch it, use LLM
   try {
+    const provider = getProvider()
+    const model = provider === 'openai_direct' ? 'gpt-4o-mini' : 'openai/gpt-4o-mini'
+
+    const startTime = Date.now()
     const completion = await getOpenAI().chat.completions.create({
-      model: 'openai/gpt-4o-mini',
+      model,
       messages: [{ role: 'user', content: buildIrrelevancePrompt(title, channelName, description) }],
       temperature: 0.1,
       max_tokens: 300,
     })
+    const latencyMs = Date.now() - startTime
+
+    // Log token usage
+    const usage = (completion as any).usage
+    if (usage) {
+      logLlmUsage({
+        callType: 'irrelevance_detection',
+        model,
+        provider,
+        inputTokens: usage.prompt_tokens || 0,
+        outputTokens: usage.completion_tokens || 0,
+        cachedTokens: usage.prompt_tokens_details?.cached_tokens || 0,
+        latencyMs,
+        success: true,
+      }).catch(() => {})
+    }
 
     const text = completion.choices[0]?.message?.content?.trim() || ''
     const jsonMatch = text.match(/\{[\s\S]*\}/)

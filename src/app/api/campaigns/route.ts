@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase, queryAll } from '@/lib/supabase'
-import { getCached, cacheKey, CACHE_TTL } from '@/lib/cache'
+import { getCached, cacheKey, CACHE_TTL, invalidateL1, redis } from '@/lib/cache'
 import { getSession } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
@@ -81,6 +81,8 @@ export async function POST(req: NextRequest) {
       [data.id, session.id]
     )
 
+    invalidateL1('campaigns:all')
+    try { if (redis) await redis.del(cacheKey.campaigns()) } catch {}
     return NextResponse.json({ campaign: data }, { status: 201 })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unknown error'

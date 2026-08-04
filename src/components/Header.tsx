@@ -64,7 +64,7 @@ export default function Header() {
       setProjectDesc('')
       setShowProjModal(false)
       
-      await fetchCampaigns()
+      await fetchCampaigns(true)
       if (d.campaign?.id) {
         setActiveCampaignId(d.campaign.id)
       }

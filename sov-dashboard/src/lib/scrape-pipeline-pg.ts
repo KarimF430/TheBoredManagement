@@ -79,6 +79,9 @@ function getWeekStart(): string {
 }
 
 async function getKeyFromSupabase(minUnits: number = 100): Promise<{ api_key: string; key_id: string } | null> {
+  const today = new Date().toISOString().split('T')[0]
+  await queryAll(`UPDATE api_keys SET units_used = 0, reset_date = $1 WHERE reset_date < $1 AND is_active = TRUE`, [today]).catch(() => {})
+
   const rows = await queryAll<{ id: string; api_key: string; units_used: number }>(
     `UPDATE api_keys SET units_used = units_used + $1, last_used_at = NOW()
      WHERE id = (
@@ -315,8 +318,17 @@ function maxSearchPages(): number {
 }
 
 function isQuotaError(err: unknown): boolean {
-  const msg = String((err as { message?: string })?.message ?? err ?? '')
-  return msg.includes('quota') || msg.includes('429') || msg.includes('403') || msg.includes('NO_API_KEYS')
+  const msg = String((err as { message?: string })?.message ?? err ?? '').toLowerCase()
+  return (
+    msg.includes('quota') ||
+    msg.includes('429') ||
+    msg.includes('403') ||
+    msg.includes('400') ||
+    msg.includes('no_api_keys') ||
+    msg.includes('api key') ||
+    msg.includes('exceeded') ||
+    msg.includes('invalid')
+  )
 }
 
 /** Whether serp_position is the video's true universal YouTube rank, a rank
@@ -845,20 +857,21 @@ export interface DailyViewUpdateResult {
  * batch never aborts the run.
  */
 export async function runDailyViewUpdatePg(campaignId?: string): Promise<DailyViewUpdateResult> {
-  const rows = campaignId
-    ? await queryAll<{ youtube_id: string; video_id: string; campaign_id: string }>(
-        `SELECT v.youtube_id, v.id as video_id, cv.campaign_id
-         FROM campaign_videos cv
-         INNER JOIN videos v ON v.id = cv.video_id
-         WHERE cv.campaign_id = $1 AND v.is_deleted = FALSE AND v.youtube_id IS NOT NULL`,
-        [campaignId]
-      )
-    : await queryAll<{ youtube_id: string; video_id: string; campaign_id: string }>(
-        `SELECT v.youtube_id, v.id as video_id, cv.campaign_id
-         FROM campaign_videos cv
-         INNER JOIN videos v ON v.id = cv.video_id
-         WHERE v.is_deleted = FALSE AND v.youtube_id IS NOT NULL`
-      )
+  // Only update RANKED videos (from keyword_videos + keyword_shorts), not all pool videos.
+  const campaignFilter = campaignId ? `AND kv.campaign_id = $1` : ''
+  const params = campaignId ? [campaignId] : []
+
+  const rows = await queryAll<{ youtube_id: string; video_id: string; campaign_id: string }>(
+    `SELECT DISTINCT v.youtube_id, kv.video_id, kv.campaign_id
+     FROM (
+       SELECT video_id, campaign_id FROM keyword_videos WHERE true ${campaignFilter}
+       UNION
+       SELECT video_id, campaign_id FROM keyword_shorts WHERE true ${campaignFilter}
+     ) kv
+     INNER JOIN videos v ON v.id = kv.video_id
+     WHERE v.is_deleted = FALSE AND v.youtube_id IS NOT NULL`,
+    params
+  )
 
   // youtube_id → every (video, campaign) pair that needs the resulting count.
   const byYoutubeId = new Map<string, Array<{ video_id: string; campaign_id: string }>>()

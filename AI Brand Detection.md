@@ -11,14 +11,15 @@
 3. [Brand Gazetteer (1,561 brands)](#3-brand-gazetteer)
 4. [Matching Engine](#4-matching-engine)
 5. [LLM Classification](#5-llm-classification)
-6. [Database Schema](#6-database-schema)
-7. [API Endpoints](#7-api-endpoints)
-8. [UI Components](#8-ui-components)
-9. [Irrelevant Video System](#9-irrelevant-video-system)
-10. [Vercel Deployment](#10-vercel-deployment)
-11. [Performance Benchmarks](#11-performance-benchmarks)
-12. [Failure Handling](#12-failure-handling)
-13. [File Reference](#13-file-reference)
+6. [LLM Usage Tracking](#6-llm-usage-tracking)
+7. [Database Schema](#7-database-schema)
+8. [API Endpoints](#8-api-endpoints)
+9. [UI Components](#9-ui-components)
+10. [Irrelevant Video System](#10-irrelevant-video-system)
+11. [Cost Analysis](#11-cost-analysis)
+12. [Accuracy & Optimization](#12-accuracy--optimization)
+13. [Failure Handling](#13-failure-handling)
+14. [File Reference](#14-file-reference)
 
 ---
 
@@ -29,18 +30,7 @@
 Automatically detects brand mentions in YouTube video transcripts using:
 - **Exact matching** (Aho-Corasick) for known brand names and aliases
 - **Fuzzy matching** (Levenshtein distance) for ASR transcription errors
-- **LLM classification** (Gemma via OpenRouter) to confirm genuine mentions vs false positives
-
-### How it differs from the old system
-
-| Aspect | Old (Pure LLM) | New (Matching + LLM) |
-|--------|----------------|----------------------|
-| Speed | ~1500 tokens/call | ~300 tokens/call |
-| Accuracy | LLM hallucination risk | Gazetteer-verified candidates |
-| Brand coverage | LLM's training data | 1,561 brands from CSV |
-| ASR error handling | None | Fuzzy matching with edit distance |
-| Cost per video | High (full extraction) | Low (classification only) |
-| 1000 videos | ~75 minutes | ~13 seconds matching + LLM calls |
+- **LLM classification** (GPT-4o-mini via OpenRouter) to confirm genuine mentions vs false positives
 
 ### Processing flow
 
@@ -57,10 +47,26 @@ Aho-Corasick Exact Matching (all 1,561 brands + 1,915 aliases)
     ↓
 Levenshtein Fuzzy Matching (for ASR errors)
     ↓
-LLM Classification (Gemini classifies candidates as genuine/false_positive/sponsor)
+LLM Full Extraction (GPT-4o-mini classifies + extracts brands)
+    ↓
+Post-Processing (grounding, canonicalization, dedup, recall safety nets)
     ↓
 Store Results (brand_analysis + brand_tags tables)
+    ↓
+Log Usage (llm_usage table — tokens, cost, latency per video)
 ```
+
+### Performance at a glance
+
+| Metric | Value |
+|--------|-------|
+| Matching speed (1000 videos) | ~13 seconds |
+| LLM cost per video | ~$0.00064 |
+| LLM cost per 1000 videos | ~$0.64 |
+| LLM cost per 10,000 videos | ~$6.40 |
+| Brands in gazetteer | 1,561 |
+| Unique aliases | 1,915 |
+| Memory per cold start | ~1 MB |
 
 ---
 
@@ -96,7 +102,7 @@ Store Results (brand_analysis + brand_tags tables)
 │  │             │  │ er           │  │                │ │
 │  │ Aho-Corasick│  │ CSV parser   │  │ LLM classif.   │ │
 │  │ Levenshtein │  │ Alias gen    │  │ Irrelevant det │ │
-│  │ Word bounds │  │ JSON index   │  │ Full fallback  │ │
+│  │ Word bounds │  │ JSON index   │  │ Full extraction│ │
 │  └──────┬──────┘  └──────┬───────┘  └───────┬────────┘ │
 │         │                │                   │          │
 │         └────────┬───────┘                   │          │
@@ -105,6 +111,13 @@ Store Results (brand_analysis + brand_tags tables)
 │         │ brand-gazetteer│───────────────────┘          │
 │         │ .json (1561)   │                              │
 │         └────────────────┘                              │
+│                                                         │
+│  ┌─────────────────────────────────────────────────┐   │
+│  │  llm-usage-monitor                              │   │
+│  │  - Token counting per video                     │   │
+│  │  - Cost calculation per call                    │   │
+│  │  - Campaign-level summaries                     │   │
+│  └─────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────┘
                       ↓
 ┌─────────────────────────────────────────────────────────┐
@@ -112,7 +125,7 @@ Store Results (brand_analysis + brand_tags tables)
 │  videos → brand_analysis → brand_tags                   │
 │  videos → video_transcripts                             │
 │  videos → video_blacklist (irrelevant content)          │
-│  keyword_videos + keyword_shorts (both formats)         │
+│  llm_usage (token tracking per video/campaign)          │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -134,8 +147,12 @@ For each batch:
       2. detectIrrelevantVideo() → store if irrelevant
       3. fetchTranscript() → library → API → Whisper
       4. matchBrandsFromTranscript() → candidates
-      5. classifyCandidates() → LLM confirmation
-      6. Store in brand_analysis + brand_tags
+      5. extractBrandNotes() → LLM extraction + classification
+      6. refineDetections() → grounding, canonicalization, dedup
+      7. recoverMissedCampaignBrands() → campaign brand recall
+      8. recoverMissedGazetteerBrands() → gazetteer brand recall
+      9. Store in brand_analysis + brand_tags
+      10. Log to llm_usage (tokens, cost, latency)
     ↓
   Frontend: Update progress bar (processed/total, success/failed)
     ↓
@@ -271,28 +288,66 @@ const context = extractContext(transcript, wordStart, wordEnd, 150)
 
 ### File: `src/lib/brand-analyzer.ts`
 
-### Why classification instead of extraction
+### Model
 
-The old system asked the LLM to "extract all brands from this transcript." This was:
-- Expensive (~1500 tokens per call)
-- Inaccurate (LLM hallucinates brands not in the transcript)
-- Slow (one call per video)
+- **Model:** `openai/gpt-4o-mini` via OpenRouter
+- **Provider:** OpenRouter (`https://openrouter.ai/api/v1`)
+- **Temperature:** 0.1 (deterministic)
+- **Max tokens:** 2000 (brand analysis) / 300 (irrelevance detection)
 
-The new system asks: "Here are 5 candidates from the gazetteer. Are they genuine mentions?"
+### Full Extraction Prompt
 
-### Classification prompt
+The LLM receives full context and extracts brands with reasoning:
 
 ```
-You are a brand mention classifier. For each candidate, classify as:
-- "genuine": Brand is actually discussed, reviewed, compared, or recommended
-- "false_positive": Homonym (Apple the fruit), incidental mention
-- "sponsor": Paid promotion, sponsored segment
+You are TBM's senior market intelligence analyst. You've manually watched
+thousands of Indian YouTube videos and written brand notes for client pitch decks.
 
-Key rules:
-- Retail platforms (Amazon, Flipkart) are ALWAYS false_positive
-- Generic words ("a mixer grinder") are false_positive
-- Campaign brands should get higher confidence if genuinely present
+═══ INPUT ═══
+TITLE: {videoTitle}
+CHANNEL: {channelName}
+DESCRIPTION: {description}
+PINNED COMMENT: {pinnedComment}
+TRANSCRIPT: {truncatedTranscript}
+
+BRANDS THIS CLIENT CARES ABOUT: {campaignBrands}
+CANDIDATE BRANDS FOUND BY TEXT SEARCH: {candidateBrands}
+
+═══ RULES ═══
+- Retail platforms (Amazon, Flipkart, Meesho, etc.) are NEVER brands
+- Generic category words are not brands
+- Regional-language mentions carry identical weight to English
+- Only tag brands that earn a place
+
+═══ OUTPUT ═══
+Return ONLY this JSON:
+{
+  "video_format": "single_review|comparison|roundup|haul_or_vlog|tutorial_or_howto|other",
+  "brand_notes": [
+    {
+      "brand_name": string,
+      "why_it_matters": string,
+      "confidence": number,
+      "context_quotes": string[]
+    }
+  ]
+}
 ```
+
+### Post-Processing Pipeline
+
+After the LLM returns results, multiple safety layers run:
+
+1. **Grounding Check** — Verifies each brand appears in the source text (prevents hallucinations)
+2. **Retail Platform Exclusion** — Amazon, Flipkart, Meesho, etc. are always filtered out
+3. **Ambiguity Guard** — Brands that are also common words (AND, MAX, W) require exact brand casing
+4. **Canonicalization** — Maps model spelling to master list ("boat" → "boAt", "kent ro" → "KENT")
+5. **Deduplication** — Merged by canonical name, highest confidence kept
+
+### Recall Safety Nets
+
+1. **Campaign brands** — If a client's brand appears in the transcript but the LLM missed it, it's recovered at 0.55 confidence
+2. **Gazetteer exact matches** — If the Aho-Corasick matcher found an exact hit the LLM missed, it's recovered at 0.50 confidence
 
 ### Mention types
 
@@ -305,18 +360,90 @@ Key rules:
 
 ### Fallback chain
 
-1. **Primary**: Aho-Corasick + Levenshtein → LLM classification
-2. **Fallback 1**: If matcher fails → Full LLM extraction (old method)
-3. **Fallback 2**: If no transcript → Metadata-only analysis (title + channel + description)
-
-### Model
-- `google/gemma-4-26b-a4b-it:free` via OpenRouter
-- Temperature: 0.1 (deterministic)
-- Max tokens: 1500 (classification) / 2000 (full extraction)
+1. **Primary:** Aho-Corasick + Levenshtein → LLM full extraction
+2. **Fallback 1:** If no transcript → Metadata-only analysis (title + channel + description)
+3. **Fallback 2:** If LLM fails → Return empty array (no crash)
 
 ---
 
-## 6. Database Schema
+## 6. LLM Usage Tracking
+
+### Overview
+
+Every LLM API call is logged to the `llm_usage` table, tracking:
+- Token usage (input, output, cached)
+- Cost in USD (calculated from GPT-4o-mini pricing)
+- Latency in milliseconds
+- Per-video and per-campaign aggregation
+
+This works like the YouTube API quota monitor (`quota-monitor.ts`) but for LLM costs.
+
+### File: `src/lib/llm-usage-monitor.ts`
+
+### What gets logged
+
+| Call Type | When | Typical Tokens |
+|-----------|------|----------------|
+| `brand_analysis` | Every transcript analysis | ~1,500 input, ~500 output |
+| `irrelevance_detection` | Every new video (not cached) | ~300 input, ~100 output |
+| `metadata_analysis` | Videos without transcripts | ~500 input, ~300 output |
+
+### Pricing (GPT-4o-mini via OpenRouter)
+
+| Token Type | Price per 1M tokens |
+|------------|---------------------|
+| Input (cache miss) | $0.15 |
+| Input (cached) | $0.075 |
+| Output | $0.60 |
+
+### Key Functions
+
+```typescript
+// Log an LLM call (called automatically by brand-analyzer.ts)
+logLlmUsage({
+  videoId: 'uuid',
+  campaignId: 'uuid',
+  callType: 'brand_analysis',
+  model: 'openai/gpt-4o-mini',
+  inputTokens: 1500,
+  outputTokens: 500,
+  cachedTokens: 0,
+  latencyMs: 2300,
+  success: true,
+})
+
+// Get summary (like getQuotaStatus for YouTube)
+const summary = await getLlmUsageSummary(campaignId)
+// Returns: totalCalls, totalCostUsd, avgLatencyMs, byModel, byCallType
+
+// Get per-campaign breakdown
+const campaigns = await getCampaignCostSummaries()
+
+// Get per-video cost details
+const videos = await getVideoCostDetails(campaignId)
+
+// Get daily trend
+const trend = await getDailyCostTrend(campaignId, 30)
+
+// Estimate cost for N videos
+const estimate = await estimateAnalysisCost(1000, campaignId)
+
+// Generate full report
+const report = await exportLlmUsageReport(campaignId)
+```
+
+### Database Views
+
+| View | Purpose |
+|------|---------|
+| `llm_campaign_costs` | Total cost per campaign (all time) |
+| `llm_video_costs` | Cost per video |
+| `llm_daily_costs` | Daily cost trend by call type |
+| `llm_usage_summary` | Materialized view for fast aggregation |
+
+---
+
+## 7. Database Schema
 
 ### Core tables
 
@@ -333,11 +460,12 @@ videos (
   duration_sec INTEGER DEFAULT 0,
   tags TEXT[] DEFAULT '{}',
   is_deleted BOOLEAN DEFAULT FALSE,
-  is_irrelevant BOOLEAN DEFAULT FALSE,      -- NEW
-  irrelevant_reason TEXT,                     -- NEW
-  irrelevant_score REAL DEFAULT 0,            -- NEW
-  irrelevant_category TEXT,                   -- NEW
-  irrelevant_detected_at TIMESTAMPTZ         -- NEW
+  is_irrelevant BOOLEAN DEFAULT FALSE,
+  irrelevant_reason TEXT,
+  irrelevant_score REAL DEFAULT 0,
+  irrelevant_category TEXT,
+  irrelevant_detected_at TIMESTAMPTZ,
+  brand_analysis_checked_at TIMESTAMPTZ
 )
 ```
 
@@ -348,12 +476,10 @@ brand_analysis (
   video_id UUID REFERENCES videos(id) ON DELETE CASCADE,
   brand_name TEXT NOT NULL,
   confidence REAL DEFAULT 0,
-  mention_type TEXT DEFAULT 'mentioned',  -- primary_review|comparison|mentioned|recommendation
+  mention_type TEXT DEFAULT 'mentioned',
   context_quotes TEXT[] DEFAULT '{}',
   analyzed_at TIMESTAMPTZ DEFAULT NOW()
 )
--- INDEX: idx_ba_video_id on (video_id) INCLUDE (brand_name, confidence, mention_type)
--- INDEX: idx_ba_brand_video on (brand_name, video_id) INCLUDE (confidence, mention_type)
 ```
 
 #### `brand_tags` (lightweight campaign-scoped tags)
@@ -378,38 +504,45 @@ video_transcripts (
 )
 ```
 
-#### `video_blacklist` (irrelevant content permanent blocklist) — NEW
+#### `video_blacklist` (irrelevant content permanent blocklist)
 ```sql
 video_blacklist (
   youtube_id TEXT PRIMARY KEY,
   reason TEXT NOT NULL DEFAULT 'irrelevant',
-  category TEXT,           -- shorts|music|gaming|non_review|etc
+  category TEXT,
   detected_by TEXT DEFAULT 'ai',
   added_at TIMESTAMPTZ DEFAULT NOW(),
   campaign_id UUID REFERENCES campaigns(id) ON DELETE SET NULL
 )
 ```
 
-### Query: "Show me all brands in video X"
-
+#### `llm_usage` (token tracking per video/campaign) — NEW
 ```sql
-SELECT brand_name, confidence, mention_type, context_quotes
-FROM brand_analysis
-WHERE video_id = '<uuid>'
-ORDER BY confidence DESC
-```
-
-### Query: "How many videos mention brand Y"
-
-```sql
-SELECT COUNT(DISTINCT video_id) as video_count
-FROM brand_analysis
-WHERE brand_name = 'Samsung' AND confidence >= 0.6
+llm_usage (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  video_id UUID REFERENCES videos(id) ON DELETE CASCADE,
+  campaign_id UUID REFERENCES campaigns(id) ON DELETE SET NULL,
+  call_type TEXT NOT NULL,           -- 'brand_analysis' | 'irrelevance_detection' | 'metadata_analysis'
+  model TEXT NOT NULL,               -- 'openai/gpt-4o-mini'
+  provider TEXT NOT NULL DEFAULT 'openrouter',
+  input_tokens INTEGER NOT NULL DEFAULT 0,
+  output_tokens INTEGER NOT NULL DEFAULT 0,
+  cached_tokens INTEGER NOT NULL DEFAULT 0,
+  total_tokens INTEGER NOT NULL DEFAULT 0,
+  cost_usd NUMERIC(10, 6) NOT NULL DEFAULT 0,
+  latency_ms INTEGER NOT NULL DEFAULT 0,
+  transcript_length INTEGER DEFAULT 0,
+  candidate_count INTEGER DEFAULT 0,
+  brands_detected INTEGER DEFAULT 0,
+  success BOOLEAN NOT NULL DEFAULT TRUE,
+  error_message TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+)
 ```
 
 ---
 
-## 7. API Endpoints
+## 8. API Endpoints
 
 ### `POST /api/brands/analyze`
 
@@ -445,7 +578,13 @@ Analyzes one or more videos for brand mentions.
 }
 ```
 
-**Per-video try/catch:** If video #50 fails, videos #51+ still process.
+### `GET /api/brands/analyze?video_id=X`
+
+Returns brand analysis for a specific video.
+
+### `GET /api/brands/analyze?campaign_id=X`
+
+Returns campaign-wide brand summary.
 
 ### `GET /api/videos/ids`
 
@@ -456,31 +595,13 @@ Fetches ALL video IDs for batch analysis.
 - `format`: `all` | `long` | `short`
 - `analyzed`: `all` | `analyzed` | `unanalyzed`
 
-**Response:**
-```json
-{
-  "total": 847,
-  "videos": [
-    {
-      "id": "uuid",
-      "youtube_id": "abc123",
-      "title": "Samsung S24 Review",
-      "channel_name": "TechReviewer",
-      "description": "..."
-    }
-  ]
-}
-```
-
 ### `GET /api/videos/leaderboard`
 
 Paginated video list with filters.
 
-**Params:** `campaign_id`, `tab` (all/long/short), `sort` (views/rank/frequency), `page`, `limit`, `brand_name`, `keyword_id`, `channel_name`, `q`, `is_ours`
-
 ---
 
-## 8. UI Components
+## 9. UI Components
 
 ### AnalysisProgressBar
 
@@ -496,14 +617,6 @@ Fixed-position bottom bar showing real-time analysis progress.
 - Cancel button during analysis
 - Auto-dismiss after completion
 
-**States:**
-| Phase | Display |
-|-------|---------|
-| `starting` | "Preparing analysis..." + spinner |
-| `analyzing` | "Analyzing videos... 45%" + progress bar |
-| `complete` | "Analysis complete" + green checkmark |
-| `error` | "Analysis stopped" + warning icon |
-
 ### "AI Analyze All" Button Behavior
 
 1. User clicks button → shows progress bar
@@ -516,7 +629,7 @@ Fixed-position bottom bar showing real-time analysis progress.
 
 ---
 
-## 9. Irrelevant Video System
+## 10. Irrelevant Video System
 
 ### Detection layers
 
@@ -525,11 +638,11 @@ Fixed-position bottom bar showing real-time analysis progress.
 |---------|----------|-------|
 | `#shorts` in title | shorts | 1.0 |
 | Music keywords (song, lyrics, remix, audio) | music | 0.95 |
-| Gaming keywords (gameplay, BGMI, Minecraft, GTA) | gaming | 0.9(title) |
+| Gaming keywords (gameplay, BGMI, Minecraft, GTA) | gaming | 0.9 |
 | Live stream keywords (live, stream, podcast) | live_stream | 0.8 |
 
 **Layer 2 — LLM classification (~200ms):**
-- Sends title + channel + description to Gemma
+- Sends title + channel + description to GPT-4o-mini
 - Returns: `is_irrelevant`, `reason`, `score`, `category`
 - Categories: shorts, music, gaming, non_review, foreign_language, live_stream, compilation, other
 
@@ -539,99 +652,114 @@ When a video is detected as irrelevant:
 1. `videos.is_irrelevant = TRUE` + reason + score + category
 2. `video_blacklist` row created (permanent, keyed by youtube_id)
 
-### Filtering during scraping
+---
 
-```
-Search results → Filter brand channels → Filter blacklist → Filter is_irrelevant → Process
-```
+## 11. Cost Analysis
 
-### Filtering during analysis
+### GPT-4o-mini Pricing (OpenRouter)
 
-```
-For each video:
-  1. Check is_irrelevant → skip immediately
-  2. Run detectIrrelevantVideo() → if irrelevant, store + skip
-  3. If relevant → proceed with transcript + brand analysis
-```
+| Token Type | Price per 1M tokens |
+|------------|---------------------|
+| Input (cache miss) | $0.15 |
+| Input (cached) | $0.075 (50% discount) |
+| Output | $0.60 |
+
+### Per-Video Cost Breakdown
+
+| Call Type | Input Tokens | Output Tokens | Cost |
+|-----------|-------------|---------------|------|
+| Brand analysis | ~1,500 | ~500 | $0.00053 |
+| Irrelevance detection | ~300 | ~100 | $0.00011 |
+| **Total per video** | **~1,800** | **~600** | **~$0.00064** |
+
+### Scale Costs
+
+| Videos | Cost |
+|--------|------|
+| 100 | $0.064 |
+| 1,000 | $0.64 |
+| 5,000 | $3.20 |
+| 10,000 | $6.40 |
+| 50,000 | $32.00 |
+
+### With Prompt Caching
+
+If prompt caching is enabled (repeated system prefix):
+- Input cost drops from $0.15/M to $0.075/M for cached tokens
+- Estimated savings: 30-40% on input tokens
+- **Total per video with caching: ~$0.00045**
+
+### LLM Usage Tracking
+
+All costs are tracked in the `llm_usage` table via `llm-usage-monitor.ts`. Use the API to query:
+- Cost per video
+- Cost per campaign
+- Daily cost trends
+- Estimate future costs
 
 ---
 
-## 10. Vercel Deployment
+## 12. Accuracy & Optimization
 
-### Configuration (`vercel.json`)
+### Current System Accuracy (Estimated)
 
-```json
-{
-  "functions": {
-    "src/app/api/brands/analyze/route.ts": {
-      "maxDuration": 120,
-      "memory": 2048
-    },
-    "src/app/api/cron/route.ts": {
-      "maxDuration": 60
-    }
-  }
-}
-```
+| Metric | Current | Target |
+|--------|---------|--------|
+| Recall (brands found) | ~75% | 90% |
+| Precision (no false positives) | ~65% | 90% |
 
-### Compatibility
+### Why Accuracy Is Lower Than Expected
 
-| Component | Vercel Status | Notes |
-|-----------|--------------|-------|
-| Aho-Corasick | ✅ Works | Pure JavaScript |
-| Fuzzy matcher | ✅ Works | Pure computation |
-| Gazetteer JSON | ✅ Works | Bundled in serverless |
-| OpenRouter API | ✅ Works | HTTP-based |
-| Supabase | ✅ Works | HTTP REST API |
-| better-sqlite3 | ⚠️ Dead code | Migrated to Supabase |
-| yt-dlp (Whisper) | ⚠️ Dead code | Falls back gracefully |
-| BullMQ workers | ⚠️ Dead code | Cron routes bypass workers |
+1. **Full extraction mode** — LLM searches for brands from scratch instead of classifying pre-identified candidates
+2. **No Whisper brand seeding** — ASR misrecognizes brand names that aren't common English
+3. **Gazetteer coverage gaps** — Some brands (Aquaguard, Livpure, AO Smith) not in the Amazon CSV
+4. **No confidence calibration** — LLM confidence scores don't reflect actual accuracy
 
-### Cold start
-- Gazetteer reloads from disk: ~50ms
-- Aho-Corasick rebuild: ~50ms
-- Fuzzy index build: ~20ms
-- **Total cold start overhead: ~120ms**
+### Roadmap to 90% Accuracy
 
----
+#### Phase 1: Classification-Only Mode (Impact: +15% precision)
+The architecture doc designed this but it was never implemented:
+- Aho-Corasick + Levenshtein find candidates (~13ms, free)
+- LLM only classifies candidates (genuine/false_positive/sponsor)
+- Drops from ~1,500 tokens to ~300 tokens per call
+- **Accuracy improves** because classification is easier than extraction
 
-## 11. Performance Benchmarks
+#### Phase 2: Whisper Brand Seeding (Impact: +10% recall)
+Already partially implemented in `transcript.ts`:
+- Inject brand names into Whisper `initial_prompt`
+- Improves ASR accuracy for brand names
+- Especially important for Indian language content
 
-### Matching speed
-| Transcript | Words | Time | Candidates |
-|-----------|-------|------|------------|
-| Short clip | 25 | 12ms | 5 |
-| Medium review | 63 | 11ms | 16 |
-| Long haul | 259 | 13ms | 49 |
-| **1000 videos** | ~200 avg | **~13s** | varies |
+#### Phase 3: Gazetteer Expansion (Impact: +5% recall)
+- Add missing brands not in the Amazon CSV
+- Expand MANUAL_ALIASES for common ASR errors
+- Add phonetic variants for Hindi/Marathi/Tamil brand pronunciations
 
-### Memory
-| Component | Size |
-|-----------|------|
-| Gazetteer JSON | 314 KB |
-| Aho-Corasick automaton | ~500 KB |
-| Fuzzy prefix index | ~200 KB |
-| **Total per cold start** | **~1 MB** |
+#### Phase 4: Confidence Calibration (Impact: +10% precision)
+- Track prediction vs actual accuracy per confidence bucket
+- Adjust confidence thresholds based on real data
+- Lower threshold for campaign brands, raise for non-campaign
 
-### LLM cost per video
-| Method | Tokens | Cost |
-|--------|--------|------|
-| Old (full extraction) | ~1500 | $0.003 |
-| New (classification) | ~300 | $0.0006 |
-| **Savings** | **80%** | **80%** |
+#### Phase 5: A/B Testing Framework
+- Compare old vs new detection on known videos
+- Measure precision/recall with human-labeled test set
+- Track accuracy over time per model version
+
+### Testing Approach
+
+1. **Unit tests** for gazetteer, matcher, analyzer (existing: `brand-analyzer.test.ts`, `brand-matcher.test.ts`)
+2. **Integration tests** with sample transcripts
+3. **Regression tests** comparing detection results across code changes
+4. **Human-labeled test set** of 100+ known videos with verified brand mentions
 
 ---
 
-## 12. Failure Handling
+## 13. Failure Handling
 
 ### Per-video isolation
 - `brands/analyze/route.ts`: Each video wrapped in try/catch
 - If video #50 fails, videos #51-1000 still process
 - Error stored in results array, not thrown
-
-### Batch isolation
-- `runDailyViewUpdatePg`: Each batch of 50 wrapped in try/catch
-- One failed API batch doesn't kill the entire update
 
 ### Retry with backoff
 - `transcript.ts`: `fetchTranscript()` wrapped in `withRetry()`
@@ -648,16 +776,21 @@ For each video:
 - No LLM call needed for obvious cases (shorts, music, gaming)
 - Saves API quota and processing time
 
+### LLM usage logging failure
+- `logLlmUsage()` is fire-and-forget — never crashes the main flow
+- Usage logging errors are caught and logged to console only
+
 ---
 
-## 13. File Reference
+## 14. File Reference
 
 ### Core brand detection
 | File | Purpose |
 |------|---------|
 | `src/lib/brand-gazetteer.ts` | CSV parser, alias generator, gazetteer loader |
 | `src/lib/brand-matcher.ts` | Aho-Corasick + Levenshtein matching engine |
-| `src/lib/brand-analyzer.ts` | LLM classification + irrelevant detection |
+| `src/lib/brand-analyzer.ts` | LLM extraction + classification + irrelevant detection |
+| `src/lib/llm-usage-monitor.ts` | Token tracking, cost calculation, usage summaries |
 | `data/brand-gazetteer.json` | Pre-built brand index (1561 brands) |
 | `scripts/build-gazetteer.js` | Gazetteer build script |
 
@@ -688,6 +821,13 @@ For each video:
 | `schema/FULL_MIGRATION.sql` | Base schema |
 | `schema/004_performance_indexes.sql` | Performance indexes |
 | `schema/006_brand_index_and_irrelevant.sql` | Brand analysis index + irrelevant video tables |
+| `schema/010_llm_usage_tracking.sql` | LLM usage tracking tables + views |
+
+### Tests
+| File | Purpose |
+|------|---------|
+| `src/lib/brand-analyzer.test.ts` | Brand analyzer tests |
+| `src/lib/brand-matcher.test.ts` | Brand matcher tests |
 
 ---
 
@@ -698,14 +838,16 @@ For each video:
 npm run build:gazetteer
 ```
 
-### 2. Run database migration
+### 2. Run database migrations
 Paste `schema/006_brand_index_and_irrelevant.sql` into Supabase SQL Editor.
+Paste `schema/010_llm_usage_tracking.sql` into Supabase SQL Editor.
 
 ### 3. Set environment variables
 ```env
 OPENROUTER_API_KEY=your_key_here
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 SUPABASE_SERVICE_ROLE_KEY=your_service_key
+GROQ_API_KEY=your_groq_key_here
 ```
 
 ### 4. Deploy to Vercel
@@ -718,3 +860,4 @@ vercel deploy --prod
 2. Select a campaign
 3. Click "AI Analyze All"
 4. Watch the progress bar
+5. Check `llm_usage` table for cost tracking

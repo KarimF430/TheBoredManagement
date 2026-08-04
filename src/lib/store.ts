@@ -23,7 +23,7 @@ interface CampaignStore {
   activeCampaignId: string
   _campaignsFetched: boolean
   setActiveCampaignId: (id: string) => void
-  fetchCampaigns: () => Promise<void>
+  fetchCampaigns: (force?: boolean) => Promise<void>
 
   // Workspace / Access Control
   userProjects: ProjectWithRole[]
@@ -43,9 +43,9 @@ export const useCampaignStore = create<CampaignStore>()(
         if (prev !== id) set({ activeCampaignId: id })
       },
 
-      fetchCampaigns: async () => {
+      fetchCampaigns: async (force = false) => {
         const state = get()
-        if (state._campaignsFetched && state.campaigns.length > 0) return
+        if (!force && state._campaignsFetched && state.campaigns.length > 0) return
 
         try {
           const r = await fetch('/api/campaigns')
@@ -55,10 +55,13 @@ export const useCampaignStore = create<CampaignStore>()(
           const d = await r.json()
           const camps: Campaign[] = d.campaigns ?? []
 
+          const currentId = get().activeCampaignId
+          const stillExists = currentId && camps.some(c => c.id === currentId)
+
           set({
             campaigns: camps,
             _campaignsFetched: true,
-            activeCampaignId: get().activeCampaignId || (camps.length > 0 ? camps[0].id : ''),
+            activeCampaignId: stillExists ? currentId : (camps.length > 0 ? camps[0].id : ''),
           })
         } catch (e) {
           console.error('Failed to fetch campaigns in store', e)

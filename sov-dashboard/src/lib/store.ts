@@ -55,10 +55,13 @@ export const useCampaignStore = create<CampaignStore>()(
           const d = await r.json()
           const camps: Campaign[] = d.campaigns ?? []
 
+          const currentId = get().activeCampaignId
+          const stillExists = currentId && camps.some(c => c.id === currentId)
+
           set({
             campaigns: camps,
             _campaignsFetched: true,
-            activeCampaignId: get().activeCampaignId || (camps.length > 0 ? camps[0].id : ''),
+            activeCampaignId: stillExists ? currentId : (camps.length > 0 ? camps[0].id : ''),
           })
         } catch (e) {
           console.error('Failed to fetch campaigns in store', e)

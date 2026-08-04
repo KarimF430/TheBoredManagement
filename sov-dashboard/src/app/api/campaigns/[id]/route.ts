@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryAll, queryOne } from '@/lib/supabase'
 import { authorizeCampaignAccess } from '@/lib/auth'
+import { invalidateL1, redis, cacheKey } from '@/lib/cache'
 
 // GET /api/campaigns/[id]
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -41,6 +42,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       `UPDATE campaigns SET name=$1, category=$2, sub_category=$3, description=$4, status=$5 WHERE id=$6`,
       [body.name, body.category ?? '', body.sub_category ?? '', body.description ?? '', body.status ?? 'active', id]
     )
+    invalidateL1('campaigns:all')
+    try { if (redis) await redis.del(cacheKey.campaigns()) } catch {}
     return NextResponse.json({ ok: true })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
@@ -55,6 +58,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (!authorized) return authError!
 
     await queryOne(`DELETE FROM campaigns WHERE id = $1`, [id])
+    invalidateL1('campaigns:all')
+    try { if (redis) await redis.del(cacheKey.campaigns()) } catch {}
     return NextResponse.json({ ok: true })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
