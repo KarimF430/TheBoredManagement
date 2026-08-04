@@ -279,11 +279,24 @@ function LeaderboardContent() {
         })
 
         try {
+          // Create AbortController so cancel can actually stop the fetch
+          const controller = new AbortController()
+          if (cancelRef.current) { controller.abort() }
+
           const res = await fetch('/api/brands/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ video_ids: batchIds, campaign_id: activeCampaignId, force: false }),
+            body: JSON.stringify({ video_ids: batchIds, campaign_id: activeCampaignId, force: true }),
+            signal: controller.signal,
+          }).catch(err => {
+            if (err.name === 'AbortError') return null
+            throw err
           })
+
+          if (!res) {
+            // Aborted — stop the loop
+            break
+          }
 
           const result = await res.json()
 
@@ -297,13 +310,14 @@ function LeaderboardContent() {
               failed++
               const v = batch.find(bv => bv.youtube_id === r.youtube_id)
               errors.push({ youtube_id: r.youtube_id, title: v?.title || r.youtube_id, error: r.error || 'Failed' })
-            } else if (r.status === 'already_analyzed') {
-              skipped++
             } else {
+              // already_analyzed or other
               skipped++
             }
           }
         } catch (err: any) {
+          // Skip error counting if user cancelled
+          if (err.name === 'AbortError' || cancelRef.current) break
           processed += batch.length
           failed += batch.length
           for (const v of batch) {
@@ -430,7 +444,7 @@ function LeaderboardContent() {
               {analysisProgress.skipped > 0 && <span style={{ fontSize: 11, color: '#F59E0B', fontWeight: 600 }}>{analysisProgress.skipped} no brands</span>}
               {analysisProgress.failed > 0 && <span style={{ fontSize: 11, color: '#EF4444', fontWeight: 600 }}>{analysisProgress.failed} failed</span>}
               {analysisProgress.phase !== 'complete' && analysisProgress.phase !== 'error' && (
-                <button onClick={() => { cancelRef.current = true }} style={{ fontSize: 11, color: '#EF4444', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Cancel</button>
+                <button onClick={() => { cancelRef.current = true; setAnalysisProgress(prev => prev ? { ...prev, phase: 'complete', currentStep: 'Cancelled by user' } : null) }} style={{ fontSize: 11, color: '#EF4444', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Cancel</button>
               )}
               {(analysisProgress.phase === 'complete' || analysisProgress.phase === 'error') && (
                 <button onClick={() => setAnalysisProgress(null)} style={{ fontSize: 11, color: '#64748B', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Dismiss</button>
