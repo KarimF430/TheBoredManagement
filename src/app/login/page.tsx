@@ -1,15 +1,15 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Mail, Lock, Eye, EyeOff, AlertCircle, Loader2, ArrowRight,
-  ShieldCheck, Check,
+  Mail, KeyRound, AlertCircle, Loader2, ArrowRight, ArrowLeft,
+  ShieldCheck, Check, RefreshCw,
 } from 'lucide-react'
 
 /* ════════════════════════════════════════════════════════════
-   DESIGN TOKENS — aligned with the app's bright glassmorphic suite
+   DESIGN TOKENS
    ════════════════════════════════════════════════════════════ */
 const C = {
   ink:       '#0F172A',
@@ -18,7 +18,6 @@ const C = {
   muted:     '#64748B',
   faint:     '#94A3B8',
   line:      'rgba(26,115,232,0.10)',
-  lineSoft:  'rgba(26,115,232,0.06)',
   blue:      '#1A73E8',
   blueDim:   'rgba(26,115,232,0.08)',
   orange:    '#F58220',
@@ -39,8 +38,11 @@ const SOV_DATA = [
 ]
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const OTP_RE = /^\d{6}$/
 
 const ease = [0.16, 1, 0.3, 1] as const
+
+type Step = 'email' | 'otp'
 
 /* ════════════════════════════════════════════════════════════
    SMALL PIECES
@@ -58,7 +60,6 @@ function Logo() {
   )
 }
 
-/* Live SOV preview — animated bar comparison shown on the brand panel */
 function SovPreview() {
   const max = Math.max(...SOV_DATA.map(d => d.value))
   return (
@@ -71,7 +72,6 @@ function SovPreview() {
       boxShadow: '0 20px 60px -20px rgba(15,23,42,0.18), inset 0 1px 0 rgba(255,255,255,0.9)',
       padding: '20px 22px',
     }}>
-      {/* header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 800, color: C.inkSoft, letterSpacing: '-0.2px' }}>
@@ -95,8 +95,6 @@ function SovPreview() {
           LIVE
         </div>
       </div>
-
-      {/* bars */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
         {SOV_DATA.map((d, i) => (
           <div key={d.label}>
@@ -133,8 +131,6 @@ function SovPreview() {
           </div>
         ))}
       </div>
-
-      {/* footer stats */}
       <div style={{
         display: 'flex', justifyContent: 'space-between', marginTop: 18,
         paddingTop: 14, borderTop: '1px solid rgba(26,115,232,0.06)',
@@ -157,6 +153,65 @@ function SovPreview() {
 }
 
 /* ════════════════════════════════════════════════════════════
+   OTP INPUT COMPONENT
+   ════════════════════════════════════════════════════════════ */
+
+function OTPInput({ value, onChange, autoFocus }: {
+  value: string
+  onChange: (v: string) => void
+  autoFocus?: boolean
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const digits = value.split('').concat(Array(6).fill('')).slice(0, 6)
+
+  useEffect(() => {
+    if (autoFocus && inputRef.current) inputRef.current.focus()
+  }, [autoFocus])
+
+  return (
+    <div
+      style={{ display: 'flex', gap: 8, justifyContent: 'center' }}
+      onClick={() => inputRef.current?.focus()}
+    >
+      {digits.map((d, i) => (
+        <div
+          key={i}
+          style={{
+            width: 48, height: 56,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 22, fontWeight: 800, color: C.ink,
+            background: '#FFFFFF',
+            border: `2px solid ${d ? C.orange : 'rgba(26,115,232,0.12)'}`,
+            borderRadius: 12,
+            transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+            boxShadow: d ? '0 0 0 3px rgba(245,130,32,0.10)' : 'none',
+          }}
+        >
+          {d}
+        </div>
+      ))}
+      <input
+        ref={inputRef}
+        type="text"
+        inputMode="numeric"
+        maxLength={6}
+        autoComplete="one-time-code"
+        autoFocus={autoFocus}
+        value={value}
+        onChange={e => {
+          const v = e.target.value.replace(/\D/g, '').slice(0, 6)
+          onChange(v)
+        }}
+        style={{
+          position: 'absolute', opacity: 0, width: 0, height: 0,
+          pointerEvents: 'none',
+        }}
+      />
+    </div>
+  )
+}
+
+/* ════════════════════════════════════════════════════════════
    MAIN PAGE
    ════════════════════════════════════════════════════════════ */
 
@@ -164,21 +219,43 @@ export default function LoginPage() {
   const router = useRouter()
   const formRef = useRef<HTMLFormElement>(null)
 
+  const [step, setStep] = useState<Step>('email')
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
-  const [capsLock, setCapsLock] = useState(false)
+  const [otpValue, setOtpValue] = useState('')
   const [remember, setRemember] = useState(false)
-  const [focused, setFocused] = useState<'email' | 'password' | null>(null)
+  const [focused, setFocused] = useState<'email' | 'otp' | null>(null)
 
-  const [fieldError, setFieldError] = useState<{ email?: string; password?: string }>({})
+  const [fieldError, setFieldError] = useState<{ email?: string; otp?: string }>({})
   const [serverError, setServerError] = useState<string | null>(null)
   const [shake, setShake] = useState(0)
 
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [otpSent, setOtpSent] = useState(false)
 
-  /* prefill remembered email — deferred so it never runs during render/hydration */
+  // Resend cooldown
+  const [resendCountdown, setResendCountdown] = useState(0)
+  const countdownRef = useRef<NodeJS.Timeout | null>(null)
+
+  const startCountdown = useCallback(() => {
+    setResendCountdown(60)
+    if (countdownRef.current) clearInterval(countdownRef.current)
+    countdownRef.current = setInterval(() => {
+      setResendCountdown(prev => {
+        if (prev <= 1) {
+          if (countdownRef.current) clearInterval(countdownRef.current)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }, [])
+
+  useEffect(() => {
+    return () => { if (countdownRef.current) clearInterval(countdownRef.current) }
+  }, [])
+
+  /* prefill remembered email */
   useEffect(() => {
     const t = window.setTimeout(() => {
       try {
@@ -189,29 +266,30 @@ export default function LoginPage() {
     return () => window.clearTimeout(t)
   }, [])
 
-  const validate = () => {
-    const errs: { email?: string; password?: string } = {}
-    if (!email.trim()) errs.email = 'Enter your email address'
-    else if (!EMAIL_RE.test(email.trim())) errs.email = 'That email doesn’t look right'
-    if (!password) errs.password = 'Enter your password'
-    setFieldError(errs)
-    return Object.keys(errs).length === 0
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  /* ── Step 1: Send OTP ── */
+  const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     setServerError(null)
-    if (!validate()) return
+    setFieldError({})
+
+    if (!email.trim()) {
+      setFieldError({ email: 'Enter your email address' })
+      return
+    }
+    if (!EMAIL_RE.test(email.trim())) {
+      setFieldError({ email: 'That email doesn\'t look right' })
+      return
+    }
 
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch('/api/auth/otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify({ email: email.trim() }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to authenticate')
+      if (!res.ok) throw new Error(data.error || 'Failed to send OTP')
 
       if (remember) {
         try { localStorage.setItem('sov_remember_email', email.trim()) } catch {}
@@ -219,17 +297,77 @@ export default function LoginPage() {
         try { localStorage.removeItem('sov_remember_email') } catch {}
       }
 
+      setOtpSent(true)
+      setStep('otp')
+      startCountdown()
+    } catch (err: unknown) {
+      setServerError(err instanceof Error ? err.message : 'Something went wrong.')
+      setShake(s => s + 1)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  /* ── Step 2: Verify OTP ── */
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setServerError(null)
+    setFieldError({})
+
+    if (!OTP_RE.test(otpValue)) {
+      setFieldError({ otp: 'Enter the 6-digit code' })
+      return
+    }
+
+    setLoading(true)
+    try {
+      const res = await fetch('/api/auth/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), code: otpValue }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Verification failed')
+
       setSuccess(true)
       setTimeout(() => {
         router.push('/workspace')
         router.refresh()
       }, 900)
     } catch (err: unknown) {
-      setServerError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+      setServerError(err instanceof Error ? err.message : 'Invalid code.')
       setShake(s => s + 1)
+      setOtpValue('')
     } finally {
       setLoading(false)
     }
+  }
+
+  /* ── Resend OTP ── */
+  const handleResend = async () => {
+    if (resendCountdown > 0) return
+    setServerError(null)
+    try {
+      const res = await fetch('/api/auth/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to resend OTP')
+      startCountdown()
+    } catch (err: unknown) {
+      setServerError(err instanceof Error ? err.message : 'Failed to resend.')
+    }
+  }
+
+  /* ── Back to email ── */
+  const handleBack = () => {
+    setStep('email')
+    setOtpValue('')
+    setServerError(null)
+    setFieldError({})
+    setOtpSent(false)
   }
 
   /* ── field shells ── */
@@ -340,7 +478,6 @@ export default function LoginPage() {
             linear-gradient(155deg, #FFFFFF 0%, #EEF3FB 100%)
           `,
         }}>
-          {/* floating accent shapes */}
           <div style={{
             position: 'absolute', top: -60, right: -60, width: 190, height: 190, borderRadius: '50%',
             background: 'radial-gradient(circle, rgba(124,58,237,0.12) 0%, transparent 70%)',
@@ -434,16 +571,19 @@ export default function LoginPage() {
               <Logo />
             </div>
             <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '1.4px', color: C.orange, textTransform: 'uppercase', marginBottom: 10 }}>
-              Sign in
+              {step === 'email' ? 'Sign in' : 'Verify code'}
             </div>
             <h1 style={{
               fontSize: 'clamp(24px, 2.6vw, 30px)', fontWeight: 800, color: C.ink,
               letterSpacing: '-0.8px', lineHeight: 1.2, margin: 0,
             }}>
-              Welcome back
+              {step === 'email' ? 'Welcome back' : 'Check your inbox'}
             </h1>
             <p style={{ fontSize: 13.5, color: C.muted, fontWeight: 500, margin: '8px 0 0' }}>
-              Sign in to your analytics workspace to continue.
+              {step === 'email'
+                ? 'Enter your email to receive a login code.'
+                : <>We sent a 6-digit code to <strong style={{ color: C.ink }}>{email}</strong></>
+              }
             </p>
           </motion.div>
 
@@ -472,185 +612,214 @@ export default function LoginPage() {
             )}
           </AnimatePresence>
 
-          <motion.form
-            ref={formRef}
-            noValidate
-            onSubmit={handleSubmit}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.22, ease }}
-            style={{ display: 'flex', flexDirection: 'column', gap: 20, marginTop: 28 }}
-          >
-            {/* email */}
-            <div>
-              <label htmlFor="login-email" style={{
-                display: 'block', fontSize: 12, fontWeight: 700, color: C.inkSoft,
-                marginBottom: 7,
-              }}>
-                Email address
-              </label>
-              <div style={{ position: 'relative' }}>
-                <div style={{ ...iconWrap, color: focused === 'email' ? C.orange : (fieldError.email ? C.red : C.faint) }}>
-                  <Mail size={16} />
-                </div>
-                <input
-                  id="login-email"
-                  type="email"
-                  autoComplete="email"
-                  autoFocus
-                  value={email}
-                  onChange={e => { setEmail(e.target.value); if (fieldError.email) setFieldError(f => ({ ...f, email: undefined })) }}
-                  onFocus={() => setFocused('email')}
-                  onBlur={() => setFocused(null)}
-                  placeholder="you@company.com"
-                  aria-invalid={!!fieldError.email}
-                  aria-describedby={fieldError.email ? 'email-error' : undefined}
-                  style={{
-                    ...fieldBase,
-                    ...(focused === 'email' ? fieldFocused : {}),
-                    ...(fieldError.email ? fieldErrorStyle : {}),
-                  }}
-                />
-              </div>
-              {fieldError.email && (
-                <div id="email-error" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 7, fontSize: 11.5, color: '#D4304F', fontWeight: 600 }}>
-                  <AlertCircle size={12} /> {fieldError.email}
-                </div>
-              )}
-            </div>
-
-            {/* password */}
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
-                <label htmlFor="login-password" style={{ fontSize: 12, fontWeight: 700, color: C.inkSoft }}>
-                  Password
-                </label>
-                <a
-                  href="mailto:Haji.karim@theboredmonkey.com?subject=SOV%20Panel%20—%20Sign-in%20issue"
-                  style={{ fontSize: 11.5, color: C.faint, fontWeight: 700, textDecoration: 'none', transition: 'color 0.15s' }}
-                  onMouseEnter={e => { e.currentTarget.style.color = C.orange }}
-                  onMouseLeave={e => { e.currentTarget.style.color = C.faint }}
-                >
-                  Trouble signing in?
-                </a>
-              </div>
-              <div style={{ position: 'relative' }}>
-                <div style={{ ...iconWrap, color: focused === 'password' ? C.orange : (fieldError.password ? C.red : C.faint) }}>
-                  <Lock size={16} />
-                </div>
-                <input
-                  id="login-password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={e => {
-                    setPassword(e.target.value)
-                    const mod = (e.nativeEvent as unknown as { getModifierState?: (k: string) => boolean })
-                    if (mod.getModifierState) setCapsLock(mod.getModifierState('CapsLock'))
-                    if (fieldError.password) setFieldError(f => ({ ...f, password: undefined }))
-                  }}
-                  onFocus={() => { setFocused('password') }}
-                  onBlur={() => { setFocused(null); setCapsLock(false) }}
-                  onKeyDown={e => { if (e.getModifierState) setCapsLock(e.getModifierState('CapsLock')) }}
-                  placeholder="••••••••"
-                  aria-invalid={!!fieldError.password}
-                  aria-describedby={fieldError.password ? 'password-error' : undefined}
-                  style={{
-                    ...fieldBase,
-                    paddingRight: 46,
-                    ...(focused === 'password' ? fieldFocused : {}),
-                    ...(fieldError.password ? fieldErrorStyle : {}),
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(s => !s)}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  tabIndex={-1}
-                  style={{
-                    position: 'absolute', right: 12, top: '50%',
-                    transform: 'translateY(-50%)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    width: 32, height: 32, borderRadius: 9,
-                    border: 'none', background: 'transparent', cursor: 'pointer',
-                    color: C.faint, transition: 'all 0.15s',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.background = C.blueDim; e.currentTarget.style.color = C.inkSoft }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.faint }}
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-
-              {/* caps lock + error row */}
-              <div style={{ minHeight: 20, marginTop: 7 }}>
-                {fieldError.password ? (
-                  <div id="password-error" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: '#D4304F', fontWeight: 600 }}>
-                    <AlertCircle size={12} /> {fieldError.password}
-                  </div>
-                ) : capsLock ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: '#B45309', fontWeight: 600 }}>
-                    <AlertCircle size={12} /> Caps Lock is on
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            {/* remember + submit */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer', userSelect: 'none' }}>
-                <input
-                  type="checkbox"
-                  checked={remember}
-                  onChange={e => setRemember(e.target.checked)}
-                  style={{
-                    width: 17, height: 17, margin: 0, cursor: 'pointer', accentColor: C.orange,
-                  }}
-                />
-                <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600 }}>Remember me</span>
-              </label>
-
-              <motion.button
-                type="submit"
-                disabled={loading || success}
-                whileHover={!loading && !success ? { scale: 1.015, boxShadow: '0 8px 24px rgba(245,130,32,0.35)' } : {}}
-                whileTap={!loading && !success ? { scale: 0.985 } : {}}
-                style={{
-                  height: 48, padding: '0 26px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
-                  fontFamily: 'inherit', fontSize: 14, fontWeight: 700,
-                  color: '#FFFFFF', border: 'none', borderRadius: 12,
-                  background: success
-                    ? 'linear-gradient(135deg, #00C853 0%, #2ECC71 100%)'
-                    : 'linear-gradient(135deg, #F58220 0%, #FF9F43 100%)',
-                  cursor: loading || success ? 'default' : 'pointer',
-                  boxShadow: success
-                    ? '0 8px 24px rgba(0,200,83,0.3)'
-                    : '0 4px 16px rgba(245,130,32,0.28)',
-                  transition: 'all 0.2s ease',
-                  position: 'relative', overflow: 'hidden',
-                  minWidth: 128,
-                }}
+          <AnimatePresence mode="wait">
+            {step === 'email' ? (
+              /* ══════════ STEP 1: EMAIL ══════════ */
+              <motion.form
+                key="email-form"
+                ref={formRef}
+                noValidate
+                onSubmit={handleSendOTP}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3, ease }}
+                style={{ display: 'flex', flexDirection: 'column', gap: 20, marginTop: 28 }}
               >
-                {success ? (
-                  <>
-                    <Check size={17} />
-                    Success
-                  </>
-                ) : loading ? (
-                  <>
-                    <Loader2 size={16} style={{ animation: 'spin 0.9s linear infinite' }} />
-                    Signing in…
-                  </>
-                ) : (
-                  <>
-                    Sign in
-                    <ArrowRight size={15} />
-                  </>
-                )}
-              </motion.button>
-            </div>
-          </motion.form>
+                <div>
+                  <label htmlFor="login-email" style={{
+                    display: 'block', fontSize: 12, fontWeight: 700, color: C.inkSoft,
+                    marginBottom: 7,
+                  }}>
+                    Email address
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <div style={{ ...iconWrap, color: focused === 'email' ? C.orange : (fieldError.email ? C.red : C.faint) }}>
+                      <Mail size={16} />
+                    </div>
+                    <input
+                      id="login-email"
+                      type="email"
+                      autoComplete="email"
+                      autoFocus
+                      value={email}
+                      onChange={e => { setEmail(e.target.value); if (fieldError.email) setFieldError(f => ({ ...f, email: undefined })) }}
+                      onFocus={() => setFocused('email')}
+                      onBlur={() => setFocused(null)}
+                      placeholder="you@company.com"
+                      aria-invalid={!!fieldError.email}
+                      aria-describedby={fieldError.email ? 'email-error' : undefined}
+                      style={{
+                        ...fieldBase,
+                        ...(focused === 'email' ? fieldFocused : {}),
+                        ...(fieldError.email ? fieldErrorStyle : {}),
+                      }}
+                    />
+                  </div>
+                  {fieldError.email && (
+                    <div id="email-error" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 7, fontSize: 11.5, color: '#D4304F', fontWeight: 600 }}>
+                      <AlertCircle size={12} /> {fieldError.email}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer', userSelect: 'none' }}>
+                    <input
+                      type="checkbox"
+                      checked={remember}
+                      onChange={e => setRemember(e.target.checked)}
+                      style={{
+                        width: 17, height: 17, margin: 0, cursor: 'pointer', accentColor: C.orange,
+                      }}
+                    />
+                    <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600 }}>Remember me</span>
+                  </label>
+
+                  <motion.button
+                    type="submit"
+                    disabled={loading}
+                    whileHover={!loading ? { scale: 1.015, boxShadow: '0 8px 24px rgba(245,130,32,0.35)' } : {}}
+                    whileTap={!loading ? { scale: 0.985 } : {}}
+                    style={{
+                      height: 48, padding: '0 26px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
+                      fontFamily: 'inherit', fontSize: 14, fontWeight: 700,
+                      color: '#FFFFFF', border: 'none', borderRadius: 12,
+                      background: 'linear-gradient(135deg, #F58220 0%, #FF9F43 100%)',
+                      cursor: loading ? 'default' : 'pointer',
+                      boxShadow: '0 4px 16px rgba(245,130,32,0.28)',
+                      transition: 'all 0.2s ease',
+                      minWidth: 128,
+                    }}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 size={16} style={{ animation: 'spin 0.9s linear infinite' }} />
+                        Sending…
+                      </>
+                    ) : (
+                      <>
+                        Send code
+                        <ArrowRight size={15} />
+                      </>
+                    )}
+                  </motion.button>
+                </div>
+              </motion.form>
+            ) : (
+              /* ══════════ STEP 2: OTP ══════════ */
+              <motion.form
+                key="otp-form"
+                noValidate
+                onSubmit={handleVerifyOTP}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.3, ease }}
+                style={{ display: 'flex', flexDirection: 'column', gap: 20, marginTop: 28 }}
+              >
+                <div>
+                  <label style={{
+                    display: 'block', fontSize: 12, fontWeight: 700, color: C.inkSoft,
+                    marginBottom: 12, textAlign: 'center',
+                  }}>
+                    Enter 6-digit code
+                  </label>
+                  <OTPInput
+                    value={otpValue}
+                    onChange={v => { setOtpValue(v); if (fieldError.otp) setFieldError(f => ({ ...f, otp: undefined })) }}
+                    autoFocus
+                  />
+                  {fieldError.otp && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10, fontSize: 11.5, color: '#D4304F', fontWeight: 600 }}>
+                      <AlertCircle size={12} /> {fieldError.otp}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <button
+                    type="button"
+                    onClick={handleBack}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      height: 48, padding: '0 16px',
+                      fontFamily: 'inherit', fontSize: 13, fontWeight: 600,
+                      color: C.muted, background: 'transparent',
+                      border: '1.5px solid var(--border-1)', borderRadius: 12,
+                      cursor: 'pointer', transition: 'all 0.15s',
+                    }}
+                  >
+                    <ArrowLeft size={14} />
+                    Back
+                  </button>
+
+                  <motion.button
+                    type="submit"
+                    disabled={loading || success}
+                    whileHover={!loading && !success ? { scale: 1.015, boxShadow: '0 8px 24px rgba(245,130,32,0.35)' } : {}}
+                    whileTap={!loading && !success ? { scale: 0.985 } : {}}
+                    style={{
+                      height: 48, padding: '0 26px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
+                      fontFamily: 'inherit', fontSize: 14, fontWeight: 700,
+                      color: '#FFFFFF', border: 'none', borderRadius: 12,
+                      background: success
+                        ? 'linear-gradient(135deg, #00C853 0%, #2ECC71 100%)'
+                        : 'linear-gradient(135deg, #F58220 0%, #FF9F43 100%)',
+                      cursor: loading || success ? 'default' : 'pointer',
+                      boxShadow: success
+                        ? '0 8px 24px rgba(0,200,83,0.3)'
+                        : '0 4px 16px rgba(245,130,32,0.28)',
+                      transition: 'all 0.2s ease',
+                      minWidth: 128,
+                    }}
+                  >
+                    {success ? (
+                      <>
+                        <Check size={17} />
+                        Verified
+                      </>
+                    ) : loading ? (
+                      <>
+                        <Loader2 size={16} style={{ animation: 'spin 0.9s linear infinite' }} />
+                        Verifying…
+                      </>
+                    ) : (
+                      <>
+                        Verify
+                        <ArrowRight size={15} />
+                      </>
+                    )}
+                  </motion.button>
+                </div>
+
+                {/* Resend link */}
+                <div style={{ textAlign: 'center' }}>
+                  {resendCountdown > 0 ? (
+                    <span style={{ fontSize: 12.5, color: C.faint, fontWeight: 600 }}>
+                      Resend code in {resendCountdown}s
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleResend}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        fontSize: 12.5, color: C.orange, fontWeight: 700,
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        fontFamily: 'inherit', padding: 0,
+                      }}
+                    >
+                      <RefreshCw size={13} />
+                      Resend code
+                    </button>
+                  )}
+                </div>
+              </motion.form>
+            )}
+          </AnimatePresence>
 
           {/* footer */}
           <motion.div

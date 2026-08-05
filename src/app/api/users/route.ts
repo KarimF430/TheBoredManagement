@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryAll, queryOne } from '@/lib/supabase'
-import { hashPassword } from '@/lib/auth'
+import { getSession } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
   try {
@@ -18,16 +18,20 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, password, role, campaign_id, brand_name } = await req.json()
-    if (!email || !password || !role) {
-      return NextResponse.json({ error: 'Email, password, and role are required' }, { status: 400 })
+    const session = await getSession(req)
+    if (!session || session.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const hashed = await hashPassword(password)
+    const { email, role, campaign_id, brand_name } = await req.json()
+    if (!email || !role) {
+      return NextResponse.json({ error: 'Email and role are required' }, { status: 400 })
+    }
+
     await queryOne(`
-      INSERT INTO users (email, password_hash, role, campaign_id, brand_name)
-      VALUES ($1, $2, $3, $4, $5) ON CONFLICT (email) DO NOTHING
-    `, [email, hashed, role, campaign_id || null, brand_name || null])
+      INSERT INTO users (email, role, campaign_id, brand_name)
+      VALUES ($1, $2, $3, $4) ON CONFLICT (email) DO NOTHING
+    `, [email, role, campaign_id || null, brand_name || null])
 
     return NextResponse.json({ ok: true })
   } catch (e: any) {
@@ -37,6 +41,11 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const session = await getSession(req)
+    if (!session || session.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const id = req.nextUrl.searchParams.get('id')
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
     await queryOne('DELETE FROM users WHERE id = $1', [id])

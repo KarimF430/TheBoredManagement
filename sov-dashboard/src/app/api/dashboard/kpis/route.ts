@@ -230,8 +230,8 @@ async function fetchKpis(cid: string, format?: string | null, language?: string 
   ])
 
   // Extract counts — handle both Supabase head query and raw SQL result shapes
-  const totalVideos = Array.isArray(cvRes) ? (cvRes[0]?.cnt ?? 0) : (cvRes.count ?? 0)
-  const newVideosLast7Days = Array.isArray(cvNewRes) ? (cvNewRes[0]?.cnt ?? 0) : (cvNewRes.count ?? 0)
+  const totalVideos = (cvRes as any)?.[0]?.cnt ?? (cvRes as any)?.count ?? 0
+  const newVideosLast7Days = (cvNewRes as any)?.[0]?.cnt ?? (cvNewRes as any)?.count ?? 0
 
   const vsToday = vsTodayRes[0]?.total_views ?? 0
   const vs1d    = vs1dRes[0]?.total_views ?? 0
@@ -242,12 +242,12 @@ async function fetchKpis(cid: string, format?: string | null, language?: string 
     meta[m.key] = { value: m.value, updated_at: m.updated_at }
   })
 
-  const taggedCount = btRes.count ?? 0
+  const taggedCount = (btRes as any)?.count ?? 0
 
   return {
     lastUpdatedViews:   meta['last_views_refresh']   ?? null,
     lastUpdatedRanking: meta['last_ranking_refresh'] ?? null,
-    totalKeywords:       kwRes.count ?? 0,
+    totalKeywords:       (kwRes as any)?.count ?? 0,
     totalVideos,
     rankedVideos:        0,
     rankedVideoCount:    0,
@@ -267,7 +267,7 @@ async function fetchKpis(cid: string, format?: string | null, language?: string 
       d7:  pctChange(vsToday, vs7d),
       d30: 0,
     },
-    activeScrapingJobs:  sjRes.count ?? 0,
+    activeScrapingJobs:  (sjRes as any)?.count ?? 0,
     transcriptCoverage:  0,
     dailyViews:          [],
     dailyNewVideos:      [],
