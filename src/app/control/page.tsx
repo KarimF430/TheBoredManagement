@@ -9,6 +9,8 @@ import {
   Eye, UserPlus, UserMinus, MoreVertical, ShoppingBag, Activity,
 } from 'lucide-react'
 import { AMAZON_INDIA_CATEGORIES } from '@/lib/amazon-india'
+import { useCampaignStore } from '@/lib/store'
+import { canAccess } from '@/lib/permissions'
 
 interface Campaign {
   id: string; name: string; category: string; sub_category: string; description: string
@@ -100,6 +102,13 @@ export default function ControlPage() {
   const [memberCampaignId, setMemberCampaignId] = useState('')
   const [newMember, setNewMember] = useState({ user_id: '', role: 'viewer' as 'owner' | 'admin' | 'editor' | 'viewer' })
   const [usersList, setUsersList] = useState<any[]>([])
+
+  const { getActiveProjectRole } = useCampaignStore()
+  const activeRole = getActiveProjectRole()
+
+  const canEdit = canAccess(activeRole, 'add-edit-keywords')
+  const canManageAccess = canAccess(activeRole, 'manage-access')
+  const canControl = canAccess(activeRole, 'campaign-control')
 
   const [showNewCampaign, setShowNewCampaign] = useState(false)
   const [newCampaign, setNewCampaign] = useState({ name: '', category: '', sub_category: '', description: '' })
@@ -296,9 +305,11 @@ export default function ControlPage() {
         <button className={`toggle-btn ${tab === 'campaigns' ? 'active' : ''}`} onClick={() => setTab('campaigns')}>
           <BarChart2 size={13} /> Campaigns & Keywords
         </button>
-        <button className={`toggle-btn ${tab === 'members' ? 'active' : ''}`} onClick={() => { setTab('members'); fetchUsersList(); if (memberCampaignId) fetchMembers(memberCampaignId) }}>
-          <UsersIcon size={13} /> Project Access
-        </button>
+        {canManageAccess && (
+          <button className={`toggle-btn ${tab === 'members' ? 'active' : ''}`} onClick={() => { setTab('members'); fetchUsersList(); if (memberCampaignId) fetchMembers(memberCampaignId) }}>
+            <UsersIcon size={13} /> Project Access
+          </button>
+        )}
       </div>
 
       {/* ════════════════════════ CAMPAIGNS & KEYWORDS ════════════════════════ */}
@@ -312,7 +323,9 @@ export default function ControlPage() {
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)' }}>Campaigns <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({campaigns.length})</span></span>
-              <button className="btn btn-blue btn-xs" onClick={() => setShowNewCampaign(v => !v)}><Plus size={11} /> New</button>
+              {canControl && (
+                <button className="btn btn-blue btn-xs" onClick={() => setShowNewCampaign(v => !v)}><Plus size={11} /> New</button>
+              )}
             </div>
             {showNewCampaign && (
               <div style={{ padding: 12, borderBottom: '1px solid var(--border-1)', background: 'var(--blue-dim)' }}>
@@ -356,21 +369,23 @@ export default function ControlPage() {
                         {c.last_scraped && <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{fmtRelative(c.last_scraped)}</span>}
                       </div>
                     </div>
-                    <div style={{ position: 'relative', flexShrink: 0 }} data-menu-id={c.id}>
-                      <button onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === c.id ? null : c.id) }}
-                        style={{ background: openMenuId === c.id ? 'var(--blue-dim)' : 'none', border: 'none', cursor: 'pointer', padding: 3, color: 'var(--text-muted)', borderRadius: 4 }}>
-                        <MoreVertical size={13} />
-                      </button>
-                      {openMenuId === c.id && (
-                        <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 3, background: '#FFF', border: '1.5px solid var(--border-1)', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.08)', zIndex: 50, minWidth: 150, overflow: 'hidden' }}>
-                          <button onClick={() => { setDeleteTarget({ id: c.id, name: c.name }); setOpenMenuId(null) }}
-                            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '7px 12px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 11.5, color: '#EF4444', fontFamily: 'inherit' }}
-                            onMouseEnter={e => e.currentTarget.style.background = '#FEF2F2'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                            <Trash2 size={11} /> Delete Campaign
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                    {canControl && (
+                      <div style={{ position: 'relative', flexShrink: 0 }} data-menu-id={c.id}>
+                        <button onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === c.id ? null : c.id) }}
+                          style={{ background: openMenuId === c.id ? 'var(--blue-dim)' : 'none', border: 'none', cursor: 'pointer', padding: 3, color: 'var(--text-muted)', borderRadius: 4 }}>
+                          <MoreVertical size={13} />
+                        </button>
+                        {openMenuId === c.id && (
+                          <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 3, background: '#FFF', border: '1.5px solid var(--border-1)', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.08)', zIndex: 50, minWidth: 150, overflow: 'hidden' }}>
+                            <button onClick={() => { setDeleteTarget({ id: c.id, name: c.name }); setOpenMenuId(null) }}
+                              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '7px 12px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 11.5, color: '#EF4444', fontFamily: 'inherit' }}
+                              onMouseEnter={e => e.currentTarget.style.background = '#FEF2F2'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                              <Trash2 size={11} /> Delete Campaign
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -389,12 +404,16 @@ export default function ControlPage() {
                     {selectedCampaign?.name} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({keywords.length} keywords)</span>
                   </span>
                   <div style={{ display: 'flex', gap: 5 }}>
-                    <button className="btn btn-blue btn-xs" onClick={() => { setShowAddKw(v => !v); setSelCategory(''); setSelSubCategory('') }} style={{ fontSize: 10.5 }}>
-                      <Plus size={10} /> Add Keywords
-                    </button>
-                    <button className="btn btn-ghost btn-xs" onClick={() => triggerScrape()} disabled={scraping} style={{ fontSize: 10.5 }}>
-                      {scraping ? <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={10} />} Scrape All
-                    </button>
+                    {canEdit && (
+                      <button className="btn btn-blue btn-xs" onClick={() => { setShowAddKw(v => !v); setSelCategory(''); setSelSubCategory('') }} style={{ fontSize: 10.5 }}>
+                        <Plus size={10} /> Add Keywords
+                      </button>
+                    )}
+                    {canEdit && (
+                      <button className="btn btn-ghost btn-xs" onClick={() => triggerScrape()} disabled={scraping} style={{ fontSize: 10.5 }}>
+                        {scraping ? <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={10} />} Scrape All
+                      </button>
+                    )}
                   </div>
                 </div>
 

@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { useCampaignStore } from '@/lib/store'
-import { Play } from 'lucide-react'
+import { getVisibleNavItems, type ProjectRole } from '@/lib/permissions'
+import { Play, Shield, ShieldCheck, ShieldAlert, Eye } from 'lucide-react'
 
 const NAV = [
   {
@@ -53,15 +54,25 @@ const DOT_COLORS: Record<string, { color: string; dim: string }> = {
   gray:   { color: '#94A3B8', dim: 'rgba(148,163,184,0.12)' },
 }
 
+const ROLE_BADGES: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
+  owner: { label: 'Owner', color: '#00C853', bg: 'rgba(0,200,83,0.1)', icon: <ShieldCheck size={10} /> },
+  admin: { label: 'Admin', color: '#1A73E8', bg: 'rgba(26,115,232,0.1)', icon: <Shield size={10} /> },
+  editor: { label: 'Editor', color: '#7C3AED', bg: 'rgba(124,58,237,0.1)', icon: <ShieldAlert size={10} /> },
+  viewer: { label: 'Viewer', color: '#64748B', bg: 'rgba(100,116,139,0.1)', icon: <Eye size={10} /> },
+}
+
 export default function Sidebar({ open = false, onNavigate }: { open?: boolean; onNavigate?: () => void } = {}) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
   const [quota, setQuota] = useState<{ used: number; total: number } | null>(null)
-  const { campaigns, activeCampaignId, fetchCampaigns } = useCampaignStore()
+  const { campaigns, activeCampaignId, fetchCampaigns, userProjects, fetchUserProjects, getActiveProjectRole } = useCampaignStore()
+
+  const activeRole = getActiveProjectRole()
 
   useEffect(() => {
     fetchCampaigns()
-  }, [fetchCampaigns])
+    fetchUserProjects()
+  }, [fetchCampaigns, fetchUserProjects])
 
   useEffect(() => {
     fetch('/api/api-keys')
@@ -145,14 +156,17 @@ export default function Sidebar({ open = false, onNavigate }: { open?: boolean; 
         overflowY: 'auto',
         overflowX: 'hidden',
       }}>
-        {NAV.map(group => (
+        {NAV.map(group => {
+          const visibleItems = getVisibleNavItems(group.items, activeRole)
+          if (visibleItems.length === 0) return null
+          return (
           <div key={group.section} style={{ marginBottom: 8 }}>
             {!collapsed && (
               <div className="nav-section">
                 {group.section}
               </div>
             )}
-            {group.items.map(item => {
+            {visibleItems.map(item => {
               const active = pathname === item.href
               const dot = DOT_COLORS[item.dot] || DOT_COLORS.gray
               return (
@@ -178,7 +192,8 @@ export default function Sidebar({ open = false, onNavigate }: { open?: boolean; 
               )
             })}
           </div>
-        ))}
+          )
+        })}
       </nav>
 
       {/* ── API Quota bar ── */}
@@ -217,7 +232,19 @@ export default function Sidebar({ open = false, onNavigate }: { open?: boolean; 
             <div style={{ fontSize: 'var(--fs-label)', fontWeight: 700, color: 'var(--text-bright)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               Admin Panel
             </div>
-            <div className="t-micro">Logged in</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+              {activeRole && ROLE_BADGES[activeRole] && (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  fontSize: 9.5, fontWeight: 700, color: ROLE_BADGES[activeRole].color,
+                  background: ROLE_BADGES[activeRole].bg,
+                  padding: '2px 7px', borderRadius: 99,
+                }}>
+                  {ROLE_BADGES[activeRole].icon}
+                  {ROLE_BADGES[activeRole].label}
+                </span>
+              )}
+            </div>
           </div>
           <button
             className="btn-danger btn-sm"

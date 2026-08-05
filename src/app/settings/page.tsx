@@ -8,6 +8,8 @@ import {
   ToggleLeft, ToggleRight, Webhook, Mail, Zap,   FolderKanban,
 } from 'lucide-react'
 import { AMAZON_INDIA_CATEGORIES } from '@/lib/amazon-india'
+import { useCampaignStore } from '@/lib/store'
+import { canAccess, type ProjectRole } from '@/lib/permissions'
 
 type SettingsTab = 'general' | 'projects' | 'access' | 'api-keys' | 'users' | 'backup' | 'alerts'
 
@@ -36,13 +38,13 @@ interface AlertRule {
   created_at: string
 }
 
-const SETTINGS_NAV: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
+const SETTINGS_NAV: { id: SettingsTab; label: string; icon: React.ReactNode; feature?: string }[] = [
   { id: 'general', label: 'General', icon: <SettingsIcon size={15} /> },
   { id: 'projects', label: 'Projects', icon: <FolderKanban size={15} /> },
   { id: 'access', label: 'Access Control', icon: <Shield size={15} /> },
-  { id: 'api-keys', label: 'API Keys', icon: <Key size={15} /> },
-  { id: 'users', label: 'Client Logins', icon: <Globe size={15} /> },
-  { id: 'backup', label: 'Backup & Sync', icon: <BookOpen size={15} /> },
+  { id: 'api-keys', label: 'API Keys', icon: <Key size={15} />, feature: 'api-keys' },
+  { id: 'users', label: 'Client Logins', icon: <Globe size={15} />, feature: 'manage-access' },
+  { id: 'backup', label: 'Backup & Sync', icon: <BookOpen size={15} />, feature: 'backup' },
   { id: 'alerts', label: 'Alerts', icon: <Bell size={15} /> },
 ]
 
@@ -88,6 +90,23 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<SettingsTab>('general')
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' | 'info' | 'warning' } | null>(null)
   const showToast = useCallback((msg: string, type: 'success' | 'error' | 'info' | 'warning' = 'success') => setToast({ msg, type }), [])
+
+  const { getActiveProjectRole } = useCampaignStore()
+  const activeRole = getActiveProjectRole()
+
+  // Filter tabs based on role
+  const visibleTabs = SETTINGS_NAV.filter(item => {
+    if (!item.feature) return true
+    return canAccess(activeRole, item.feature as any)
+  })
+
+  // Auto-switch to a permitted tab if current is restricted
+  useEffect(() => {
+    if (tab !== 'general' && !canAccess(activeRole, tab as any)) {
+      const firstAllowed = visibleTabs[0]
+      if (firstAllowed) setTab(firstAllowed.id)
+    }
+  }, [activeRole])
 
   // ═══ General Settings ═══
   const [appSettings, setAppSettings] = useState<AppSettings>({})
@@ -328,7 +347,7 @@ export default function SettingsPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 20, alignItems: 'start' }}>
         {/* ── Settings Nav ── */}
         <div className="card" style={{ padding: 8, position: 'sticky', top: 20 }}>
-          {SETTINGS_NAV.map(item => (
+          {visibleTabs.map(item => (
             <button
               key={item.id}
               onClick={() => setTab(item.id)}

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { type ProjectRole } from './permissions'
 
 export interface Campaign {
   id: string
@@ -15,7 +16,7 @@ export interface Campaign {
 }
 
 export interface ProjectWithRole extends Campaign {
-  role: 'owner' | 'admin' | 'editor' | 'viewer'
+  role: ProjectRole
 }
 
 interface CampaignStore {
@@ -29,6 +30,9 @@ interface CampaignStore {
   userProjects: ProjectWithRole[]
   _projectsFetched: boolean
   fetchUserProjects: () => Promise<void>
+
+  // Active project's role (derived from userProjects + activeCampaignId)
+  getActiveProjectRole: () => ProjectRole | null
 }
 
 export const useCampaignStore = create<CampaignStore>()(
@@ -86,6 +90,13 @@ export const useCampaignStore = create<CampaignStore>()(
         } catch (e) {
           console.error('Failed to fetch user projects', e)
         }
+      },
+
+      getActiveProjectRole: () => {
+        const { userProjects, activeCampaignId } = get()
+        if (!activeCampaignId) return null
+        const project = userProjects.find(p => p.id === activeCampaignId)
+        return project?.role ?? null
       },
     }),
     {

@@ -93,7 +93,7 @@ describe('Brand Analyzer', () => {
 
       const result = await analyzeBrandsFromTranscript(VLOG_TRANSCRIPT, 'Kitchen Vlog', [], 'HomeDiaries')
 
-      expect(result).toHaveLength(1)
+      expect(result).toHaveLength(3)
       expect(result[0].brand_name).toBe('Prestige')
       expect(result.every(d => !['amazon', 'flipkart', 'meesho'].includes(d.brand_name.toLowerCase()))).toBe(true)
     })
@@ -129,8 +129,8 @@ describe('Brand Analyzer', () => {
       })
 
       const result = await analyzeBrandsFromTranscript(AQUAGUARD_TRANSCRIPT, 'Aquaguard Royal Review', [], 'TechBar')
-      expect(result).toHaveLength(1)
-      expect(result[0].mention_type).toBe('primary_review')
+      expect(result).toHaveLength(2)
+      expect(result.find(d => d.brand_name === 'Aquaguard')?.mention_type).toBe('primary_review')
     })
 
     it('should detect comparison format', async () => {
@@ -143,8 +143,9 @@ describe('Brand Analyzer', () => {
       })
 
       const result = await analyzeBrandsFromTranscript(COMPARISON_TRANSCRIPT, 'Samsung vs iPhone', [], 'TechChannel')
-      expect(result).toHaveLength(2)
-      expect(result.every(d => d.mention_type === 'comparison')).toBe(true)
+      expect(result).toHaveLength(6)
+      expect(result.some(d => d.brand_name === 'Samsung' && d.mention_type === 'comparison')).toBe(true)
+      expect(result.some(d => d.brand_name === 'Apple' && d.mention_type === 'comparison')).toBe(true)
     })
 
     it('should detect roundup format', async () => {

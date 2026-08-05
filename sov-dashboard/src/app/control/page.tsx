@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { AMAZON_INDIA_CATEGORIES } from '@/lib/amazon-india'
 import { useCampaignStore } from '@/lib/store'
+import { canAccess } from '@/lib/permissions'
 import { normalizeKeyword, dedupeKeywords } from '@/lib/keyword-utils'
 
 interface Campaign {
@@ -128,6 +129,12 @@ export default function ControlPage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+
+  const { getActiveProjectRole } = useCampaignStore()
+  const activeRole = getActiveProjectRole()
+  const canEdit = canAccess(activeRole, 'add-edit-keywords')
+  const canManageAccess = canAccess(activeRole, 'manage-access')
+  const canControl = canAccess(activeRole, 'campaign-control')
 
   const subCategories = AMAZON_INDIA_CATEGORIES.find(c => c.id === selCategory)?.subCategories || []
   const filteredKw = keywords.filter(k => k.text.toLowerCase().includes(search.toLowerCase()))
@@ -359,9 +366,11 @@ export default function ControlPage() {
         <button className={`toggle-btn ${tab === 'campaigns' ? 'active' : ''}`} onClick={() => setTab('campaigns')}>
           <BarChart2 size={13} /> Campaigns & Keywords
         </button>
-        <button className={`toggle-btn ${tab === 'members' ? 'active' : ''}`} onClick={() => { setTab('members'); fetchUsersList(); if (memberCampaignId) fetchMembers(memberCampaignId) }}>
-          <UsersIcon size={13} /> Project Access
-        </button>
+        {canManageAccess && (
+          <button className={`toggle-btn ${tab === 'members' ? 'active' : ''}`} onClick={() => { setTab('members'); fetchUsersList(); if (memberCampaignId) fetchMembers(memberCampaignId) }}>
+            <UsersIcon size={13} /> Project Access
+          </button>
+        )}
       </div>
 
       {/* ════════════════════════ CAMPAIGNS & KEYWORDS ════════════════════════ */}
@@ -375,7 +384,9 @@ export default function ControlPage() {
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: 'var(--text-primary)' }}>Campaigns <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({campaigns.length})</span></span>
-              <button className="btn btn-blue btn-xs" onClick={() => setShowNewCampaign(v => !v)}><Plus size={11} /> New</button>
+              {canControl && (
+                <button className="btn btn-blue btn-xs" onClick={() => setShowNewCampaign(v => !v)}><Plus size={11} /> New</button>
+              )}
             </div>
             {showNewCampaign && (
               <div style={{ padding: 12, borderBottom: '1px solid var(--border-light)', background: 'var(--accent-dim)' }}>
@@ -452,12 +463,16 @@ export default function ControlPage() {
                     {selectedCampaign?.name} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({keywords.length} keywords)</span>
                   </span>
                   <div style={{ display: 'flex', gap: 5 }}>
-                    <button className="btn btn-blue btn-xs" onClick={() => { setShowAddKw(v => !v); setSelCategory(''); setSelSubCategory('') }} style={{ fontSize: 'var(--fs-label)' }}>
-                      <Plus size={10} /> Add Keywords
-                    </button>
-                    <button className="btn btn-ghost btn-xs" onClick={() => triggerScrape()} disabled={scraping} style={{ fontSize: 'var(--fs-label)' }}>
-                      {scraping ? <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={10} />} Scrape All
-                    </button>
+                    {canEdit && (
+                      <button className="btn btn-blue btn-xs" onClick={() => { setShowAddKw(v => !v); setSelCategory(''); setSelSubCategory('') }} style={{ fontSize: 'var(--fs-label)' }}>
+                        <Plus size={10} /> Add Keywords
+                      </button>
+                    )}
+                    {canEdit && (
+                      <button className="btn btn-ghost btn-xs" onClick={() => triggerScrape()} disabled={scraping} style={{ fontSize: 'var(--fs-label)' }}>
+                        {scraping ? <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={10} />} Scrape All
+                      </button>
+                    )}
                   </div>
                 </div>
 
