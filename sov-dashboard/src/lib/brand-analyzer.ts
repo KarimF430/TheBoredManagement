@@ -108,7 +108,10 @@ CANDIDATE BRANDS FOUND BY TEXT SEARCH (a fast scan matched these names verbatim 
 - Retail platforms (Amazon, Flipkart, Meesho, etc.) are NEVER brands
 - Generic category words are not brands
 - Regional-language mentions carry identical weight to English
-- Only tag brands that earn a place — if you can't state why a real analyst would write it down, don't include it
+- IGNORE peripheral/contextual brands (e.g., Apple, Google, Android, iOS, Windows) if they are only mentioned for connectivity, OS support, or casting.
+- IGNORE streaming platforms (e.g., Netflix, YouTube, Hotstar, Prime Video) unless the video is exclusively reviewing them.
+- IGNORE brands of connected devices (e.g., Sony speakers, Samsung phones) unless they are the central product being reviewed.
+- Only tag brands that earn a place — if you can't state why a real analyst would write it down as the CORE PRODUCT of the video, don't include it.
 
 ═══ OUTPUT ═══
 Return ONLY this JSON:
@@ -635,10 +638,23 @@ export async function detectIrrelevantVideo(
   // Heuristic: Live stream indicators
   if (titleLower.includes('live') || titleLower.includes('stream') ||
     titleLower.includes('podcast') || titleLower.includes('interview')) {
-    return { is_irrelevant: true, reason: 'Live stream/podcast detected', score: 0.8, category: 'live_stream' }
+    return { is_irrelevant: true, reason: 'Live stream or podcast detected', score: 0.85, category: 'live_stream' }
   }
 
-  // If heuristics don't catch it, use LLM
+  // Heuristic: Known massive foreign tech channels
+  const channelLower = channelName.toLowerCase()
+  if (
+    channelLower.includes('unbox therapy') || channelLower.includes('marques brownlee') || 
+    channelLower.includes('mkbhd') || channelLower.includes('mrwhosetheboss') || 
+    channelLower.includes('linus tech tips') || channelLower.includes('ijustine') || 
+    channelLower.includes('dave2d') || channelLower.includes('uravgconsumer') ||
+    channelLower.includes('austin evans') || channelLower.includes('techspurt') ||
+    channelLower.includes('the verge') || channelLower.includes('cnet')
+  ) {
+    return { is_irrelevant: true, reason: 'Known foreign channel', score: 1.0, category: 'foreign_language' }
+  }
+
+  // Fallback to LLM for nuanced detection
   try {
     const completion = await getOpenAI().chat.completions.create({
       model: getModelName(),

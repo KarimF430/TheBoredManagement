@@ -235,9 +235,18 @@ export async function filterEligibleChannels<
   const eligible: T[] = []
   const rejected: Array<{ hit: T; reason: RejectReason }> = []
 
+  const KNOWN_FOREIGN = [
+    'unbox therapy', 'marques brownlee', 'mkbhd', 'mrwhosetheboss', 'linus tech tips', 'ijustine',
+    'dave2d', 'uravgconsumer', 'austin evans', 'techspurt', 'the verge', 'cnet', 'engadget',
+    'unboxtherapy'
+  ]
+
   for (const hit of hits) {
+    const channelLower = (hit.channel_name || '').toLowerCase()
+    const isKnownForeign = KNOWN_FOREIGN.some(name => channelLower.includes(name))
+
     const country = countries.get(hit.channel_id) ?? null
-    if (country && country !== 'IN') {
+    if ((country && country !== 'IN') || isKnownForeign) {
       rejected.push({ hit, reason: 'foreign_channel' })
       continue
     }

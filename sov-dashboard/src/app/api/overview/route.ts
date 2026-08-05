@@ -191,7 +191,7 @@ async function fetchOverview(cid: string) {
       lastUpdatedViews: lastViews,
       lastUpdatedRanking: lastRanking,
       totalKeywords,
-      totalVideos,
+      totalVideos: rankedVideos,
       rankedVideos,
       totalViewership,
       uniqueVideos: uniqueRankedIds.size,
@@ -248,5 +248,5 @@ async function getDailyData(
 }
 
 function pctChange(now: number, prev: number) {
-  return prev > 0 ? Math.round(((now - prev) / prev) * 1000) / 10 : 0
+  return prev > 0 ? Math.round(((now - prev) / prev) * 1000) / 10 : null
 }

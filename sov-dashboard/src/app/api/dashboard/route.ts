@@ -102,27 +102,23 @@ async function fetchDashboard(cid: string, isOurs?: string | null, format?: stri
     // Total videos in campaign count — filtered by format
     format === 'long'
       ? queryAll<{ cnt: number }>(`
-          SELECT COUNT(DISTINCT cv.video_id)::INT as cnt
-          FROM campaign_videos cv
-          JOIN videos v ON v.id = cv.video_id
-          WHERE cv.campaign_id = $1
-            AND ((v.duration_sec IS NULL OR v.duration_sec > 60) OR cv.video_id IN (SELECT video_id FROM keyword_videos WHERE campaign_id = $1))
-            ${langVideoIdFilter('cv.video_id')}
+          SELECT COUNT(*)::INT as cnt
+          FROM keyword_videos
+          WHERE campaign_id = $1 ${langKeywordFilter}
         `, [cid])
       : format === 'short'
       ? queryAll<{ cnt: number }>(`
-          SELECT COUNT(DISTINCT cv.video_id)::INT as cnt
-          FROM campaign_videos cv
-          JOIN videos v ON v.id = cv.video_id
-          WHERE cv.campaign_id = $1
-            AND ((v.duration_sec IS NOT NULL AND v.duration_sec <= 60) OR cv.video_id IN (SELECT video_id FROM keyword_shorts WHERE campaign_id = $1))
-            ${langVideoIdFilter('cv.video_id')}
+          SELECT COUNT(*)::INT as cnt
+          FROM keyword_shorts
+          WHERE campaign_id = $1 ${langKeywordFilter}
         `, [cid])
       : queryAll<{ cnt: number }>(`
-          SELECT COUNT(DISTINCT video_id)::INT as cnt
-          FROM campaign_videos
-          WHERE campaign_id = $1
-            ${langVideoIdFilter('video_id')}
+          SELECT COUNT(*)::INT as cnt
+          FROM (
+            SELECT video_id FROM keyword_videos WHERE campaign_id = $1 ${langKeywordFilter}
+            UNION ALL
+            SELECT video_id FROM keyword_shorts WHERE campaign_id = $1 ${langKeywordFilter}
+          ) t
         `, [cid]),
 
     // New videos count (last 7 days) — filtered by format
@@ -589,5 +585,5 @@ async function queryViewSumSQL(cid: string, date: string, format?: string | null
 }
 
 function pctChange(now: number, prev: number) {
-  return prev > 0 ? Math.round(((now - prev) / prev) * 1000) / 10 : 0
+  return prev > 0 ? Math.round(((now - prev) / prev) * 1000) / 10 : null
 }

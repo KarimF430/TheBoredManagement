@@ -76,6 +76,7 @@ async function fetchKpis(cid: string, format?: string | null, language?: string 
   const [
     kwRes,        // keyword count
     cvRes,        // total video count (format-filtered)
+    uvRes,        // unique video count (format-filtered)
     cvNewRes,     // new videos (7 days, format-filtered)
     btRes,        // tagged video count
     top5Views,    // brand SOV by views (materialized view)
@@ -95,34 +96,49 @@ async function fetchKpis(cid: string, format?: string | null, language?: string 
       return q
     })(),
 
-    // Format-filtered video count
+    // Format-filtered total ranking positions count
     format === 'long'
       ? queryAll<{ cnt: number }>(`
-          SELECT COUNT(DISTINCT cv.video_id)::INT as cnt
-          FROM campaign_videos cv
-          JOIN videos v ON v.id = cv.video_id
-          WHERE cv.campaign_id = $1
-            AND ((v.duration_sec IS NULL OR v.duration_sec > 60) OR cv.video_id IN (SELECT video_id FROM keyword_videos WHERE campaign_id = $1))
-            ${langCvFilter}
+          SELECT COUNT(*)::INT as cnt
+          FROM keyword_videos
+          WHERE campaign_id = $1 ${langKeywordFilter}
         `, [cid])
       : format === 'short'
       ? queryAll<{ cnt: number }>(`
-          SELECT COUNT(DISTINCT cv.video_id)::INT as cnt
-          FROM campaign_videos cv
-          JOIN videos v ON v.id = cv.video_id
-          WHERE cv.campaign_id = $1
-            AND ((v.duration_sec IS NOT NULL AND v.duration_sec <= 60) OR cv.video_id IN (SELECT video_id FROM keyword_shorts WHERE campaign_id = $1))
-            ${langCvFilter}
+          SELECT COUNT(*)::INT as cnt
+          FROM keyword_shorts
+          WHERE campaign_id = $1 ${langKeywordFilter}
         `, [cid])
-      : language
+      : queryAll<{ cnt: number }>(`
+          SELECT COUNT(*)::INT as cnt
+          FROM (
+            SELECT video_id FROM keyword_videos WHERE campaign_id = $1 ${langKeywordFilter}
+            UNION ALL
+            SELECT video_id FROM keyword_shorts WHERE campaign_id = $1 ${langKeywordFilter}
+          ) t
+        `, [cid]),
+
+    // Format-filtered unique videos count
+    format === 'long'
       ? queryAll<{ cnt: number }>(`
-          SELECT COUNT(DISTINCT cv.video_id)::INT as cnt
-          FROM campaign_videos cv
-          WHERE cv.campaign_id = $1 ${langCvFilter}
+          SELECT COUNT(DISTINCT video_id)::INT as cnt
+          FROM keyword_videos
+          WHERE campaign_id = $1 ${langKeywordFilter}
         `, [cid])
-      : supabase.from('campaign_videos')
-          .select('video_id', { count: 'exact', head: true })
-          .eq('campaign_id', cid),
+      : format === 'short'
+      ? queryAll<{ cnt: number }>(`
+          SELECT COUNT(DISTINCT video_id)::INT as cnt
+          FROM keyword_shorts
+          WHERE campaign_id = $1 ${langKeywordFilter}
+        `, [cid])
+      : queryAll<{ cnt: number }>(`
+          SELECT COUNT(DISTINCT video_id)::INT as cnt
+          FROM (
+            SELECT video_id FROM keyword_videos WHERE campaign_id = $1 ${langKeywordFilter}
+            UNION ALL
+            SELECT video_id FROM keyword_shorts WHERE campaign_id = $1 ${langKeywordFilter}
+          ) t
+        `, [cid]),
 
     // Format-filtered new videos (7 days)
     format === 'long'
@@ -233,7 +249,7 @@ async function fetchKpis(cid: string, format?: string | null, language?: string 
     rankedVideos:        0,
     rankedVideoCount:    0,
     totalViewership:     vsToday || vs1d || 0,
-    uniqueVideos:        0,
+    uniqueVideos:        uvRes[0]?.cnt ?? 0,
     uniqueVideoViewership: vsToday || vs1d || 0,
     uniqueChannels:      0,
     mostRankingChannel:  topChannel?.data
@@ -259,5 +275,5 @@ async function fetchKpis(cid: string, format?: string | null, language?: string 
 }
 
 function pctChange(now: number, prev: number) {
-  return prev > 0 ? Math.round(((now - prev) / prev) * 1000) / 10 : 0
+  return prev > 0 ? Math.round(((now - prev) / prev) * 1000) / 10 : null
 }

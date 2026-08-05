@@ -337,8 +337,8 @@ export default function OverviewPage() {
       `}</style>
 
       {/* ── HEADER ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, gap: 12, flexWrap: 'wrap' }} data-tutorial="filter-bar">
-        <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, gap: 12, flexWrap: 'nowrap' }} data-tutorial="filter-bar">
+        <div style={{ flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
             <h1 className="t-h1" style={{ margin: 0, letterSpacing: '-0.4px' }}>
               {campaign?.name || 'Campaign Analytics'}

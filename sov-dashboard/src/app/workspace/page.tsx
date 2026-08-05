@@ -425,7 +425,7 @@ export default function WorkspacePage() {
           {[
             { label: 'Total Projects', value: projects.length, icon: <FolderKanban size={18} />, color: '#1A73E8', bg: 'rgba(26,115,232,0.06)' },
             { label: 'Total Keywords', value: totalKeywords, icon: <Hash size={18} />, color: '#7C3AED', bg: 'rgba(124,58,237,0.06)' },
-            { label: 'Total Views', value: platformStats.totalVideos.toLocaleString(), icon: <Eye size={18} />, color: '#00C853', bg: 'rgba(0,200,83,0.06)' },
+            { label: 'Total Videos', value: platformStats.totalVideos.toLocaleString(), icon: <Video size={18} />, color: '#00C853', bg: 'rgba(0,200,83,0.06)' },
             {
               label: 'Last Activity',
               value: recentActivity.length > 0 ? formatTimeAgo(recentActivity[0].timestamp) : 'N/A',
