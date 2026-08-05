@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { queryAll } from '@/lib/supabase'
 import { signToken, hashPassword, verifyPassword } from '@/lib/auth'
 
+export const runtime = 'nodejs'
+
 const MASTER_EMAIL = 'Haji.karim@theboredmonkey.com'
 
 export async function POST(req: NextRequest) {

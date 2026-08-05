@@ -71,6 +71,9 @@ async function fetchKpis(cid: string, format?: string | null, language?: string 
     : ''
   const langCvFilter = langVideoIds('cv.video_id')
   const langVsFilter = langVideoIds('vs.video_id')
+  const langKeywordFilter = language
+    ? `AND keyword_id IN (SELECT id FROM keywords WHERE campaign_id = $1 AND language = '${language}')`
+    : ''
 
   // All queries run in parallel — each is a COUNT or materialized view read.
   const [
