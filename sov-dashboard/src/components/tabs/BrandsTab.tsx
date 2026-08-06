@@ -129,6 +129,7 @@ export default function BrandsTab() {
     const totalFreq = topViews.reduce((s: number, b: any) => s + b.freq, 0) || 1
 
     const chartTop = CHART_TOP
+    const maxSOV = topViews.length > 0 ? topViews[0].pct : 0
     const efficiencies = topViews.filter((b: any) => b.freq > 0).map((b: any) => b.value / b.freq)
     const avgEfficiency = efficiencies.length > 0 ? efficiencies.reduce((s: number, e: number) => s + e, 0) / efficiencies.length : 0
 
@@ -169,10 +170,10 @@ export default function BrandsTab() {
     const nicheBrands = brandPositioning.filter(b => !b.aboveMedianView && b.aboveMedianFreq)
     const weakBrands = brandPositioning.filter(b => !b.aboveMedianView && !b.aboveMedianFreq)
 
-    return { topViews, totalViews, totalFreq, brandPositioning, brandEfficiency, avgEfficiency, medianViewSOV, medianFreqSOV, mostEfficient, widestReach, viewLeader, starBrands, volumeBrands, nicheBrands, weakBrands }
+    return { topViews, totalViews, totalFreq, maxSOV, brandPositioning, brandEfficiency, avgEfficiency, medianViewSOV, medianFreqSOV, mostEfficient, widestReach, viewLeader, starBrands, volumeBrands, nicheBrands, weakBrands }
   }, [brandsData, brandSOVLang])
 
-  const { topViews, totalViews, brandPositioning, brandEfficiency, avgEfficiency, medianViewSOV, medianFreqSOV, mostEfficient, widestReach, viewLeader, starBrands, volumeBrands, nicheBrands, weakBrands } = analytics
+  const { topViews, totalViews, maxSOV, brandPositioning, brandEfficiency, avgEfficiency, medianViewSOV, medianFreqSOV, mostEfficient, widestReach, viewLeader, starBrands, volumeBrands, nicheBrands, weakBrands } = analytics
   const sortedBrands = sortBy === 'views' ? topViews : [...topViews].sort((a: any, b: any) => b.freq - a.freq)
   const visibleBrands = showAllBrands ? sortedBrands : sortedBrands.slice(0, TABLE_PAGE_SIZE)
   const hasMore = sortedBrands.length > TABLE_PAGE_SIZE
@@ -267,7 +268,7 @@ export default function BrandsTab() {
                       <div style={{ width: 8, height: 8, borderRadius: '50%', background: b.color, flexShrink: 0 }} />
                       <span style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</span>
                     </div>
-                    <Bar100 value={b.pct} color={b.color} />
+                    <Bar100 value={maxSOV > 0 ? (b.pct / maxSOV) * 100 : 0} color={b.color} />
                     <span style={{ fontSize: 11, fontWeight: 700, color: '#475569', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace" }}>{fmtIndian(b.value)}</span>
                     <span style={{ fontSize: 11, fontWeight: 700, color: '#475569', textAlign: 'right', fontFamily: "'JetBrains Mono', monospace" }}>{b.freq}</span>
                     <span style={{ fontSize: 11, fontWeight: 600, color: '#94A3B8', textAlign: 'right' }}>{b.videoCount}</span>

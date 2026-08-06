@@ -581,61 +581,6 @@ export default function ControlPage() {
                   </div>
                 </div>
 
-                {/* Add Keywords form */}
-                {showAddKw && (
-                  <div style={{ padding: 14, borderBottom: '1px solid var(--border-light)', background: 'rgba(245,130,32,0.03)' }}>
-                    {/* Amazon India Category / Subcategory */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-                      <div>
-                        <label className="field-label">Category</label>
-                        <select value={selCategory} onChange={e => { setSelCategory(e.target.value); setSelSubCategory('') }}
-                          style={{ height: 32, fontSize: 'var(--fs-label)', padding: '4px 8px', border: '1.5px solid var(--accent-border)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', fontFamily: 'inherit', color: 'var(--text-bright)', cursor: 'pointer', width: '100%' }}>
-                          <option value="">All Categories</option>
-                          {AMAZON_INDIA_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="field-label">Subcategory</label>
-                        <select value={selSubCategory} onChange={e => setSelSubCategory(e.target.value)}
-                          style={{ height: 32, fontSize: 'var(--fs-label)', padding: '4px 8px', border: '1.5px solid var(--accent-border)', borderRadius: 'var(--radius-md)', background: 'var(--surface)', fontFamily: 'inherit', color: 'var(--text-bright)', cursor: 'pointer', width: '100%' }} disabled={!selCategory}>
-                          <option value="">All Subcategories</option>
-                          {subCategories.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
-                      </div>
-                    </div>
-
-                    <textarea className="input" rows={3} value={bulkKw} onChange={e => setBulkKw(e.target.value)}
-                      placeholder="Enter keywords, one per line&#10;e.g.&#10;best smartphones 2026&#10;top laptops under 50000&#10;wireless headphones review"
-                      style={{ resize: 'none', fontSize: 'var(--fs-sm)', marginBottom: 8 }} />
-                    <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-                      <select className="input" value={kwLang} onChange={e => setKwLang(e.target.value)} style={{ height: 30, fontSize: 'var(--fs-label)', flex: 1 }}>
-                        <option value="en">English</option>
-                        <option value="hi">Hindi</option><option value="ta">Tamil</option><option value="te">Telugu</option><option value="bn">Bengali</option>
-                      </select>
-                      <select className="input" value={kwType} onChange={e => setKwType(e.target.value as any)} style={{ height: 30, fontSize: 'var(--fs-label)', flex: 1 }}>
-                        <option value="generic">Generic</option>
-                        <option value="branded">Branded</option>
-                        <option value="comparison">Comparison</option>
-                      </select>
-                      <button className="btn btn-blue btn-sm" onClick={addKeywords} disabled={loading} style={{ height: 30, fontSize: 'var(--fs-label)' }}>
-                        {loading ? <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={10} />} Add
-                      </button>
-                    </div>
-                    {selCategory && (
-                      <div style={{ fontSize: 'var(--fs-micro)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <ShoppingBag size={10} />
-                        {AMAZON_INDIA_CATEGORIES.find(c => c.id === selCategory)?.name}
-                        {selSubCategory && <> &rarr; {subCategories.find(s => s.id === selSubCategory)?.name}</>}
-                        {selSubCategory && AMAZON_INDIA_CATEGORIES.find(c => c.id === selCategory) && (
-                          <span style={{ marginLeft: 'auto', color: 'var(--brand-amazon)', fontWeight: 600 }}>
-                            {keywords.length} keywords in this campaign
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 {/* Search */}
                 <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--border-light)' }}>
                   <div style={{ position: 'relative' }}>

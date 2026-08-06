@@ -58,12 +58,17 @@ function MiniSparkBar({ data, color }: { data: number[]; color: string }) {
 
 export default function BrandGrowthPage() {
   const { campaigns, activeCampaignId, fetchCampaigns } = useCampaignStore()
-  const { search, ownership, format, dateRange, customDateFrom, customDateTo } = useFilterStore()
+  const { search, ownership, format, dateRange, customDateFrom, customDateTo, setDateRange } = useFilterStore()
   const [metric, setMetric] = useState<'views' | 'frequency'>('views')
 
+  useEffect(() => {
+    if (dateRange === 'All') setDateRange('48h')
+  }, [])
+
+  const effectiveRange = dateRange === 'All' ? '48h' : dateRange
   const period = (() => {
-    const map: Record<string, string> = { '24h': '24h', '48h': '7d', '1W': '7d', '1M': '30d', 'All': '30d' }
-    return map[dateRange] || '30d'
+    const map: Record<string, string> = { '24h': '24h', '48h': '48h', '1W': '7d', '1M': '30d' }
+    return map[effectiveRange] || '48h'
   })()
 
   const growthQuery = useQuery({

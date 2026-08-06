@@ -37,7 +37,7 @@ async function fetchGrowth(
   dateTo?: string | null,
   language?: string | null
 ) {
-  let periodDays = period === '24h' ? 1 : period === '30d' ? 30 : 7
+  let periodDays = period === '24h' ? 1 : period === '48h' ? 2 : period === '7d' ? 7 : period === '30d' ? 30 : 7
   let periodStart = new Date(Date.now() - periodDays * 86400000).toISOString().split('T')[0]
   let prevStart = new Date(Date.now() - periodDays * 2 * 86400000).toISOString().split('T')[0]
 
@@ -173,22 +173,27 @@ async function fetchGrowth(
     }
     availableDates.sort()
 
-    // Compare latest snapshot vs earliest snapshot (or previous period)
+    // Compare latest snapshot vs baseline (earliest snapshot in period)
     let recentVal = 0, previousVal = 0
     if (availableDates.length >= 2) {
-      // Latest date value
+      // Latest date value = current period end
       const latestDate = availableDates[availableDates.length - 1]
       recentVal = snapByDateBrand.get(latestDate)?.get(b.brand_name) || 0
-      // Previous date value
-      const prevDate = availableDates[availableDates.length - 2]
-      previousVal = snapByDateBrand.get(prevDate)?.get(b.brand_name) || 0
+      // Earliest date in period = growth baseline
+      const baselineDate = availableDates[0]
+      previousVal = snapByDateBrand.get(baselineDate)?.get(b.brand_name) || 0
     } else if (availableDates.length === 1) {
-      // Only one snapshot — compare with current videos.view_count
+      // One snapshot: compare current video views against that snapshot
+      const singleDate = availableDates[0]
       recentVal = b.current_views
-      previousVal = 0
+      previousVal = snapByDateBrand.get(singleDate)?.get(b.brand_name) || 0
+    } else {
+      // No snapshots: no growth data available
+      recentVal = b.current_views
+      previousVal = b.current_views
     }
 
-    const growthPercent = previousVal > 0 ? parseFloat((((recentVal - previousVal) / previousVal) * 100).toFixed(1)) : (recentVal > 0 ? 100 : 0)
+    const growthPercent = previousVal > 0 ? parseFloat((((recentVal - previousVal) / previousVal) * 100).toFixed(1)) : 0
 
     // Sparkline from all available dates
     const sparklineData: number[] = availableDates.map(d => snapByDateBrand.get(d)?.get(b.brand_name) || 0)
