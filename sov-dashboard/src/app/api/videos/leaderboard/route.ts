@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     const { authorized, error } = await authorizeCampaignAccess(req, campaignId)
     if (!authorized) return error
     const sort = req.nextUrl.searchParams.get('sort') ?? 'views'
-    const tab = req.nextUrl.searchParams.get('tab') ?? 'long'
+    const tab = req.nextUrl.searchParams.get('tab') ?? 'all'
     const page = parseInt(req.nextUrl.searchParams.get('page') ?? '1')
     const limit = parseInt(req.nextUrl.searchParams.get('limit') ?? '20')
     const brandName = req.nextUrl.searchParams.get('brand_name')

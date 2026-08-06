@@ -10,6 +10,8 @@ import { filterEligibleChannels } from './channel-filter'
 import { decryptApiKey } from './crypto'
 import { fetchTranscript } from './transcript'
 import { analyzeBrandsFromTranscript, detectIrrelevantVideo } from './brand-analyzer'
+import { validateVideoPreFilter } from './video-prefilter'
+import { loadGazetteer } from './brand-gazetteer'
 
 export interface ScrapeResult {
   saved: number
@@ -28,6 +30,8 @@ export interface ScrapeResult {
   rejected_foreign?: number
   /** Hits dropped because the channel belongs to a brand. */
   rejected_brand?: number
+  /** Hits dropped by AI pre-filter (no speech / music / irrelevant). */
+  rejected_irrelevant?: number
   /** True when the API returned nothing and the campaign pool was used instead. */
   used_pool_fallback?: boolean
 }
@@ -504,6 +508,33 @@ async function loadExcludedVideoIds(youtubeIds: string[]): Promise<Set<string>> 
   return excluded
 }
 
+async function recordIrrelevantVideo(
+  youtubeId: string,
+  campaignId: string,
+  reason: string,
+  category: string
+): Promise<void> {
+  try {
+    await queryAll(
+      `INSERT INTO video_blacklist (youtube_id, reason, category, detected_by, campaign_id, added_at)
+       VALUES ($1, $2, $3, 'ai_prefilter', $4, NOW())
+       ON CONFLICT (youtube_id) DO UPDATE SET reason = EXCLUDED.reason, category = EXCLUDED.category`,
+      [youtubeId, reason, category, campaignId]
+    )
+  } catch {
+    // If video_blacklist table doesn't exist, ignore
+  }
+
+  try {
+    await queryAll(
+      `UPDATE videos SET is_irrelevant = TRUE, irrelevance_reason = $1 WHERE youtube_id = $2`,
+      [reason, youtubeId]
+    )
+  } catch {
+    // If column doesn't exist yet, ignore
+  }
+}
+
 /**
  * Fetch one keyword's first-page ranking.
  *
@@ -534,6 +565,7 @@ export async function scrapeKeyword(
   let pagesFetched = 0
   let rejectedForeign = 0
   let rejectedBrand = 0
+  let rejectedIrrelevant = 0
   let usedFallback = false
 
   const pageLimit = maxSearchPages()
@@ -569,19 +601,62 @@ export async function scrapeKeyword(
     pageQuota += detailQuota
     const details = new Map([...known, ...fetched])
 
+    // Collect candidates that need format allocation
+    const candidatesToFilter: Array<{ hit: RankedHit; video: YouTubeVideo }> = []
+
     for (const hit of eligible) {
       const video = details.get(hit.youtube_id)
-      if (!video) continue // details unavailable — cannot classify the format
+      if (!video || video.duration_sec <= 0) continue
+
+      const isShort = video.duration_sec <= SHORT_MAX_SEC
+      const isLong = hit.position_type === 'true_serp' && !isShort
+
+      if (isShort && shortForm.length >= TARGET_PER_FORMAT) continue
+      if (isLong && longForm.length >= TARGET_PER_FORMAT) continue
+      if (!isShort && !isLong) continue
+
+      candidatesToFilter.push({ hit, video })
+    }
+
+    // Process all candidate pre-filters in parallel (fast, non-blocking)
+    const filterResults = await Promise.all(
+      candidatesToFilter.map(async ({ hit, video }) => {
+        const preFilter = await validateVideoPreFilter(
+          {
+            youtube_id: video.youtube_id,
+            title: video.title,
+            channel_name: video.channel_name,
+            channel_id: video.channel_id,
+            description: video.description,
+            duration_sec: video.duration_sec,
+          },
+          keywordText,
+          { skipWhisper: true }
+        )
+        return { hit, video, preFilter }
+      })
+    )
+
+    for (const { hit, video, preFilter } of filterResults) {
+      const isShort = video.duration_sec <= SHORT_MAX_SEC
+      const isLong = hit.position_type === 'true_serp' && !isShort
+
+      if (isShort && shortForm.length >= TARGET_PER_FORMAT) continue
+      if (isLong && longForm.length >= TARGET_PER_FORMAT) continue
+
+      if (!preFilter.isValid) {
+        console.log(`AI Pre-filter dropped video ${video.youtube_id} ("${video.title}"): ${preFilter.reason}`)
+        rejectedIrrelevant++
+        await recordIrrelevantVideo(video.youtube_id, campaignId, preFilter.reason, preFilter.category)
+        continue
+      }
+
       poolVideos.set(video.youtube_id, video)
 
-      if (video.duration_sec <= 0) continue
-      if (video.duration_sec <= SHORT_MAX_SEC) {
+      if (isShort) {
         if (shortForm.length < TARGET_PER_FORMAT) shortForm.push({ hit, video })
-      } else if (hit.position_type === 'true_serp' && longForm.length < TARGET_PER_FORMAT) {
-        // Long-form only ever comes from the unfiltered phase — a
-        // shorts_filtered page should never contain anything long enough to
-        // qualify, but the guard keeps the true-SERP promise airtight.
-        longForm.push({ hit, video })
+      } else if (isLong) {
+        if (longForm.length < TARGET_PER_FORMAT) longForm.push({ hit, video })
       }
     }
     return pageQuota
@@ -696,6 +771,7 @@ export async function scrapeKeyword(
     pages_fetched: pagesFetched,
     rejected_foreign: rejectedForeign,
     rejected_brand: rejectedBrand,
+    rejected_irrelevant: rejectedIrrelevant,
     used_pool_fallback: usedFallback,
   }
 }
@@ -723,11 +799,47 @@ async function persistRankedVideos(
     `SELECT name FROM campaign_brands WHERE campaign_id = $1`, [campaignId]
   ).then(rows => rows.map(r => r.name)).catch(() => [] as string[])
 
-  // Brand tags from the video's own metadata (transcript analysis refines these later).
+  // Brand tags from video metadata & gazetteer (transcript AI analysis refines these further)
+  let gazetteer: any = null
+  try { gazetteer = loadGazetteer() } catch {}
+
+  const STOP_WORD_BRANDS = new Set([
+    'and', 'only', 'w', 'max', 'uno', 'it', 'or', 'in', 'on', 'at', 'is', 'be', 'by', 'to', 'for', 'the', 'a', 'an', 'of', 'with', 'if', 'echo', 'hero', 'titan', 'all', 'can', 'do', 'go', 'no', 'so', 'my', 'up', 'us', 'we', 'me', 'he', 'hi', 'am', 'as'
+  ])
+
   const videoBrandMap = new Map<string, string[]>()
   for (const v of allVideos) {
-    const haystack = `${v.title} ${v.channel_name} ${v.description || ''}`.toLowerCase()
-    videoBrandMap.set(v.youtube_id, brandNames.filter(b => haystack.includes(b.toLowerCase())))
+    const haystack = `${v.title} ${v.channel_name} ${v.description || ''}`
+    const haystackLower = haystack.toLowerCase()
+    const detected = new Set<string>()
+
+    // Match campaign custom brands
+    for (const b of brandNames) {
+      if (b && haystackLower.includes(b.toLowerCase())) {
+        detected.add(b)
+      }
+    }
+
+    // Match master brand gazetteer & aliases (e.g. iPad -> Apple, Galaxy -> Samsung, Redmi -> Xiaomi)
+    if (gazetteer && gazetteer.byAlias) {
+      for (const [alias, entry] of gazetteer.byAlias.entries()) {
+        const canonicalLower = entry.canonical.toLowerCase()
+        const aliasLower = alias.toLowerCase()
+
+        if (STOP_WORD_BRANDS.has(canonicalLower) || STOP_WORD_BRANDS.has(aliasLower)) {
+          continue
+        }
+
+        if (alias.length >= 3) {
+          const regex = new RegExp(`\\b${alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i')
+          if (regex.test(haystack)) {
+            detected.add(entry.canonical)
+          }
+        }
+      }
+    }
+
+    videoBrandMap.set(v.youtube_id, Array.from(detected))
   }
 
   const allYoutubeIds = allVideos.map(v => v.youtube_id)

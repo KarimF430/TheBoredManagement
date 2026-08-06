@@ -132,11 +132,24 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { video_ids, campaign_id, force = false } = body
 
-    if (!video_ids || !Array.isArray(video_ids) || video_ids.length === 0) {
-      return NextResponse.json({ error: 'video_ids array is required' }, { status: 400 })
-    }
     if (!campaign_id) {
       return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 })
+    }
+
+    let targetVideoIds = video_ids
+    if (!targetVideoIds || !Array.isArray(targetVideoIds) || targetVideoIds.length === 0) {
+      const untagged = await queryAll<{ youtube_id: string }>(
+        `SELECT v.youtube_id FROM videos v
+         JOIN campaign_videos cv ON cv.video_id = v.id
+         WHERE cv.campaign_id = $1 AND v.brand_analysis_checked_at IS NULL
+         LIMIT 20`,
+        [campaign_id]
+      )
+      targetVideoIds = untagged.map(u => u.youtube_id)
+    }
+
+    if (!targetVideoIds || targetVideoIds.length === 0) {
+      return NextResponse.json({ ok: true, message: 'All campaign videos are already analyzed', results: [] })
     }
 
     const brandRows = await queryAll('SELECT name FROM campaign_brands WHERE campaign_id = $1', [campaign_id])
@@ -144,7 +157,7 @@ export async function POST(req: NextRequest) {
 
     const videos = await queryAll<{ id: string; youtube_id: string; title: string; channel_name: string; description: string }>(
       `SELECT id, youtube_id, title, channel_name, description FROM videos WHERE youtube_id = ANY($1)`,
-      [video_ids]
+      [targetVideoIds]
     )
 
     const results: AnalyzeResult[] = []

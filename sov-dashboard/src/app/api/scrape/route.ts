@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { queryAll } from '@/lib/supabase'
 import { scrapeKeyword } from '@/lib/scrape-pipeline-pg'
 import { authorizeCampaignAccess } from '@/lib/auth'
+import { invalidateCampaign } from '@/lib/cache'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
 export async function POST(req: NextRequest) {
   try {
-    const { campaign_id, keyword_id, limit = 2 } = await req.json()
+    const { campaign_id, keyword_id, limit = 2, force = false } = await req.json()
 
     const { authorized, error } = await authorizeCampaignAccess(req, campaign_id)
     if (!authorized) return error
@@ -21,14 +22,14 @@ export async function POST(req: NextRequest) {
       [new Date().toISOString()]
     )
 
-    // 2. Build keyword filter — skip keywords scraped in the last 12 hours
+    // 2. Build keyword filter — skip 12h check if keyword_id or force=true is provided
     let kwFilter = `AND status = 'active'`
     const params: any[] = [campaign_id]
 
     if (keyword_id) {
       kwFilter += ` AND id = $2`
       params.push(keyword_id)
-    } else {
+    } else if (!force) {
       kwFilter += ` AND (last_scraped_at IS NULL OR last_scraped_at < NOW() - INTERVAL '12 hours')`
     }
 
@@ -80,14 +81,27 @@ export async function POST(req: NextRequest) {
           `UPDATE scrape_jobs SET status = 'completed', results_count = $1, quota_used = $2, completed_at = $3 WHERE id = $4`,
           [result.ranked, result.quota_cost, new Date().toISOString(), jobId]
         )
-        return { keyword: kw.text, ranked: result.ranked, quota_cost: result.quota_cost }
+        return {
+          keyword: kw.text,
+          keyword_id: kw.id,
+          ranked: result.ranked,
+          quota_cost: result.quota_cost,
+          long_form: result.long_form ?? 0,
+          short_form: result.short_form ?? 0,
+          pages_fetched: result.pages_fetched ?? 0,
+          rejected_foreign: result.rejected_foreign ?? 0,
+          rejected_brand: result.rejected_brand ?? 0,
+          rejected_irrelevant: result.rejected_irrelevant ?? 0,
+          saved: result.saved ?? 0,
+          pool_added: result.pool_added ?? 0,
+        }
       } catch (err: any) {
         console.error(`Scrape failed for keyword "${kw.text}":`, err)
         await queryAll(
           `UPDATE scrape_jobs SET status = 'failed', error_msg = $1, completed_at = $2 WHERE id = $3`,
           [err.message?.substring(0, 500) || 'Unknown error', new Date().toISOString(), jobId]
         )
-        return { keyword: kw.text, ranked: 0, quota_cost: 0, error: err.message?.substring(0, 200) }
+        return { keyword: kw.text, keyword_id: kw.id, ranked: 0, quota_cost: 0, error: err.message?.substring(0, 200) }
       }
     })
 
@@ -111,6 +125,17 @@ export async function POST(req: NextRequest) {
     } catch (e) {
       console.error('Pool cleanup after scrape failed (non-fatal):', e)
     }
+
+    // Invalidate stale overview & leaderboard caches for this campaign
+    await invalidateCampaign(campaign_id)
+
+    // Trigger background AI Brand Analysis for newly ranked videos
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    fetch(`${appUrl}/api/brands/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campaign_id, force: false }),
+    }).catch(() => {})
 
     return NextResponse.json({
       ok: true,

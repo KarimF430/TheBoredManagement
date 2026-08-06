@@ -213,24 +213,30 @@ async function fetchViaWhisper(youtubeId: string): Promise<{ text: string; langu
 }
 
 // ── Main: Try all methods in order with retry ──────────────────────
-export async function fetchTranscript(youtubeId: string): Promise<{ text: string; language: string } | null> {
+export async function fetchTranscript(
+  youtubeId: string,
+  options: { skipWhisper?: boolean; maxRetries?: number } = {}
+): Promise<{ text: string; language: string } | null> {
+  const retries = options.maxRetries ?? (options.skipWhisper ? 0 : 1)
   return withRetry(async () => {
-    // Method 1: youtube-transcript library (fastest)
+    // Method 1: youtube-transcript library (fastest, ~50ms)
     const libraryResult = await fetchViaLibrary(youtubeId)
     if (libraryResult) return libraryResult
 
-    // Method 2: YouTube Data API captions (OAuth)
+    // Method 2: YouTube Data API captions (OAuth, ~100ms)
     const apiResult = await fetchViaYouTubeAPI(youtubeId)
     if (apiResult) return apiResult
 
-    // Method 3: Whisper Speech-to-Text (slowest, but works for ALL languages)
-    const whisperResult = await fetchViaWhisper(youtubeId)
-    if (whisperResult) return whisperResult
+    // Method 3: Whisper Speech-to-Text (slow, optional for live pre-filter)
+    if (!options.skipWhisper) {
+      const whisperResult = await fetchViaWhisper(youtubeId)
+      if (whisperResult) return whisperResult
+    }
 
     return null
   }, {
-    maxRetries: 2,
-    baseDelayMs: 2000,
+    maxRetries: retries,
+    baseDelayMs: 1000,
     onRetry: (attempt, err, delay) => {
       console.log(`Transcript fetch retry ${attempt} for ${youtubeId} after ${delay}ms: ${err.message}`)
     },

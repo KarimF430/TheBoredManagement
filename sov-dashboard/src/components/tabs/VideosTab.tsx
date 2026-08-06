@@ -187,7 +187,7 @@ export default function VideosTab() {
       const params = new URLSearchParams({
         campaign_id: activeCampaignId, sort, page: String(page), limit: String(limit),
       })
-      if (formatTab !== 'all') params.set('tab', formatTab)
+      params.set('tab', formatTab)
       if (ownershipFilter !== 'all') params.set('is_ours', ownershipFilter === 'ours' ? 'true' : 'false')
       if (debouncedSearch) params.set('q', debouncedSearch)
       const res = await fetch(`/api/videos/leaderboard?${params}`)

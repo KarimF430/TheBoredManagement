@@ -12,6 +12,7 @@ import { AMAZON_INDIA_CATEGORIES } from '@/lib/amazon-india'
 import { useCampaignStore } from '@/lib/store'
 import { canAccess } from '@/lib/permissions'
 import { normalizeKeyword, dedupeKeywords } from '@/lib/keyword-utils'
+import PreFilterProgressBox, { ScrapeProgressItem } from '@/components/PreFilterProgressBox'
 
 interface Campaign {
   id: string; name: string; category: string; sub_category: string; description: string
@@ -107,7 +108,7 @@ export default function ControlPage() {
 
   const [selCategory, setSelCategory] = useState('')
   const [selSubCategory, setSelSubCategory] = useState('')
-  const [scrapeProgress, setScrapeProgress] = useState<ScrapeItem[]>([])
+  const [scrapeProgress, setScrapeProgress] = useState<ScrapeProgressItem[]>([])
 
   const [members, setMembers] = useState<any[]>([])
   const [memberCampaignId, setMemberCampaignId] = useState('')
@@ -118,7 +119,7 @@ export default function ControlPage() {
   const [newCampaign, setNewCampaign] = useState({ name: '', category: '', sub_category: '', description: '' })
   const [campaignCategory, setCampaignCategory] = useState('')
   const [campaignSubCategory, setCampaignSubCategory] = useState('')
-  const [showAddKw, setShowAddKw] = useState(false)
+  const [showAddKw, setShowAddKw] = useState(true)
   const [bulkKw, setBulkKw] = useState('')
   const [kwLang, setKwLang] = useState('en')
   const [kwType, setKwType] = useState<'generic' | 'branded' | 'comparison'>('generic')
@@ -289,17 +290,84 @@ export default function ControlPage() {
     } catch { showToast('Connection error', 'error') } finally { setSavingEdit(false) }
   }
 
+  const [isPaused, setIsPaused] = useState(false)
+  const cancelScrapeRef = useRef<boolean>(false)
+
+  const stopScrape = () => {
+    cancelScrapeRef.current = true
+    setIsPaused(true)
+    setScraping(false)
+    showToast('Stopping scrape after current keyword finishes...', 'info')
+  }
+
+  const resumeScrape = async () => {
+    if (!activeCampaign) return
+    cancelScrapeRef.current = false
+    setIsPaused(false)
+    setScraping(true)
+
+    const remaining = scrapeProgress.filter(s => s.status === 'pending' || s.status === 'failed')
+    if (remaining.length === 0) {
+      showToast('No pending keywords to resume', 'info')
+      setScraping(false)
+      setIsPaused(false)
+      return
+    }
+
+    for (let i = 0; i < remaining.length; i++) {
+      if (cancelScrapeRef.current) {
+        setIsPaused(true)
+        setScraping(false)
+        showToast('Scraping paused.', 'warning')
+        return
+      }
+
+      const kw = remaining[i]
+      updateScrapeItem(kw.keywordId, 'running')
+      try {
+        const r = await fetch('/api/scrape', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ campaign_id: activeCampaign, keyword_id: kw.keywordId, limit: 1, force: true })
+        })
+        const d = await r.json()
+        if (!r.ok) {
+          updateScrapeItem(kw.keywordId, 'failed', { error: d.error })
+        } else {
+          const resItem = d.results && d.results[0]
+          updateScrapeItem(kw.keywordId, 'completed', {
+            message: d.message,
+            ranked: resItem?.ranked,
+            long_form: resItem?.long_form,
+            short_form: resItem?.short_form,
+            pages_fetched: resItem?.pages_fetched,
+            rejected_foreign: resItem?.rejected_foreign,
+            rejected_brand: resItem?.rejected_brand,
+            rejected_irrelevant: resItem?.rejected_irrelevant,
+            saved: resItem?.saved,
+          })
+        }
+      } catch { updateScrapeItem(kw.keywordId, 'failed', { error: 'Connection error' }) }
+    }
+
+    await fetchCampaignDetail(activeCampaign)
+    setScraping(false)
+    setIsPaused(false)
+  }
+
   const toggleKeyword = async (id: string, current: string) => {
     const next = current === 'active' ? 'paused' : 'active'
     try { await fetch('/api/keywords', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: next }) }); if (activeCampaign) await fetchCampaignDetail(activeCampaign) } catch { showToast('Update failed', 'error') }
   }
 
-  const updateScrapeItem = (keywordId: string, status: ScrapeItem['status'], message?: string) => {
-    setScrapeProgress(prev => prev.map(s => s.keywordId === keywordId ? { ...s, status, message } : s))
+  const updateScrapeItem = (keywordId: string, status: ScrapeProgressItem['status'], extra?: Partial<ScrapeProgressItem>) => {
+    setScrapeProgress(prev => prev.map(s => s.keywordId === keywordId ? { ...s, status, ...extra } : s))
   }
 
   const triggerScrape = async (keywordId?: string) => {
     if (!activeCampaign) return
+    cancelScrapeRef.current = false
+    setIsPaused(false)
     setScraping(true)
 
     if (keywordId) {
@@ -311,11 +379,22 @@ export default function ControlPage() {
         return [...prev, { keywordId: kw.id, text: kw.text, status: 'running' }]
       })
       try {
-        const r = await fetch('/api/scrape', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ campaign_id: activeCampaign, keyword_id: keywordId, limit: 1 }) })
+        const r = await fetch('/api/scrape', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ campaign_id: activeCampaign, keyword_id: keywordId, limit: 1, force: true }) })
         const d = await r.json()
-        if (!r.ok) { updateScrapeItem(keywordId, 'failed', d.error); return showToast(d.error, 'error') }
-        updateScrapeItem(keywordId, 'completed', d.message)
-      } catch { updateScrapeItem(keywordId, 'failed', 'Connection error') }
+        if (!r.ok) { updateScrapeItem(keywordId, 'failed', { error: d.error }); return showToast(d.error, 'error') }
+        const resItem = d.results && d.results[0]
+        updateScrapeItem(keywordId, 'completed', {
+          message: d.message,
+          ranked: resItem?.ranked,
+          long_form: resItem?.long_form,
+          short_form: resItem?.short_form,
+          pages_fetched: resItem?.pages_fetched,
+          rejected_foreign: resItem?.rejected_foreign,
+          rejected_brand: resItem?.rejected_brand,
+          rejected_irrelevant: resItem?.rejected_irrelevant,
+          saved: resItem?.saved,
+        })
+      } catch { updateScrapeItem(keywordId, 'failed', { error: 'Connection error' }) }
     } else {
       const active = keywords.filter(k => k.status === 'active')
       if (active.length === 0) { showToast('No active keywords to scrape', 'warning'); setScraping(false); return }
@@ -323,17 +402,38 @@ export default function ControlPage() {
       setScrapeProgress(active.map(k => ({ keywordId: k.id, text: k.text, status: 'pending' as const })))
 
       for (let i = 0; i < active.length; i++) {
+        if (cancelScrapeRef.current) {
+          setIsPaused(true)
+          setScraping(false)
+          showToast('Scraping paused.', 'warning')
+          return
+        }
+
         const kw = active[i]
         updateScrapeItem(kw.id, 'running')
         try {
-          const r = await fetch('/api/scrape', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ campaign_id: activeCampaign, keyword_id: kw.id, limit: 1 }) })
+          const r = await fetch('/api/scrape', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ campaign_id: activeCampaign, keyword_id: kw.id, limit: 1, force: true }) })
           const d = await r.json()
-          if (!r.ok) { updateScrapeItem(kw.id, 'failed', d.error) }
-          else { updateScrapeItem(kw.id, 'completed', d.message) }
-        } catch { updateScrapeItem(kw.id, 'failed', 'Connection error') }
+          if (!r.ok) {
+            updateScrapeItem(kw.id, 'failed', { error: d.error })
+          } else {
+            const resItem = d.results && d.results[0]
+            updateScrapeItem(kw.id, 'completed', {
+              message: d.message,
+              ranked: resItem?.ranked,
+              long_form: resItem?.long_form,
+              short_form: resItem?.short_form,
+              pages_fetched: resItem?.pages_fetched,
+              rejected_foreign: resItem?.rejected_foreign,
+              rejected_brand: resItem?.rejected_brand,
+              rejected_irrelevant: resItem?.rejected_irrelevant,
+              saved: resItem?.saved,
+            })
+          }
+        } catch { updateScrapeItem(kw.id, 'failed', { error: 'Connection error' }) }
       }
     }
-    await fetchCampaignDetail(activeCampaign); setScraping(false)
+    await fetchCampaignDetail(activeCampaign); setScraping(false); setIsPaused(false)
   }
 
   const kwListCss: React.CSSProperties = {
@@ -372,6 +472,16 @@ export default function ControlPage() {
           </button>
         )}
       </div>
+
+      {/* Real-time AI Pre-Filter Progress Box Banner */}
+      <PreFilterProgressBox
+        items={scrapeProgress}
+        isScraping={scraping}
+        isPaused={isPaused}
+        onStop={stopScrape}
+        onResume={resumeScrape}
+        onDismiss={() => { setScrapeProgress([]); setIsPaused(false) }}
+      />
 
       {/* ════════════════════════ CAMPAIGNS & KEYWORDS ════════════════════════ */}
       {tab === 'campaigns' && (
@@ -463,11 +573,6 @@ export default function ControlPage() {
                     {selectedCampaign?.name} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({keywords.length} keywords)</span>
                   </span>
                   <div style={{ display: 'flex', gap: 5 }}>
-                    {canEdit && (
-                      <button className="btn btn-blue btn-xs" onClick={() => { setShowAddKw(v => !v); setSelCategory(''); setSelSubCategory('') }} style={{ fontSize: 'var(--fs-label)' }}>
-                        <Plus size={10} /> Add Keywords
-                      </button>
-                    )}
                     {canEdit && (
                       <button className="btn btn-ghost btn-xs" onClick={() => triggerScrape()} disabled={scraping} style={{ fontSize: 'var(--fs-label)' }}>
                         {scraping ? <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={10} />} Scrape All

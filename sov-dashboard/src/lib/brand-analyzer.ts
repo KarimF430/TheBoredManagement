@@ -586,22 +586,30 @@ const IRRELEVANCE_CATEGORIES = [
   'other',            // Everything else
 ]
 
-function buildIrrelevancePrompt(title: string, channelName: string, description: string): string {
-  return `You are a video relevance classifier for Indian YouTube brand tracking. Determine if this video is relevant for brand mention analysis.
+function buildIrrelevancePrompt(
+  title: string,
+  channelName: string,
+  description: string,
+  transcript?: string,
+  keywordText?: string
+): string {
+  const kwSection = keywordText ? `SEARCH KEYWORD INTENT: "${keywordText}"\n` : ''
+  const trSection = transcript ? `TRANSCRIPT SNIPPET: "${transcript.slice(0, 1500)}"\n` : ''
+  return `You are a video relevance classifier for Indian YouTube product search tracking. Determine if this video is relevant and contains meaningful product review speech.
 
 VIDEO CONTEXT:
 TITLE: "${title}"
 CHANNEL: "${channelName}"
-DESCRIPTION: "${description?.slice(0, 500) || '(none)'}"
-
+${kwSection}DESCRIPTION: "${description?.slice(0, 500) || '(none)'}"
+${trSection}
 RULES:
-- RELEVANT: Product reviews, comparisons, recommendations, tutorials, unboxings, hauls, how-to videos mentioning products
-- IRRELEVANT: Music videos, gaming, live streams, shorts (<60s), compilations, memes, news/drama, non-Indian content, pure entertainment with no product discussion
+- RELEVANT: Product reviews, unboxings, comparisons, recommendations, buying guides, how-to/tutorials explaining products, human talking about product features/pros/cons.
+- IRRELEVANT: Pure music videos, B-roll with background song, non-talking visual montages, gaming, live streams, compilations, memes, news/drama with no product review.
 
 Return ONLY this JSON:
 {
   "is_irrelevant": true/false,
-  "reason": "one line reason",
+  "reason": "one line clear reason why relevant or irrelevant",
   "score": 0.0-1.0,
   "category": "shorts|music|gaming|non_review|foreign_language|live_stream|compilation|other"
 }`
@@ -610,7 +618,9 @@ Return ONLY this JSON:
 export async function detectIrrelevantVideo(
   title: string,
   channelName: string,
-  description: string
+  description: string,
+  transcript?: string,
+  keywordText?: string
 ): Promise<IrrelevantResult> {
   // Quick heuristic filters first (no LLM call needed)
   const titleLower = title.toLowerCase()
@@ -621,23 +631,23 @@ export async function detectIrrelevantVideo(
   }
 
   // Heuristic: Music video indicators
-  if (titleLower.includes('official music video') || titleLower.includes('song') ||
-    titleLower.includes('album') || titleLower.includes('lyrics') ||
-    titleLower.includes('audio') || titleLower.includes('remix')) {
-    return { is_irrelevant: true, reason: 'Music content detected', score: 0.95, category: 'music' }
+  if (titleLower.includes('official music video') || titleLower.includes('official song') ||
+    titleLower.includes('full album') || titleLower.includes('lyrics video') ||
+    titleLower.includes('lirycs') || titleLower.includes('remix song')) {
+    return { is_irrelevant: true, reason: 'Music video content detected', score: 0.95, category: 'music' }
   }
 
   // Heuristic: Gaming indicators
   if (titleLower.includes('gameplay') || titleLower.includes('let\'s play') ||
-    titleLower.includes('minecraft') || titleLower.includes('gta') ||
+    titleLower.includes('minecraft') || titleLower.includes('gta 5') ||
     titleLower.includes('free fire') || titleLower.includes('bgmi') ||
     titleLower.includes('pubg')) {
     return { is_irrelevant: true, reason: 'Gaming content detected', score: 0.9, category: 'gaming' }
   }
 
   // Heuristic: Live stream indicators
-  if (titleLower.includes('live') || titleLower.includes('stream') ||
-    titleLower.includes('podcast') || titleLower.includes('interview')) {
+  if (titleLower.includes('live stream') || titleLower.includes('podcast episode') ||
+    titleLower.includes('interview with')) {
     return { is_irrelevant: true, reason: 'Live stream or podcast detected', score: 0.85, category: 'live_stream' }
   }
 
@@ -658,7 +668,7 @@ export async function detectIrrelevantVideo(
   try {
     const completion = await getOpenAI().chat.completions.create({
       model: getModelName(),
-      messages: [{ role: 'user', content: buildIrrelevancePrompt(title, channelName, description) }],
+      messages: [{ role: 'user', content: buildIrrelevancePrompt(title, channelName, description, transcript, keywordText) }],
       temperature: 0.1,
       max_tokens: 300,
     })
