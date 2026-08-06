@@ -1,0 +1,16 @@
+FROM node:18-alpine
+
+WORKDIR /app
+ENV NODE_ENV=production
+
+RUN apk add --no-cache dumb-init
+
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+COPY tsconfig.json ./
+COPY worker-start.ts ./
+COPY src/lib ./src/lib
+
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["npx", "tsx", "worker-start.ts"]

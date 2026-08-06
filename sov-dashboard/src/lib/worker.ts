@@ -146,7 +146,7 @@ export async function initializeScheduledJobs() {
   const existingJobs = await (scrapeQueue as any).getJobIds()
   if (existingJobs.length === 0) {
     await (scrapeQueue as any).add('daily-views', {}, {
-      repeat: { pattern: '0 8 * * *' },
+      repeat: { pattern: '30 2 * * *' },
       jobId: 'daily-views-recurring',
     })
     console.log('Scheduled daily views job')
