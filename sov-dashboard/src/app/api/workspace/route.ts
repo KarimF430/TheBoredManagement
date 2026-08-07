@@ -13,11 +13,17 @@ export async function GET(req: NextRequest) {
         campaign_id UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'editor', 'viewer')),
+        page_permissions JSONB,
         invited_by UUID REFERENCES users(id),
         created_at TIMESTAMPTZ DEFAULT NOW(),
         PRIMARY KEY (campaign_id, user_id)
       )
     `)
+
+    // Ensure page_permissions column exists
+    try {
+      await queryAll(`ALTER TABLE project_members ADD COLUMN IF NOT EXISTS page_permissions JSONB`)
+    } catch { /* column already exists */ }
 
     // Ensure the logged-in user has an owner entry for every campaign
     // that doesn't have any owner yet
@@ -50,6 +56,7 @@ export async function GET(req: NextRequest) {
       SELECT
         c.id, c.name, c.category, c.sub_category, c.description, c.status, c.created_at,
         COALESCE(pm.role, 'viewer') as role,
+        pm.page_permissions,
         COALESCE(k.cnt, 0)::INT as keyword_count,
         COALESCE(b.cnt, 0)::INT as brand_count,
         s.last_scraped

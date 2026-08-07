@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryAll, queryOne } from '@/lib/supabase'
-import { getSession } from '@/lib/auth'
+import { getSession, hashPassword } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
   try {
+    const session = await getSession(req)
+    if (!session || session.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const users = await queryAll(`
       SELECT u.id, u.email, u.role, u.brand_name, c.name as campaign_name
       FROM users u
@@ -23,15 +28,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const { email, role, campaign_id, brand_name } = await req.json()
+    const { email, password, role, campaign_id, brand_name } = await req.json()
     if (!email || !role) {
       return NextResponse.json({ error: 'Email and role are required' }, { status: 400 })
     }
 
-    await queryOne(`
-      INSERT INTO users (email, role, campaign_id, brand_name)
-      VALUES ($1, $2, $3, $4) ON CONFLICT (email) DO NOTHING
-    `, [email, role, campaign_id || null, brand_name || null])
+    let passwordHash: string | null = null
+    if (password) {
+      passwordHash = await hashPassword(password)
+    }
+
+    if (passwordHash) {
+      await queryOne(`
+        INSERT INTO users (email, password_hash, role, campaign_id, brand_name)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (email) DO UPDATE SET password_hash = $2, role = $3, campaign_id = $4, brand_name = $5
+      `, [email, passwordHash, role, campaign_id || null, brand_name || null])
+    } else {
+      await queryOne(`
+        INSERT INTO users (email, role, campaign_id, brand_name)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (email) DO UPDATE SET role = $2, campaign_id = $3, brand_name = $4
+      `, [email, role, campaign_id || null, brand_name || null])
+    }
 
     return NextResponse.json({ ok: true })
   } catch (e: any) {

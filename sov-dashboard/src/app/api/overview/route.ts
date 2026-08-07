@@ -56,7 +56,7 @@ async function fetchOverview(cid: string) {
 
     const byCampaign = (q: any) => q.eq('campaign_id', cid)
 
-    const [kwRows, cvRows, kvRows, ksRows, btRows, vsTodayRows, vs1dRows, vs7dRows, vs30dRows, sjRes, cvNewRows] = await Promise.all([
+    const [kwRows, cvRows, kvRows, ksRows, btRows, vsTodayRows, vs1dRows, vs7dRows, vs30dRows, sjRes, cvNewRows, ourVideoRows] = await Promise.all([
       selectAll<{ id: string }>('keywords', 'id', (q) => q.eq('campaign_id', cid).eq('status', 'active')),
       selectAll<{ video_id: string }>('campaign_videos', 'video_id', byCampaign),
       selectAll<{ video_id: string; rank: number }>('keyword_videos', 'video_id, rank', byCampaign),
@@ -69,6 +69,7 @@ async function fetchOverview(cid: string) {
       supabase.from('scrape_jobs').select('id').in('status', ['running', 'pending']).limit(100),
       selectAll<{ video_id: string }>('campaign_videos', 'video_id', (q) =>
         q.eq('campaign_id', cid).gte('first_seen_at', new Date(Date.now() - 7 * 86400000).toISOString())),
+      selectAll<{ video_id: string }>('campaign_videos', 'video_id', (q) => q.eq('campaign_id', cid).eq('is_ours', true)),
     ])
 
     let lastViews: any = null
@@ -214,6 +215,9 @@ async function fetchOverview(cid: string) {
       dailyViews,
       dailyNewVideos,
       dailyKeywordsAdded: dailyKeywords,
+      ourVideos: {
+        count: ourVideoRows.length,
+      },
     }
 }
 

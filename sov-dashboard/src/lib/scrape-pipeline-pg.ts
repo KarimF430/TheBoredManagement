@@ -749,6 +749,41 @@ export async function scrapeKeyword(
     Array.from(poolVideos.values())
   )
 
+  // ── Auto-match: tag videos as "ours" if they appear in our videos list ──
+  // After scraping, check if any ranked video matches a video marked is_ours
+  // in the campaign pool. This catches videos the user added via the Our Videos
+  // section that now appear in keyword rankings.
+  try {
+    const rankedYoutubeIds = [...longForm, ...shortForm].map(e => e.video.youtube_id)
+    if (rankedYoutubeIds.length > 0) {
+      // Find any of these that are already marked as ours in the videos table
+      const oursMatch = await queryAll<{ id: string }>(
+        `SELECT id FROM videos WHERE youtube_id = ANY($1) AND is_ours = true`,
+        [rankedYoutubeIds]
+      )
+      // Also check campaign_videos for is_ours flag
+      if (oursMatch && oursMatch.length > 0) {
+        const oursIds = oursMatch.map((r: { id: string }) => r.id)
+        // Ensure campaign_videos also has is_ours set
+        await queryAll(
+          `UPDATE campaign_videos SET is_ours = true WHERE campaign_id = $1 AND video_id = ANY($2)`,
+          [campaignId, oursIds]
+        )
+        // Mark in keyword_videos/keyword_shorts as is_our_video
+        await queryAll(
+          `UPDATE keyword_videos SET is_our_video = true WHERE keyword_id = $1 AND video_id = ANY($2)`,
+          [keywordId, oursIds]
+        ).catch(() => {}) // Column may not exist in older schemas
+        await queryAll(
+          `UPDATE keyword_shorts SET is_our_video = true WHERE keyword_id = $1 AND video_id = ANY($2)`,
+          [keywordId, oursIds]
+        ).catch(() => {})
+      }
+    }
+  } catch (err) {
+    console.error('Our videos auto-match error (non-fatal):', err)
+  }
+
   const now = new Date().toISOString()
   await queryAll(`UPDATE keywords SET last_scraped_at = $1 WHERE id = $2`, [now, keywordId])
   await queryAll(

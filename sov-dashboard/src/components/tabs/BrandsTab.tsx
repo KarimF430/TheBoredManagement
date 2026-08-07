@@ -403,113 +403,217 @@ export default function BrandsTab() {
         )}
       </div>
 
-      {/* Brand Opportunity Map — 2x2 quadrants */}
-      <div className="card" style={{ padding: '20px 22px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Target size={14} style={{ color: '#6366F1' }} />
-              Brand Opportunity Map
+      {/* ═══════════════════════════════════════════════════════════════════
+          BRAND OPPORTUNITY MAP — 2×2 Quadrant Matrix
+      ═══════════════════════════════════════════════════════════════════ */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        {/* Header strip */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 22px', borderBottom: '1px solid #F1F5F9' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Target size={16} style={{ color: '#fff' }} />
             </div>
-            <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>2×2 matrix: View Share (X) vs Keyword Reach Share (Y)</div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', letterSpacing: '-0.2px' }}>Brand Opportunity Map</div>
+              <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 1 }}>View Share vs Keyword Reach — strategic quadrant classification</div>
+            </div>
           </div>
-          <span style={{ fontSize: 10, color: '#94A3B8', fontWeight: 500 }}>
-            Median view SOV: <strong style={{ color: '#64748B' }}>{medianViewSOV.toFixed(1)}%</strong>
-            <span style={{ margin: '0 6px', color: '#E2E8F0' }}>|</span>
-            Median reach SOV: <strong style={{ color: '#64748B' }}>{medianFreqSOV.toFixed(1)}%</strong>
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 6, background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#6366F1' }} />
+              <span style={{ fontSize: 10, color: '#64748B', fontWeight: 600 }}>View SOV Median: <span style={{ color: '#0F172A', fontFamily: "'JetBrains Mono', monospace" }}>{medianViewSOV.toFixed(1)}%</span></span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 6, background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#8B5CF6' }} />
+              <span style={{ fontSize: 10, color: '#64748B', fontWeight: 600 }}>Reach Median: <span style={{ color: '#0F172A', fontFamily: "'JetBrains Mono', monospace" }}>{medianFreqSOV.toFixed(1)}%</span></span>
+            </div>
+          </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+
+        {/* Quadrant grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0 }}>
           {[
-            { title: 'Star Brands', icon: '⭐', color: '#10B981', desc: 'High view share & high keyword reach — dominant players', brands: starBrands, metric: (b: any) => `${b.viewSOV?.toFixed(1)}% SOV` },
-            { title: 'Volume Brands', icon: '📈', color: '#3B82F6', desc: 'High view share but low reach — concentrated visibility', brands: volumeBrands, metric: (b: any) => `${b.viewSOV?.toFixed(1)}% SOV` },
-            { title: 'Niche Brands', icon: '🎯', color: '#8B5CF6', desc: 'Low view share but wide reach — efficient niche players', brands: nicheBrands, metric: (b: any) => `${b.freqSOV?.toFixed(1)}% reach` },
-            { title: 'Weak Brands', icon: '📉', color: '#EF4444', desc: 'Low view share & low reach — need strategy overhaul', brands: weakBrands, metric: (b: any) => `${b.viewSOV?.toFixed(1)}% SOV` },
-          ].map((q) => (
-            <div key={q.title} style={{ background: '#FAFBFC', borderRadius: 10, border: '1px solid #F1F5F9', borderTop: `3px solid ${q.color}`, padding: '14px 16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <span style={{ fontSize: 12 }}>{q.icon}</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: q.color }}>{q.title}</span>
+            {
+              title: 'Star Brands', emoji: '⭐', color: '#059669', lightBg: '#ECFDF5', lightBorder: '#D1FAE5',
+              desc: 'High view share & high keyword reach',
+              sub: 'Dominant market players with strong visibility across search and views',
+              brands: starBrands, metric: (b: any) => `${b.viewSOV?.toFixed(1)}%`, metricLabel: 'SOV',
+              iconBg: 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
+            },
+            {
+              title: 'Volume Brands', emoji: '📊', color: '#2563EB', lightBg: '#EFF6FF', lightBorder: '#DBEAFE',
+              desc: 'High view share but low reach',
+              sub: 'Concentrated visibility — strong views but limited keyword coverage',
+              brands: volumeBrands, metric: (b: any) => `${b.viewSOV?.toFixed(1)}%`, metricLabel: 'SOV',
+              iconBg: 'linear-gradient(135deg, #2563EB 0%, #3B82F6 100%)',
+            },
+            {
+              title: 'Niche Brands', emoji: '🎯', color: '#7C3AED', lightBg: '#F5F3FF', lightBorder: '#EDE9FE',
+              desc: 'Low view share but wide reach',
+              sub: 'Efficient niche players — broad keyword coverage with fewer views',
+              brands: nicheBrands, metric: (b: any) => `${b.freqSOV?.toFixed(1)}%`, metricLabel: 'Reach',
+              iconBg: 'linear-gradient(135deg, #7C3AED 0%, #8B5CF6 100%)',
+            },
+            {
+              title: 'Weak Brands', emoji: '⚠️', color: '#DC2626', lightBg: '#FEF2F2', lightBorder: '#FECACA',
+              desc: 'Low view share & low reach',
+              sub: 'Need strategy overhaul — limited visibility across all metrics',
+              brands: weakBrands, metric: (b: any) => `${b.viewSOV?.toFixed(1)}%`, metricLabel: 'SOV',
+              iconBg: 'linear-gradient(135deg, #DC2626 0%, #EF4444 100%)',
+            },
+          ].map((q, qi) => (
+            <div key={q.title} style={{ padding: '18px 20px', borderRight: qi < 3 ? '1px solid #F1F5F9' : 'none', display: 'flex', flexDirection: 'column' }}>
+              {/* Quadrant header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 7, background: q.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, boxShadow: `0 2px 6px ${q.color}25` }}>
+                    {q.emoji}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: q.color, letterSpacing: '-0.1px' }}>{q.title}</div>
+                    <div style={{ fontSize: 9.5, color: '#94A3B8', marginTop: 1, lineHeight: 1.2 }}>{q.desc}</div>
+                  </div>
                 </div>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: q.color, borderRadius: 6, padding: '1px 7px' }}>{q.brands.length}</span>
+                <div style={{ minWidth: 24, height: 24, borderRadius: 6, background: q.color, color: '#fff', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'JetBrains Mono', monospace" }}>
+                  {q.brands.length}
+                </div>
               </div>
-              <div style={{ fontSize: 10.5, color: '#64748B', marginBottom: 8, lineHeight: 1.3 }}>{q.desc}</div>
-              {q.brands.length === 0 ? (
-                <div style={{ fontSize: 11, color: '#CBD5E1', fontStyle: 'italic' }}>No brands</div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {q.brands.slice(0, 4).map((b: any) => (
-                    <div key={b.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
-                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: b.color, flexShrink: 0 }} />
-                        <span style={{ fontSize: 11, fontWeight: 600, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</span>
+
+              {/* Brand list */}
+              <div style={{ flex: 1 }}>
+                {q.brands.length === 0 ? (
+                  <div style={{ padding: '16px 0', textAlign: 'center' }}>
+                    <div style={{ fontSize: 20, marginBottom: 4, opacity: 0.3 }}>—</div>
+                    <div style={{ fontSize: 10.5, color: '#CBD5E1', fontWeight: 500 }}>No brands in this quadrant</div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {q.brands.slice(0, 5).map((b: any, bi: number) => (
+                      <div key={b.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', borderRadius: 6, background: bi === 0 ? q.lightBg : 'transparent', border: bi === 0 ? `1px solid ${q.lightBorder}` : '1px solid transparent', transition: 'all 0.15s' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+                          <div style={{ width: 20, height: 20, borderRadius: 5, background: `${b.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: b.color }} />
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 3, flexShrink: 0, marginLeft: 6 }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: q.color, fontFamily: "'JetBrains Mono', monospace" }}>{q.metric(b)}</span>
+                          <span style={{ fontSize: 9, color: '#94A3B8', fontWeight: 600 }}>{q.metricLabel}</span>
+                        </div>
                       </div>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: '#475569', fontFamily: "'JetBrains Mono', monospace", flexShrink: 0, marginLeft: 4 }}>{q.metric(b)}</span>
-                    </div>
-                  ))}
-                  {q.brands.length > 4 && (
-                    <span style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600 }}>+{q.brands.length - 4} more</span>
-                  )}
-                </div>
-              )}
+                    ))}
+                    {q.brands.length > 5 && (
+                      <div style={{ padding: '4px 8px', fontSize: 10, color: '#94A3B8', fontWeight: 600 }}>
+                        +{q.brands.length - 5} more brand{q.brands.length - 5 > 1 ? 's' : ''}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Positioning Map & Efficiency */}
+      {/* ═══════════════════════════════════════════════════════════════════
+          BRAND POSITIONING MAP & EFFICIENCY SCORE — Side by Side
+      ═══════════════════════════════════════════════════════════════════ */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        {/* Positioning Map */}
-        <div className="card" style={{ padding: '20px 22px' }}>
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <BarChart3 size={14} style={{ color: '#6366F1' }} />
-              Brand Positioning Map
+        {/* ── Positioning Map ── */}
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          {/* Header strip */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 22px', borderBottom: '1px solid #F1F5F9' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #7C3AED 0%, #A78BFA 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <BarChart3 size={16} style={{ color: '#fff' }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', letterSpacing: '-0.2px' }}>Brand Positioning Map</div>
+                <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 1 }}>View SOV vs Keyword Reach — bubble size = video count</div>
+              </div>
             </div>
-            <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>View SOV (X) vs KW Reach SOV (Y) — bubble = video count</div>
           </div>
-          <div style={{ position: 'relative' }}>
-            <ResponsiveContainer width="100%" height={300}>
-              <ScatterChart margin={{ top: 20, right: 20, left: 8, bottom: 28 }}>
+
+          {/* Chart area */}
+          <div style={{ padding: '16px 22px 12px', position: 'relative' }}>
+            <ResponsiveContainer width="100%" height={320}>
+              <ScatterChart margin={{ top: 24, right: 24, left: 12, bottom: 32 }}>
+                <defs>
+                  <filter id="bubbleShadow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.15" />
+                  </filter>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-                <XAxis type="number" dataKey="viewSOV" name="View SOV %" tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false}
-                  label={{ value: 'View SOV %', position: 'insideBottom', offset: -16, fontSize: 10, fill: '#94A3B8', fontWeight: 600 }} />
-                <YAxis type="number" dataKey="freqSOV" name="KW Reach %" tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false}
-                  label={{ value: 'KW Reach %', angle: -90, position: 'insideLeft', offset: 8, fontSize: 10, fill: '#94A3B8', fontWeight: 600 }} />
-                <ZAxis type="number" dataKey="z" range={[100, 500]} />
-                <ReferenceLine x={medianViewSOV} stroke="#CBD5E1" strokeDasharray="5 3" strokeWidth={1} />
-                <ReferenceLine y={medianFreqSOV} stroke="#CBD5E1" strokeDasharray="5 3" strokeWidth={1} />
+                <XAxis type="number" dataKey="viewSOV" name="View SOV %" tick={{ fontSize: 10, fill: '#94A3B8', fontFamily: "'JetBrains Mono', monospace" }} axisLine={false} tickLine={false}
+                  label={{ value: 'View SOV %', position: 'insideBottom', offset: -20, fontSize: 10, fill: '#94A3B8', fontWeight: 600 }} />
+                <YAxis type="number" dataKey="freqSOV" name="KW Reach %" tick={{ fontSize: 10, fill: '#94A3B8', fontFamily: "'JetBrains Mono', monospace" }} axisLine={false} tickLine={false}
+                  label={{ value: 'KW Reach %', angle: -90, position: 'insideLeft', offset: 4, fontSize: 10, fill: '#94A3B8', fontWeight: 600 }} />
+                <ZAxis type="number" dataKey="z" range={[120, 600]} />
+                <ReferenceLine x={medianViewSOV} stroke="#CBD5E1" strokeDasharray="6 4" strokeWidth={1} />
+                <ReferenceLine y={medianFreqSOV} stroke="#CBD5E1" strokeDasharray="6 4" strokeWidth={1} />
                 <RechartsTooltip
-                  cursor={{ strokeDasharray: '3 3' }}
+                  cursor={{ strokeDasharray: '3 3', stroke: '#CBD5E1' }}
                   content={({ active, payload }: any) => {
                     if (!active || !payload?.length) return null
                     const d = payload[0]?.payload
                     if (!d) return null
                     return (
-                      <div style={{ background: '#0F172A', borderRadius: 10, padding: '12px 16px', boxShadow: '0 4px 20px rgba(0,0,0,0.3)', minWidth: 180 }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: '#FFF', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <div style={{ width: 8, height: 8, borderRadius: '50%', background: d.color }} />
-                          {d.name}
-                          <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: '#334155', color: '#94A3B8' }}>#{d.rank}</span>
+                      <div style={{ background: '#0F172A', borderRadius: 12, padding: '14px 18px', boxShadow: '0 8px 32px rgba(0,0,0,0.4)', minWidth: 200, border: '1px solid #1E293B' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #1E293B' }}>
+                          <div style={{ width: 10, height: 10, borderRadius: '50%', background: d.color, boxShadow: `0 0 8px ${d.color}60` }} />
+                          <span style={{ fontSize: 13, fontWeight: 700, color: '#F8FAFC' }}>{d.name}</span>
+                          <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: '#334155', color: '#94A3B8', fontWeight: 600, marginLeft: 'auto' }}>#{d.rank}</span>
                         </div>
-                        <div style={{ fontSize: 11, color: '#94A3B8' }}>View SOV: <strong style={{ color: '#0284C7' }}>{d.viewSOV?.toFixed(1)}%</strong> · KW Reach: <strong style={{ color: '#059669' }}>{d.freqSOV?.toFixed(1)}%</strong></div>
-                        <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>Efficiency: <strong style={{ color: '#FBBF24' }}>{fmt(d.efficiency)}</strong> views/kw</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px' }}>
+                          <div>
+                            <div style={{ fontSize: 9, color: '#64748B', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>View SOV</div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: '#38BDF8', fontFamily: "'JetBrains Mono', monospace" }}>{d.viewSOV?.toFixed(1)}%</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 9, color: '#64748B', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>KW Reach</div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: '#A78BFA', fontFamily: "'JetBrains Mono', monospace" }}>{d.freqSOV?.toFixed(1)}%</div>
+                          </div>
+                          <div style={{ gridColumn: '1 / -1', marginTop: 2, paddingTop: 6, borderTop: '1px solid #1E293B' }}>
+                            <div style={{ fontSize: 9, color: '#64748B', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Efficiency</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#FBBF24', fontFamily: "'JetBrains Mono', monospace" }}>{fmt(d.efficiency)} <span style={{ fontSize: 10, color: '#94A3B8', fontWeight: 500 }}>views/kw</span></div>
+                          </div>
+                        </div>
                       </div>
                     )
                   }}
                 />
-                {brandPositioning.map((d: any, i: number) => <Scatter key={i} name={d.name} data={[d]} fill={d.color} fillOpacity={0.85} />)}
+                {brandPositioning.map((d: any, i: number) => (
+                  <Scatter key={i} name={d.name} data={[d]} fill={d.color} fillOpacity={0.8} stroke={d.color} strokeWidth={2} strokeOpacity={0.3}>
+                  </Scatter>
+                ))}
               </ScatterChart>
             </ResponsiveContainer>
-            <div style={{ position: 'absolute', top: 28, right: 32, fontSize: 8, fontWeight: 700, color: '#10B981', opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.5px', pointerEvents: 'none' }}>Market Leaders</div>
-            <div style={{ position: 'absolute', top: 28, left: 48, fontSize: 8, fontWeight: 700, color: '#8B5CF6', opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.5px', pointerEvents: 'none' }}>Niche Players</div>
-            <div style={{ position: 'absolute', bottom: 42, right: 32, fontSize: 8, fontWeight: 700, color: '#F59E0B', opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.5px', pointerEvents: 'none' }}>Growth Challengers</div>
-            <div style={{ position: 'absolute', bottom: 42, left: 48, fontSize: 8, fontWeight: 700, color: '#EF4444', opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.5px', pointerEvents: 'none' }}>Emerging</div>
+
+            {/* Quadrant labels */}
+            <div style={{ position: 'absolute', top: 36, right: 44, display: 'flex', alignItems: 'center', gap: 4, pointerEvents: 'none' }}>
+              <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#10B981', opacity: 0.6 }} />
+              <span style={{ fontSize: 8, fontWeight: 700, color: '#10B981', opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.8px' }}>Market Leaders</span>
+            </div>
+            <div style={{ position: 'absolute', top: 36, left: 56, display: 'flex', alignItems: 'center', gap: 4, pointerEvents: 'none' }}>
+              <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#8B5CF6', opacity: 0.6 }} />
+              <span style={{ fontSize: 8, fontWeight: 700, color: '#8B5CF6', opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.8px' }}>Niche Players</span>
+            </div>
+            <div style={{ position: 'absolute', bottom: 52, right: 44, display: 'flex', alignItems: 'center', gap: 4, pointerEvents: 'none' }}>
+              <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#F59E0B', opacity: 0.6 }} />
+              <span style={{ fontSize: 8, fontWeight: 700, color: '#F59E0B', opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.8px' }}>Growth Challengers</span>
+            </div>
+            <div style={{ position: 'absolute', bottom: 52, left: 56, display: 'flex', alignItems: 'center', gap: 4, pointerEvents: 'none' }}>
+              <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#EF4444', opacity: 0.6 }} />
+              <span style={{ fontSize: 8, fontWeight: 700, color: '#EF4444', opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.8px' }}>Emerging</span>
+            </div>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
+
+          {/* Legend */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '8px 22px 16px', borderTop: '1px solid #F8FAFC' }}>
             {brandPositioning.map((d: any) => (
-              <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 4, background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
                 <div style={{ width: 7, height: 7, borderRadius: '50%', background: d.color }} />
                 <span style={{ fontSize: 10, color: '#475569', fontWeight: 600 }}>{d.name}</span>
               </div>
@@ -517,51 +621,78 @@ export default function BrandsTab() {
           </div>
         </div>
 
-        {/* Efficiency Score */}
-        <div className="card" style={{ padding: '20px 22px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <TrendingUp size={14} style={{ color: '#10B981' }} />
-                Brand Efficiency Score
+        {/* ── Efficiency Score ── */}
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          {/* Header strip */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 22px', borderBottom: '1px solid #F1F5F9' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #059669 0%, #34D399 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <TrendingUp size={16} style={{ color: '#fff' }} />
               </div>
-              <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>Views per keyword reached — avg: {fmt(avgEfficiency)}</div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', letterSpacing: '-0.2px' }}>Brand Efficiency Score</div>
+                <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 1 }}>Views per keyword reached — higher = more efficient content</div>
+              </div>
             </div>
-            <span style={{ fontSize: 10, color: '#94A3B8', fontWeight: 500 }}>dashed line = market avg</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 6, background: '#F0FDF4', border: '1px solid #DCFCE7' }}>
+              <div style={{ width: 16, height: 2, borderTop: '2px dashed #059669' }} />
+              <span style={{ fontSize: 10, color: '#059669', fontWeight: 600 }}>Avg: <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(avgEfficiency)}</span></span>
+            </div>
           </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={brandEfficiency} layout="vertical" margin={{ top: 4, right: 70, left: -14, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} tickFormatter={(v: any) => fmt(v)} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#475569', fontWeight: 600 }} axisLine={false} tickLine={false} width={88} />
-              <RechartsTooltip
-                content={({ active, payload }: any) => {
-                  if (!active || !payload?.length) return null
-                  const d = payload[0]?.payload
-                  if (!d) return null
+
+          {/* Chart area */}
+          <div style={{ padding: '16px 22px 8px' }}>
+            <ResponsiveContainer width="100%" height={320}>
+              <BarChart data={brandEfficiency} layout="vertical" margin={{ top: 8, right: 80, left: -10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 10, fill: '#94A3B8', fontFamily: "'JetBrains Mono', monospace" }} axisLine={false} tickLine={false} tickFormatter={(v: any) => fmt(v)} />
+                <YAxis type="category" dataKey="name" tick={({ x, y, payload }: any) => {
+                  const d = brandEfficiency.find((b: any) => b.name === payload.value)
                   return (
-                    <div style={{ background: '#0F172A', borderRadius: 10, padding: '12px 16px', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: '#FFF', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: d.color }} />
-                        {d.fullName}
-                        <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: '#334155', color: '#94A3B8' }}>#{d.rank}</span>
-                      </div>
-                      <div style={{ fontSize: 11, color: '#94A3B8' }}>Views/keyword: <strong style={{ color: d.aboveAvg ? '#34D399' : '#F87171' }}>{fmt(d.efficiency)}</strong></div>
-                      <div style={{ fontSize: 11, color: '#94A3B8' }}>vs avg: <strong style={{ color: d.aboveAvg ? '#34D399' : '#F87171' }}>{d.effVsAvg > 0 ? '+' : ''}{d.effVsAvg}%</strong></div>
-                    </div>
+                    <g transform={`translate(${x},${y})`}>
+                      <circle cx={-8} cy={0} r={4} fill={d?.color || '#CBD5E1'} />
+                      <text x={-18} y={0} dy={4} textAnchor="end" fontSize={11} fill="#0F172A" fontWeight={600}>{payload.value}</text>
+                    </g>
                   )
-                }}
-              />
-              <ReferenceLine x={avgEfficiency} stroke="#94A3B8" strokeDasharray="4 4" strokeWidth={1.5}>
-                <Label value={`Avg: ${fmt(avgEfficiency)}`} position="top" fontSize={10} fill="#94A3B8" fontWeight={600} />
-              </ReferenceLine>
-              <Bar dataKey="efficiency" radius={[0, 6, 6, 0]} label={{ position: 'right', formatter: (v: any) => fmt(v), fontSize: 11, fill: '#64748B', fontWeight: 700 }}>
-                {brandEfficiency.map((d: any, i: number) => (
-                  <Cell key={i} fill={d.aboveAvg ? d.color : '#CBD5E1'} fillOpacity={d.aboveAvg ? 1 : 0.5} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+                }} axisLine={false} tickLine={false} width={90} />
+                <RechartsTooltip
+                  cursor={{ fill: 'rgba(99, 102, 241, 0.04)' }}
+                  content={({ active, payload }: any) => {
+                    if (!active || !payload?.length) return null
+                    const d = payload[0]?.payload
+                    if (!d) return null
+                    return (
+                      <div style={{ background: '#0F172A', borderRadius: 12, padding: '14px 18px', boxShadow: '0 8px 32px rgba(0,0,0,0.4)', minWidth: 200, border: '1px solid #1E293B' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #1E293B' }}>
+                          <div style={{ width: 10, height: 10, borderRadius: '50%', background: d.color, boxShadow: `0 0 8px ${d.color}60` }} />
+                          <span style={{ fontSize: 13, fontWeight: 700, color: '#F8FAFC' }}>{d.fullName}</span>
+                          <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: '#334155', color: '#94A3B8', fontWeight: 600, marginLeft: 'auto' }}>#{d.rank}</span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px' }}>
+                          <div>
+                            <div style={{ fontSize: 9, color: '#64748B', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Efficiency</div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: d.aboveAvg ? '#34D399' : '#F87171', fontFamily: "'JetBrains Mono', monospace" }}>{fmt(d.efficiency)}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 9, color: '#64748B', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>vs Market Avg</div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: d.aboveAvg ? '#34D399' : '#F87171', fontFamily: "'JetBrains Mono', monospace" }}>{d.effVsAvg > 0 ? '+' : ''}{d.effVsAvg}%</div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  }}
+                />
+                <ReferenceLine x={avgEfficiency} stroke="#94A3B8" strokeDasharray="6 4" strokeWidth={1.5}>
+                  <Label value={`Avg: ${fmt(avgEfficiency)}`} position="top" fontSize={10} fill="#94A3B8" fontWeight={600} />
+                </ReferenceLine>
+                <Bar dataKey="efficiency" radius={[0, 8, 8, 0]} barSize={20} label={{ position: 'right', formatter: (v: any) => fmt(v), fontSize: 11, fill: '#64748B', fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>
+                  {brandEfficiency.map((d: any, i: number) => (
+                    <Cell key={i} fill={d.aboveAvg ? d.color : '#E2E8F0'} fillOpacity={d.aboveAvg ? 0.9 : 0.6} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
     </motion.div>

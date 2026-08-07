@@ -1,5 +1,7 @@
 import { SignJWT, jwtVerify } from 'jose'
 import { NextRequest, NextResponse } from 'next/server'
+import { queryOne } from './supabase'
+import { ProjectRole } from './permissions'
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'sov_dashboard_secret_key_minimum_32_characters'
@@ -93,10 +95,40 @@ export async function getSession(req: NextRequest) {
   return verifyToken(token)
 }
 
+const ROLE_HIERARCHY: Record<ProjectRole, number> = {
+  viewer: 0,
+  editor: 1,
+  admin: 2,
+  owner: 3,
+}
+
+/**
+ * Look up the user's project-level role from project_members.
+ * Returns null if the user has no membership in this project.
+ */
+export async function getProjectRole(
+  userId: string,
+  campaignId: string
+): Promise<ProjectRole | null> {
+  const row = await queryOne<{ role: ProjectRole }>(
+    `SELECT role FROM project_members WHERE user_id = $1 AND campaign_id = $2`,
+    [userId, campaignId]
+  )
+  return row?.role ?? null
+}
+
+/**
+ * Authorize campaign access AND optionally enforce a minimum project role.
+ *
+ * - Global admins bypass all checks.
+ * - If `requiredRole` is provided, the user must have at least that role
+ *   in the project_members table.
+ */
 export async function authorizeCampaignAccess(
   req: NextRequest,
-  campaignId: string | null
-): Promise<{ authorized: boolean; error?: NextResponse }> {
+  campaignId: string | null,
+  requiredRole?: ProjectRole
+): Promise<{ authorized: boolean; error?: NextResponse; role?: ProjectRole | null }> {
   if (!campaignId) {
     return { authorized: false, error: NextResponse.json({ error: 'campaign_id required' }, { status: 400 }) }
   }
@@ -106,15 +138,30 @@ export async function authorizeCampaignAccess(
     return { authorized: false, error: NextResponse.json({ error: 'Not authenticated' }, { status: 401 }) }
   }
 
-  // Admin can access any campaign
+  // Global admin bypasses everything
   if (session.role === 'admin') {
-    return { authorized: true }
+    return { authorized: true, role: 'owner' }
   }
 
-  // Brand users can only access their assigned campaign
-  if (session.campaign_id !== campaignId) {
+  // Check project membership
+  const projectRole = await getProjectRole(session.id, campaignId)
+
+  if (!projectRole) {
     return { authorized: false, error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
   }
 
-  return { authorized: true }
+  // Enforce minimum role if specified
+  if (requiredRole) {
+    const userLevel = ROLE_HIERARCHY[projectRole] ?? -1
+    const requiredLevel = ROLE_HIERARCHY[requiredRole] ?? 999
+    if (userLevel < requiredLevel) {
+      return {
+        authorized: false,
+        error: NextResponse.json({ error: `Requires ${requiredRole} role or higher` }, { status: 403 }),
+        role: projectRole,
+      }
+    }
+  }
+
+  return { authorized: true, role: projectRole }
 }

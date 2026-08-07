@@ -9,24 +9,46 @@ export async function GET(req: NextRequest) {
 
   try {
     const campaignId = req.nextUrl.searchParams.get('campaign_id')
-    if (!campaignId) return NextResponse.json({ error: 'campaign_id required' }, { status: 400 })
 
-    const members = await queryAll<any>(`
-      SELECT
-        pm.campaign_id, pm.user_id, pm.role, pm.created_at as joined_at,
-        u.email, u.role as user_role
-      FROM project_members pm
-      JOIN users u ON u.id = pm.user_id
-      WHERE pm.campaign_id = $1::uuid
-      ORDER BY
-        CASE pm.role
-          WHEN 'owner' THEN 1
-          WHEN 'admin' THEN 2
-          WHEN 'editor' THEN 3
-          WHEN 'viewer' THEN 4
-        END,
-        pm.created_at ASC
-    `, [campaignId])
+    let members: any[]
+    if (campaignId === 'all') {
+      members = await queryAll<any>(`
+        SELECT
+          pm.campaign_id, pm.user_id, pm.role, pm.page_permissions, pm.created_at as joined_at,
+          u.email, u.role as user_role, c.name as campaign_name
+        FROM project_members pm
+        JOIN users u ON u.id = pm.user_id
+        LEFT JOIN campaigns c ON c.id = pm.campaign_id
+        ORDER BY
+          CASE pm.role
+            WHEN 'owner' THEN 1
+            WHEN 'admin' THEN 2
+            WHEN 'editor' THEN 3
+            WHEN 'viewer' THEN 4
+          END,
+          pm.created_at ASC
+      `)
+    } else if (campaignId) {
+      members = await queryAll<any>(`
+        SELECT
+          pm.campaign_id, pm.user_id, pm.role, pm.page_permissions, pm.created_at as joined_at,
+          u.email, u.role as user_role, c.name as campaign_name
+        FROM project_members pm
+        JOIN users u ON u.id = pm.user_id
+        LEFT JOIN campaigns c ON c.id = pm.campaign_id
+        WHERE pm.campaign_id = $1::uuid
+        ORDER BY
+          CASE pm.role
+            WHEN 'owner' THEN 1
+            WHEN 'admin' THEN 2
+            WHEN 'editor' THEN 3
+            WHEN 'viewer' THEN 4
+          END,
+          pm.created_at ASC
+      `, [campaignId])
+    } else {
+      return NextResponse.json({ error: 'campaign_id required' }, { status: 400 })
+    }
 
     return NextResponse.json({ members })
   } catch (e: unknown) {
@@ -89,6 +111,41 @@ export async function DELETE(req: NextRequest) {
       `DELETE FROM project_members WHERE campaign_id = $1::uuid AND user_id = $2::uuid`,
       [campaign_id, user_id]
     )
+
+    return NextResponse.json({ ok: true })
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Unknown error'
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  const session = await getSession(req)
+  if (!session) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  if (session.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  try {
+    const { campaign_id, user_id, role, page_permissions } = await req.json()
+    if (!campaign_id || !user_id) {
+      return NextResponse.json({ error: 'campaign_id and user_id required' }, { status: 400 })
+    }
+
+    if (role) {
+      if (!['owner', 'admin', 'editor', 'viewer'].includes(role)) {
+        return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
+      }
+      await queryAll(
+        `UPDATE project_members SET role = $3 WHERE campaign_id = $1::uuid AND user_id = $2::uuid`,
+        [campaign_id, user_id, role]
+      )
+    }
+
+    if (page_permissions !== undefined) {
+      await queryAll(
+        `UPDATE project_members SET page_permissions = $3::jsonb WHERE campaign_id = $1::uuid AND user_id = $2::uuid`,
+        [campaign_id, user_id, JSON.stringify(page_permissions)]
+      )
+    }
 
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {

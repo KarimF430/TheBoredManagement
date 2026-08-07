@@ -131,11 +131,12 @@ export default function ControlPage() {
   const [deleting, setDeleting] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
 
-  const { getActiveProjectRole } = useCampaignStore()
+  const { getActiveProjectRole, getActivePagePermissions } = useCampaignStore()
   const activeRole = getActiveProjectRole()
-  const canEdit = canAccess(activeRole, 'add-edit-keywords')
-  const canManageAccess = canAccess(activeRole, 'manage-access')
-  const canControl = canAccess(activeRole, 'campaign-control')
+  const activePermissions = getActivePagePermissions()
+  const canEdit = canAccess(activeRole, 'add-edit-keywords', activePermissions)
+  const canManageAccess = canAccess(activeRole, 'manage-access', activePermissions)
+  const canControl = canAccess(activeRole, 'campaign-control', activePermissions)
 
   const subCategories = AMAZON_INDIA_CATEGORIES.find(c => c.id === selCategory)?.subCategories || []
   const filteredKw = keywords.filter(k => k.text.toLowerCase().includes(search.toLowerCase()))

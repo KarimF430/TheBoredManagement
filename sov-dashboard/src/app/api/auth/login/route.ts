@@ -11,16 +11,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email and password required' }, { status: 400 })
     }
 
-    // Only master login is allowed
-    if (email.toLowerCase() !== MASTER_EMAIL.toLowerCase()) {
-      return NextResponse.json({ error: 'Access denied. Contact your administrator.' }, { status: 403 })
-    }
-
     const users = await queryAll<any>('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [email])
     let user = users?.[0] ?? null
 
-    // Auto-create master on first login
-    if (!user) {
+    // Auto-create master on first login (only for master email)
+    if (!user && email.toLowerCase() === MASTER_EMAIL.toLowerCase()) {
       const hashed = await hashPassword(password)
       const inserted = await queryAll<any>(
         `INSERT INTO users (email, password_hash, role) VALUES ($1, $2, 'admin') RETURNING *`,
@@ -30,8 +25,10 @@ export async function POST(req: NextRequest) {
       if (!user) {
         return NextResponse.json({ error: 'Failed to create user' }, { status: 500 })
       }
+    } else if (!user) {
+      return NextResponse.json({ error: 'Access denied. Contact your administrator.' }, { status: 403 })
     } else {
-      // Verify password — strict check, no auto-update
+      // Existing user — verify password
       const valid = user.password_hash ? await verifyPassword(password, user.password_hash) : false
       if (!valid) {
         return NextResponse.json({ error: 'Invalid password' }, { status: 401 })

@@ -426,7 +426,9 @@ export default function OverviewTab() {
             info="The creator channel with the highest search reach and keyword rankings. Click to open Creators Intelligence Hub."
           />
         </div>
-        <MetricCard label="Our Videos" value={fmt(overview?.ourVideos?.count || 0)} icon={Video} color="#10B981" info="Videos identified as belonging to your brand or campaign." />
+        <Link href="/our-videos" style={{ textDecoration: 'none', height: '100%', display: 'block', cursor: 'pointer' }}>
+          <MetricCard label="Our Videos" value={fmt(overview?.ourVideos?.count || 0)} icon={Video} color="#10B981" info="Videos identified as belonging to your brand or campaign. Click to open Our Videos analytics." />
+        </Link>
       </div>
 
       {/* Regional Map + Videos */}

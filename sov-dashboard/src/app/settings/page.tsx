@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Fragment } from 'react'
 import {
   Settings as SettingsIcon, Shield, Key, Globe, BookOpen, Bell,
   Plus, Trash2, X, Check, Loader2, AlertTriangle, CheckCircle, XCircle,
@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { AMAZON_INDIA_CATEGORIES } from '@/lib/amazon-india'
 import { useCampaignStore } from '@/lib/store'
-import { canAccess, type ProjectRole } from '@/lib/permissions'
+import { canAccess, type ProjectRole, ALL_FEATURES, FEATURE_LABELS, type Feature } from '@/lib/permissions'
 
 type SettingsTab = 'general' | 'projects' | 'access' | 'api-keys' | 'users' | 'backup' | 'alerts'
 
@@ -91,18 +91,19 @@ export default function SettingsPage() {
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' | 'info' | 'warning' } | null>(null)
   const showToast = useCallback((msg: string, type: 'success' | 'error' | 'info' | 'warning' = 'success') => setToast({ msg, type }), [])
 
-  const { getActiveProjectRole } = useCampaignStore()
+  const { getActiveProjectRole, getActivePagePermissions } = useCampaignStore()
   const activeRole = getActiveProjectRole()
+  const activePermissions = getActivePagePermissions()
 
-  // Filter tabs based on role
+  // Filter tabs based on role + per-member overrides
   const visibleTabs = SETTINGS_NAV.filter(item => {
     if (!item.feature) return true
-    return canAccess(activeRole, item.feature as any)
+    return canAccess(activeRole, item.feature as any, activePermissions)
   })
 
   // Auto-switch to a permitted tab if current is restricted
   useEffect(() => {
-    if (tab !== 'general' && !canAccess(activeRole, tab as any)) {
+    if (tab !== 'general' && !canAccess(activeRole, tab as any, activePermissions)) {
       const firstAllowed = visibleTabs[0]
       if (firstAllowed) setTab(firstAllowed.id)
     }
@@ -128,6 +129,14 @@ export default function SettingsPage() {
   const [campaigns, setCampaigns] = useState<any[]>([])
   const [members, setMembers] = useState<any[]>([])
   const [memberCampaignId, setMemberCampaignId] = useState('')
+  const [expandedMember, setExpandedMember] = useState<string | null>(null)
+  const [showAddMember, setShowAddMember] = useState(false)
+  const [newMemberEmail, setNewMemberEmail] = useState('')
+  const [newMemberRole, setNewMemberRole] = useState<ProjectRole>('viewer')
+  const [allUsers, setAllUsers] = useState<any[]>([])
+  const [savingPermissions, setSavingPermissions] = useState(false)
+  const [createMode, setCreateMode] = useState<'existing' | 'new'>('existing')
+  const [newUserPassword, setNewUserPassword] = useState('')
 
   // ═══ Backup ═══
   const [syncStatus, setSyncStatus] = useState<any>(null)
@@ -156,6 +165,7 @@ export default function SettingsPage() {
     fetchAlerts()
     fetchCampaigns()
     fetchSyncStatus()
+    fetchAllUsers()
   }, [])
 
   const fetchSettings = async () => {
@@ -283,6 +293,95 @@ export default function SettingsPage() {
   const fetchMembers = async (campaignId: string) => {
     if (!campaignId) { setMembers([]); return }
     try { const r = await fetch(`/api/workspace/members?campaign_id=${campaignId}`); const d = await r.json(); setMembers(d.members ?? []) } catch {}
+  }
+
+  const fetchAllMembers = async () => {
+    try { const r = await fetch('/api/workspace/members?campaign_id=all'); const d = await r.json(); setMembers(d.members ?? []) } catch {}
+  }
+
+  const fetchAllUsers = async () => {
+    try { const r = await fetch('/api/users'); const d = await r.json(); setAllUsers(d.users ?? []) } catch {}
+  }
+
+  const addMember = async () => {
+    if (!memberCampaignId) return showToast('Select a project', 'error')
+
+    if (createMode === 'new') {
+      if (!newMemberEmail.trim() || !newUserPassword.trim()) return showToast('Email and password required', 'error')
+      try {
+        const r = await fetch('/api/users', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: newMemberEmail, password: newUserPassword, role: 'brand' }),
+        })
+        const d = await r.json()
+        if (!r.ok) return showToast(d.error || 'Failed to create user', 'error')
+        await fetchAllUsers()
+        const newUser = allUsers.find((u: any) => u.email === newMemberEmail) || { id: d.user_id }
+        const r2 = await fetch('/api/workspace/members', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ campaign_id: memberCampaignId, user_id: newUser.id, role: newMemberRole }),
+        })
+        if (!r2.ok) { const d2 = await r2.json(); return showToast(d2.error || 'User created but failed to add to project', 'error') }
+      } catch { showToast('Failed', 'error') }
+    } else {
+      if (!newMemberEmail.trim()) return showToast('Select a user', 'error')
+      const user = allUsers.find((u: any) => u.email === newMemberEmail)
+      if (!user) return showToast('User not found', 'error')
+      try {
+        const r = await fetch('/api/workspace/members', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ campaign_id: memberCampaignId, user_id: user.id, role: newMemberRole }),
+        })
+        if (!r.ok) { const d = await r.json(); return showToast(d.error || 'Failed', 'error') }
+      } catch { showToast('Failed', 'error') }
+    }
+
+    setShowAddMember(false); setNewMemberEmail(''); setNewMemberRole('viewer'); setNewUserPassword(''); setCreateMode('existing')
+    await fetchMembers(memberCampaignId)
+    showToast('Member added')
+  }
+
+  const updateMemberRole = async (userId: string, newRole: ProjectRole) => {
+    if (!memberCampaignId) return
+    try {
+      await fetch('/api/workspace/members', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaign_id: memberCampaignId, user_id: userId, role: newRole }),
+      })
+      await fetchMembers(memberCampaignId)
+      showToast('Role updated')
+    } catch { showToast('Failed', 'error') }
+  }
+
+  const toggleMemberPermission = async (userId: string, feature: Feature, currentValue: boolean) => {
+    if (!memberCampaignId) return
+    const member = members.find((m: any) => m.user_id === userId)
+    if (!member || member.role === 'owner') return
+
+    const current = member.page_permissions || {}
+    const updated = { ...current, [feature]: !currentValue }
+
+    setSavingPermissions(true)
+    try {
+      await fetch('/api/workspace/members', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaign_id: memberCampaignId, user_id: userId, page_permissions: updated }),
+      })
+      setMembers(prev => prev.map(m => m.user_id === userId ? { ...m, page_permissions: updated } : m))
+    } catch { showToast('Failed to update permissions', 'error') }
+    finally { setSavingPermissions(false) }
+  }
+
+  const getMemberEffectiveAccess = (member: any): Record<string, boolean> => {
+    const roleDefaults = ALL_FEATURES.reduce((acc, f) => {
+      acc[f] = canAccess(member.role, f)
+      return acc
+    }, {} as Record<string, boolean>)
+
+    if (member.page_permissions) {
+      return { ...roleDefaults, ...member.page_permissions }
+    }
+    return roleDefaults
   }
 
   const fetchSyncStatus = async () => {
@@ -439,13 +538,62 @@ export default function SettingsPage() {
                 {sectionTitle('Access Control')}
                 {sectionDesc('Manage project-level membership and role-based permissions')}
 
-                <div style={{ marginBottom: 16 }}>
-                  <label className="field-label">Select Project</label>
-                  <select className="input" value={memberCampaignId} onChange={e => { setMemberCampaignId(e.target.value); if (e.target.value) fetchMembers(e.target.value) }} style={{ height: 38, maxWidth: 320 }}>
-                    <option value="">-- Select Project --</option>
-                    {campaigns.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'flex-end' }}>
+                  <div style={{ flex: 1, maxWidth: 320 }}>
+                    <label className="field-label">Select Project</label>
+                    <select className="input" value={memberCampaignId} onChange={e => { const v = e.target.value; setMemberCampaignId(v); if (v === 'all') fetchAllMembers(); else if (v) fetchMembers(v); else setMembers([]) }} style={{ height: 38 }}>
+                      <option value="all">All Projects</option>
+                      <option value="">-- Select Project --</option>
+                      {campaigns.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  {memberCampaignId && memberCampaignId !== 'all' && (
+                    <button className="btn btn-blue btn-sm" onClick={() => setShowAddMember(!showAddMember)}>
+                      <Plus size={12} /> Add Member
+                    </button>
+                  )}
                 </div>
+
+                {/* Add Member Form */}
+                {showAddMember && memberCampaignId && memberCampaignId !== 'all' && (
+                  <div style={{ marginBottom: 16, padding: 14, borderRadius: 'var(--radius-md)', background: 'var(--accent-dim)', border: '1.5px solid var(--accent-dim)' }}>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                      <button onClick={() => setCreateMode('existing')} style={{ padding: '4px 10px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--fs-label)', fontWeight: 600, border: '1.5px solid var(--accent-dim)', background: createMode === 'existing' ? 'var(--accent)' : 'var(--surface)', color: createMode === 'existing' ? '#fff' : 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit' }}>Existing User</button>
+                      <button onClick={() => setCreateMode('new')} style={{ padding: '4px 10px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--fs-label)', fontWeight: 600, border: '1.5px solid var(--accent-dim)', background: createMode === 'new' ? 'var(--accent)' : 'var(--surface)', color: createMode === 'new' ? '#fff' : 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'inherit' }}>New User</button>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+                      <div style={{ flex: 1 }}>
+                        <label className="field-label">Email</label>
+                        {createMode === 'existing' ? (
+                          <select className="input" value={newMemberEmail} onChange={e => setNewMemberEmail(e.target.value)} style={{ height: 36 }}>
+                            <option value="">-- Select User --</option>
+                            {allUsers.filter((u: any) => !members.some((m: any) => m.user_id === u.id)).map((u: any) => (
+                              <option key={u.id} value={u.email}>{u.email}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input className="input" type="email" value={newMemberEmail} onChange={e => setNewMemberEmail(e.target.value)} placeholder="user@example.com" style={{ height: 36 }} />
+                        )}
+                      </div>
+                      {createMode === 'new' && (
+                        <div style={{ flex: 1 }}>
+                          <label className="field-label">Password</label>
+                          <input className="input" type="password" value={newUserPassword} onChange={e => setNewUserPassword(e.target.value)} placeholder="Min 6 characters" style={{ height: 36 }} />
+                        </div>
+                      )}
+                      <div style={{ width: 130 }}>
+                        <label className="field-label">Role</label>
+                        <select className="input" value={newMemberRole} onChange={e => setNewMemberRole(e.target.value as ProjectRole)} style={{ height: 36 }}>
+                          <option value="viewer">Viewer</option>
+                          <option value="editor">Editor</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </div>
+                      <button className="btn btn-blue btn-sm" onClick={addMember}><Check size={12} /> Add</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => { setShowAddMember(false); setNewMemberEmail(''); setNewUserPassword(''); setCreateMode('existing') }}>Cancel</button>
+                    </div>
+                  </div>
+                )}
 
                 {memberCampaignId ? (
                   <div className="table-wrap">
@@ -454,47 +602,100 @@ export default function SettingsPage() {
                         <tr>
                           <th>User</th>
                           <th>Role</th>
-                          <th>Page Access</th>
+                          <th>Access</th>
                           <th>Joined</th>
-                          <th style={{ width: 60, textAlign: 'center' }}>Action</th>
+                          <th style={{ width: 80, textAlign: 'center' }}>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {members.length === 0 ? (
                           <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: 'var(--neutral-300)' }}>No members in this project.</td></tr>
-                        ) : members.map((m: any) => (
-                          <tr key={m.user_id}>
-                            <td style={{ fontWeight: 600, color: 'var(--text-bright)' }}>{m.email}</td>
-                            <td>
-                              <select value={m.role} style={{
-                                padding: '3px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--fs-label)', fontWeight: 700,
-                                border: '1.5px solid var(--accent-dim)', background: 'var(--surface)', cursor: 'pointer', fontFamily: 'inherit',
-                                color: m.role === 'owner' ? 'var(--success)' : m.role === 'admin' ? 'var(--accent)' : m.role === 'editor' ? 'var(--info)' : 'var(--text-secondary)',
-                              }} disabled={m.role === 'owner'}>
-                                <option value="owner" disabled>Owner</option>
-                                <option value="admin">Admin</option>
-                                <option value="editor">Editor</option>
-                                <option value="viewer">Viewer</option>
-                              </select>
-                            </td>
-                            <td style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)' }}>
-                              {m.role === 'owner' ? 'Everything' : m.role === 'admin' ? 'Manage + Edit' : m.role === 'editor' ? 'Edit Content' : 'View Only'}
-                            </td>
-                            <td style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>{new Date(m.joined_at).toLocaleDateString()}</td>
-                            <td style={{ textAlign: 'center' }}>
-                              {m.role !== 'owner' && (
-                                <button onClick={() => {
-                                  if (!confirm(`Remove ${m.email}?`)) return
-                                  fetch(`/api/workspace/members?campaign_id=${memberCampaignId}&user_id=${m.user_id}`, { method: 'DELETE' })
-                                    .then(() => { fetchMembers(memberCampaignId); showToast('Member removed') })
-                                    .catch(() => showToast('Failed', 'error'))
-                                }} style={{ background: 'var(--danger-dim)', border: '1.5px solid var(--danger-dim)', borderRadius: 'var(--radius-sm)', padding: '4px 7px', cursor: 'pointer', color: 'var(--danger)', display: 'inline-flex', alignItems: 'center' }}>
-                                  <Trash2 size={11} />
-                                </button>
+                        ) : members.map((m: any) => {
+                          const access = getMemberEffectiveAccess(m)
+                          const accessCount = Object.values(access).filter(Boolean).length
+                          const totalFeatures = ALL_FEATURES.length
+                          const isExpanded = expandedMember === m.user_id
+                          const isOwner = m.role === 'owner'
+
+                          return (
+                            <Fragment key={m.user_id}>
+                              <tr>
+                                <td style={{ fontWeight: 600, color: 'var(--text-bright)' }}>{m.email}</td>
+                                <td>
+                                  <select value={m.role} onChange={e => updateMemberRole(m.user_id, e.target.value as ProjectRole)} style={{
+                                    padding: '3px 8px', borderRadius: 'var(--radius-sm)', fontSize: 'var(--fs-label)', fontWeight: 700,
+                                    border: '1.5px solid var(--accent-dim)', background: 'var(--surface)', cursor: isOwner ? 'default' : 'pointer', fontFamily: 'inherit',
+                                    color: m.role === 'owner' ? 'var(--success)' : m.role === 'admin' ? 'var(--accent)' : m.role === 'editor' ? 'var(--info)' : 'var(--text-secondary)',
+                                  }} disabled={isOwner}>
+                                    <option value="owner" disabled>Owner</option>
+                                    <option value="admin">Admin</option>
+                                    <option value="editor">Editor</option>
+                                    <option value="viewer">Viewer</option>
+                                  </select>
+                                </td>
+                                <td style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>
+                                  {isOwner ? 'Everything' : `${accessCount}/${totalFeatures} pages`}
+                                </td>
+                                <td style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-secondary)' }}>{new Date(m.joined_at).toLocaleDateString()}</td>
+                                <td style={{ textAlign: 'center' }}>
+                                  <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                                    {!isOwner && (
+                                      <button onClick={() => setExpandedMember(isExpanded ? null : m.user_id)} className="btn btn-xs btn-ghost" title="Customize access" style={{ color: 'var(--accent)' }}>
+                                        <Shield size={11} />
+                                      </button>
+                                    )}
+                                    {!isOwner && (
+                                      <button onClick={() => {
+                                        if (!confirm(`Remove ${m.email}?`)) return
+                                        fetch(`/api/workspace/members?campaign_id=${memberCampaignId}&user_id=${m.user_id}`, { method: 'DELETE' })
+                                          .then(() => { fetchMembers(memberCampaignId); showToast('Member removed') })
+                                          .catch(() => showToast('Failed', 'error'))
+                                      }} style={{ background: 'var(--danger-dim)', border: '1.5px solid var(--danger-dim)', borderRadius: 'var(--radius-sm)', padding: '4px 7px', cursor: 'pointer', color: 'var(--danger)', display: 'inline-flex', alignItems: 'center' }}>
+                                        <Trash2 size={11} />
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                              {isExpanded && !isOwner && (
+                                <tr key={`${m.user_id}-perms`}>
+                                  <td colSpan={5} style={{ padding: '8px 16px 16px', background: 'var(--bg-secondary, var(--accent-dim))' }}>
+                                    <div style={{ fontSize: 'var(--fs-label)', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                                      Page Access for {m.email}
+                                      {m.page_permissions && <span style={{ marginLeft: 8, color: 'var(--warning)', fontWeight: 600 }}>(custom overrides active)</span>}
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 6 }}>
+                                      {ALL_FEATURES.map(feature => {
+                                        const isChecked = access[feature]
+                                        const hasOverride = m.page_permissions && feature in m.page_permissions
+                                        return (
+                                          <label key={feature} style={{
+                                            display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 'var(--radius-sm)',
+                                            background: hasOverride ? 'var(--warning-dim)' : isChecked ? 'var(--success-dim)' : 'var(--danger-dim)',
+                                            border: `1.5px solid ${hasOverride ? 'var(--warning-border)' : isChecked ? 'var(--success-border)' : 'var(--danger-border)'}`,
+                                            cursor: 'pointer', fontSize: 'var(--fs-sm)', fontWeight: 500, color: 'var(--text-bright)',
+                                          }}>
+                                            <input
+                                              type="checkbox"
+                                              checked={isChecked}
+                                              disabled={savingPermissions}
+                                              onChange={() => toggleMemberPermission(m.user_id, feature, isChecked)}
+                                              style={{ accentColor: 'var(--accent)', width: 14, height: 14 }}
+                                            />
+                                            <span>{FEATURE_LABELS[feature]}</span>
+                                          </label>
+                                        )
+                                      })}
+                                    </div>
+                                    <div style={{ marginTop: 8, fontSize: 'var(--fs-micro)', color: 'var(--text-muted)' }}>
+                                      Checked = granted, unchecked = denied. Overrides role defaults. Yellow = custom override active.
+                                    </div>
+                                  </td>
+                                </tr>
                               )}
-                            </td>
-                          </tr>
-                        ))}
+                            </Fragment>
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -503,11 +704,11 @@ export default function SettingsPage() {
                 )}
               </div>
 
-              {/* Permissions Matrix */}
+              {/* Permissions Legend */}
               <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                 <div style={{ padding: '14px 18px', borderBottom: '1.5px solid var(--accent-dim)' }}>
                   <span style={{ fontSize: 'var(--fs-body)', fontWeight: 700, color: 'var(--text-bright)' }}>Role Permissions</span>
-                  <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginLeft: 8, fontWeight: 500 }}>What each role can access</span>
+                  <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginLeft: 8, fontWeight: 500 }}>Default access per role (owner can override per member)</span>
                 </div>
                 <div className="table-wrap">
                   <table className="data-table" style={{ minWidth: 580 }}>
@@ -521,28 +722,12 @@ export default function SettingsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {[
-                        { feature: 'Overview Dashboard', o: true, a: true, e: true, v: true },
-                        { feature: 'Top Videos / Leaderboard', o: true, a: true, e: true, v: true },
-                        { feature: 'Brand Growth', o: true, a: true, e: true, v: true },
-                        { feature: 'SOV Trend', o: true, a: true, e: true, v: true },
-                        { feature: 'Keyword SOV', o: true, a: true, e: true, v: true },
-                        { feature: 'All Brands', o: true, a: true, e: true, v: true },
-                        { feature: 'Multi-Keyword', o: true, a: true, e: true, v: true },
-                        { feature: 'Add / Edit Keywords', o: true, a: true, e: true, v: false },
-                        { feature: 'Add / Edit Brands', o: true, a: true, e: true, v: false },
-                        { feature: 'Campaign Control Center', o: true, a: true, e: false, v: false },
-                        { feature: 'Manage Project Access', o: true, a: true, e: false, v: false },
-                        { feature: 'Manage API Keys', o: true, a: false, e: false, v: false },
-                        { feature: 'Settings & Alerts', o: true, a: false, e: false, v: false },
-                        { feature: 'Delete Project', o: true, a: false, e: false, v: false },
-                        { feature: 'Backup & Sync', o: true, a: false, e: false, v: false },
-                      ].map(row => (
-                        <tr key={row.feature}>
-                          <td style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-bright)' }}>{row.feature}</td>
-                          {['o', 'a', 'e', 'v'].map(k => (
-                            <td key={k} style={{ textAlign: 'center' }}>
-                              {(row as any)[k]
+                      {ALL_FEATURES.map(feature => (
+                        <tr key={feature}>
+                          <td style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, color: 'var(--text-bright)' }}>{FEATURE_LABELS[feature]}</td>
+                          {(['owner', 'admin', 'editor', 'viewer'] as ProjectRole[]).map(role => (
+                            <td key={role} style={{ textAlign: 'center' }}>
+                              {canAccess(role, feature)
                                 ? <Check size={13} style={{ color: 'var(--success)' }} />
                                 : <X size={13} style={{ color: 'var(--neutral-300)' }} />
                               }

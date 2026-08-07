@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCampaignStore } from '@/lib/store'
 import { CATEGORIES } from '@/lib/categories'
-import { Plus, Search, X, Check, Loader2, Menu } from 'lucide-react'
+import { Plus, Search, X, Check, Loader2, Menu, ChevronDown } from 'lucide-react'
 
 export default function Header({ onMenuToggle, navOpen }: { onMenuToggle?: () => void; navOpen?: boolean } = {}) {
   const router = useRouter()
@@ -13,6 +13,8 @@ export default function Header({ onMenuToggle, navOpen }: { onMenuToggle?: () =>
   // Modal States
   const [showKwModal, setShowKwModal] = useState(false)
   const [showProjModal, setShowProjModal] = useState(false)
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -140,6 +142,18 @@ export default function Header({ onMenuToggle, navOpen }: { onMenuToggle?: () =>
     { code: 'comparison', label: 'Comparison' }
   ]
 
+  // Close project dropdown on outside click
+  useEffect(() => {
+    if (!showProjectDropdown) return
+    const handleClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowProjectDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showProjectDropdown])
+
   return (
     <header className="app-header">
       <button
@@ -166,18 +180,100 @@ export default function Header({ onMenuToggle, navOpen }: { onMenuToggle?: () =>
       {/* Right side controls: Project Selector & Keyword Intake */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <select
-            className="input"
-            data-tutorial="campaign-selector"
-            value={activeCampaignId}
-            onChange={e => setActiveCampaignId(e.target.value)}
-            style={{ width: 220, height: 36, fontSize: 12.5, fontWeight: 600, padding: '0 12px', backgroundPosition: 'right 10px center' }}
-          >
-            {campaigns.length === 0 && <option value="">No Active Projects</option>}
-            {campaigns.map(c => (
-              <option key={c.id} value={c.id}>🎯 {c.name}</option>
-            ))}
-          </select>
+          <div ref={dropdownRef} style={{ position: 'relative' }}>
+            {/* Trigger button */}
+            <button
+              onClick={() => setShowProjectDropdown(!showProjectDropdown)}
+              data-tutorial="campaign-selector"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                height: 38, padding: '0 14px 0 12px',
+                background: '#fff', border: '1px solid #E2E8F0',
+                borderRadius: 10, cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                transition: 'all 0.15s ease',
+                minWidth: 210, maxWidth: 240,
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = '#CBD5E1'; e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.06)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)' }}
+            >
+              <div style={{ width: 22, height: 22, borderRadius: 6, background: 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>
+                  {campaigns.find(c => c.id === activeCampaignId)?.name?.charAt(0)?.toUpperCase() || '?'}
+                </span>
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, textAlign: 'left' }}>
+                {campaigns.find(c => c.id === activeCampaignId)?.name || 'Select Project'}
+              </span>
+              <ChevronDown size={14} style={{ color: '#94A3B8', flexShrink: 0, transition: 'transform 0.2s', transform: showProjectDropdown ? 'rotate(180deg)' : 'rotate(0)' }} />
+            </button>
+
+            {/* Dropdown menu */}
+            {showProjectDropdown && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
+                background: '#fff', border: '1px solid #E2E8F0',
+                borderRadius: 12, boxShadow: '0 8px 30px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)',
+                zIndex: 1000, overflow: 'hidden',
+                animation: 'dropdownFadeIn 0.15s ease',
+              }}>
+                {/* Dropdown header */}
+                <div style={{ padding: '10px 14px 8px', borderBottom: '1px solid #F1F5F9' }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Projects</span>
+                </div>
+                {/* Project list */}
+                <div style={{ maxHeight: 280, overflowY: 'auto', padding: '4px' }}>
+                  {campaigns.map(c => {
+                    const isActive = c.id === activeCampaignId
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => { setActiveCampaignId(c.id); setShowProjectDropdown(false) }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          width: '100%', padding: '9px 10px', border: 'none',
+                          background: isActive ? 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)' : 'transparent',
+                          borderRadius: 8, cursor: 'pointer',
+                          transition: 'all 0.12s ease',
+                          textAlign: 'left',
+                        }}
+                        onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = '#F8FAFC' }}
+                        onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}
+                      >
+                        <div style={{
+                          width: 28, height: 28, borderRadius: 7,
+                          background: isActive ? 'linear-gradient(135deg, #6366F1 0%, #818CF8 100%)' : '#F1F5F9',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                          transition: 'all 0.15s ease',
+                        }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: isActive ? '#fff' : '#64748B' }}>
+                            {c.name.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: isActive ? 700 : 500, color: isActive ? '#4338CA' : '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {c.name}
+                          </div>
+                        </div>
+                        {isActive && (
+                          <div style={{ width: 18, height: 18, borderRadius: 5, background: '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Check size={11} style={{ color: '#fff', strokeWidth: 3 }} />
+                          </div>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <style>{`
+            @keyframes dropdownFadeIn {
+              from { opacity: 0; transform: translateY(-4px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+          `}</style>
           <button
             onClick={() => setShowProjModal(true)}
             title="Create New Project"

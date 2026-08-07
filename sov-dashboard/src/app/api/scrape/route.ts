@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   try {
     const { campaign_id, keyword_id, limit = 2, force = false } = await req.json()
 
-    const { authorized, error } = await authorizeCampaignAccess(req, campaign_id)
+    const { authorized, error } = await authorizeCampaignAccess(req, campaign_id, 'editor')
     if (!authorized) return error
     if (!campaign_id) return NextResponse.json({ error: 'campaign_id required' }, { status: 400 })
 

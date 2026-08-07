@@ -17,6 +17,7 @@ export interface Campaign {
 
 export interface ProjectWithRole extends Campaign {
   role: ProjectRole
+  page_permissions?: Record<string, boolean> | null
 }
 
 interface CampaignStore {
@@ -33,6 +34,7 @@ interface CampaignStore {
 
   // Active project's role (derived from userProjects + activeCampaignId)
   getActiveProjectRole: () => ProjectRole | null
+  getActivePagePermissions: () => Record<string, boolean> | null
 }
 
 export const useCampaignStore = create<CampaignStore>()(
@@ -97,6 +99,13 @@ export const useCampaignStore = create<CampaignStore>()(
         if (!activeCampaignId) return null
         const project = userProjects.find(p => p.id === activeCampaignId)
         return project?.role ?? null
+      },
+
+      getActivePagePermissions: () => {
+        const { userProjects, activeCampaignId } = get()
+        if (!activeCampaignId) return null
+        const project = userProjects.find(p => p.id === activeCampaignId)
+        return project?.page_permissions ?? null
       },
     }),
     {

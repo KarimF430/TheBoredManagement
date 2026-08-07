@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne, queryAll } from '@/lib/supabase'
+import { getSession } from '@/lib/auth'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const session = await getSession(req)
+    if (!session) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
     const row = await queryOne<any>(
       `SELECT value, updated_at FROM system_metadata WHERE key = 'app_settings'`
     )
@@ -15,6 +21,11 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getSession(req)
+    if (!session || session.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const body = await req.json()
     const existing = await queryOne<any>(
       `SELECT value FROM system_metadata WHERE key = 'app_settings'`

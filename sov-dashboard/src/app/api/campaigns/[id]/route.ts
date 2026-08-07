@@ -34,7 +34,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const { authorized, error: authError } = await authorizeCampaignAccess(req, id)
+    const { authorized, error: authError } = await authorizeCampaignAccess(req, id, 'admin')
     if (!authorized) return authError!
 
     const body = await req.json()
@@ -54,7 +54,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const { authorized, error: authError } = await authorizeCampaignAccess(req, id)
+    const { authorized, error: authError } = await authorizeCampaignAccess(req, id, 'owner')
     if (!authorized) return authError!
 
     await queryOne(`DELETE FROM campaigns WHERE id = $1`, [id])

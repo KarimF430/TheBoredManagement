@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { campaign_id, name, type } = body
 
-    const { authorized, error } = await authorizeCampaignAccess(req, campaign_id)
+    const { authorized, error } = await authorizeCampaignAccess(req, campaign_id, 'editor')
     if (!authorized) return error
     if (!campaign_id || !name) return NextResponse.json({ error: 'campaign_id and name required' }, { status: 400 })
 
@@ -173,7 +173,7 @@ export async function DELETE(req: NextRequest) {
     const body = await req.json()
     const { id, campaign_id } = body
 
-    const { authorized, error } = await authorizeCampaignAccess(req, campaign_id)
+    const { authorized, error } = await authorizeCampaignAccess(req, campaign_id, 'editor')
     if (!authorized) return error
     if (!id || !campaign_id) return NextResponse.json({ error: 'id and campaign required' }, { status: 400 })
 

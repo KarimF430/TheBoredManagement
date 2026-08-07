@@ -29,6 +29,7 @@ const NAV = [
       { href: '/multi-keyword', label: 'Multi-Keyword',     dot: 'violet' },
       { href: '/analytic-calendar', label: 'Calendar',      dot: 'blue' },
       { href: '/brands-products', label: 'Brands & Products', dot: 'orange' },
+      { href: '/our-videos', label: 'Our Videos', dot: 'green' },
     ]
   },
   {
@@ -65,9 +66,10 @@ export default function Sidebar({ open = false, onNavigate }: { open?: boolean; 
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
   const [quota, setQuota] = useState<{ used: number; total: number } | null>(null)
-  const { campaigns, activeCampaignId, fetchCampaigns, userProjects, fetchUserProjects, getActiveProjectRole } = useCampaignStore()
+  const { campaigns, activeCampaignId, fetchCampaigns, userProjects, fetchUserProjects, getActiveProjectRole, getActivePagePermissions } = useCampaignStore()
 
   const activeRole = getActiveProjectRole()
+  const activePermissions = getActivePagePermissions()
 
   useEffect(() => {
     fetchCampaigns()
@@ -157,7 +159,7 @@ export default function Sidebar({ open = false, onNavigate }: { open?: boolean; 
         overflowX: 'hidden',
       }}>
         {NAV.map(group => {
-          const visibleItems = getVisibleNavItems(group.items, activeRole)
+          const visibleItems = getVisibleNavItems(group.items, activeRole, activePermissions)
           if (visibleItems.length === 0) return null
           return (
           <div key={group.section} style={{ marginBottom: 8 }}>

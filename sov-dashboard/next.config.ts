@@ -1,8 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Render needs standalone for Docker; Vercel uses its own format
-  output: process.env.RENDER ? 'standalone' : undefined,
   serverExternalPackages: ['better-sqlite3'],
 
 

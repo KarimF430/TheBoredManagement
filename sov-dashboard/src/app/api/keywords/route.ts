@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
 
     const campaignId = body.campaign_id
 
-    const { authorized, error: authError } = await authorizeCampaignAccess(req, campaignId)
+    const { authorized, error: authError } = await authorizeCampaignAccess(req, campaignId, 'editor')
     if (!authorized) return authError
     if (!campaignId) return NextResponse.json({ error: 'campaign_id required' }, { status: 400 })
 
@@ -160,8 +160,13 @@ export async function DELETE(req: NextRequest) {
     const id = req.nextUrl.searchParams.get('id')
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
     const { data: row } = await supabase.from('keywords').select('campaign_id').eq('id', id).maybeSingle()
+    if (!row?.campaign_id) return NextResponse.json({ error: 'Keyword not found' }, { status: 404 })
+
+    const { authorized, error: authError } = await authorizeCampaignAccess(req, row.campaign_id, 'editor')
+    if (!authorized) return authError
+
     await supabase.from('keywords').delete().eq('id', id)
-    if (row?.campaign_id) await invalidateCampaign(row.campaign_id)
+    await invalidateCampaign(row.campaign_id)
     return NextResponse.json({ ok: true })
   } catch (e: any) {
     console.error('Keywords DELETE error:', e)
@@ -173,6 +178,12 @@ export async function PUT(req: NextRequest) {
   try {
     const { id, text, language, category } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+
+    const { data: currentKw } = await supabase.from('keywords').select('campaign_id').eq('id', id).maybeSingle()
+    if (!currentKw?.campaign_id) return NextResponse.json({ error: 'Keyword not found' }, { status: 404 })
+
+    const { authorized, error: authError } = await authorizeCampaignAccess(req, currentKw.campaign_id, 'editor')
+    if (!authorized) return authError
 
     const updates: any = {}
     if (text !== undefined) updates.text = text.trim()
@@ -216,6 +227,12 @@ export async function PUT(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const { id, status } = await req.json()
+    const { data: kw } = await supabase.from('keywords').select('campaign_id').eq('id', id).maybeSingle()
+    if (!kw?.campaign_id) return NextResponse.json({ error: 'Keyword not found' }, { status: 404 })
+
+    const { authorized, error: authError } = await authorizeCampaignAccess(req, kw.campaign_id, 'editor')
+    if (!authorized) return authError
+
     const { data: updated } = await supabase
       .from('keywords').update({ status }).eq('id', id).select('campaign_id').maybeSingle()
     if (updated?.campaign_id) await invalidateCampaign(updated.campaign_id)

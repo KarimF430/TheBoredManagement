@@ -11,7 +11,10 @@ export async function proxy(req: NextRequest) {
     path.startsWith('/favicon.ico') ||
     path.startsWith('/tbm-logo') ||
     path.startsWith('/login') ||
+    path.startsWith('/privacy-policy') ||
     path.startsWith('/api/auth') ||
+    path.startsWith('/api/health') ||
+    path.startsWith('/api/init') ||
     path.startsWith('/api/brands/analyze') ||
     path.startsWith('/api/videos/ids') ||
     path.startsWith('/api/warm') ||
@@ -43,10 +46,18 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next()
   }
 
-  // Any other pages are Admin only
-  if (session.role !== 'admin') {
-    const clientUrl = new URL('/client', req.url)
-    return NextResponse.redirect(clientUrl)
+  // Dashboard / main page accessible by all authenticated users
+  if (path === '/') {
+    return NextResponse.next()
+  }
+
+  // Admin-only pages: settings, control
+  const isAdminOnly = path.startsWith('/settings') || path.startsWith('/control')
+  const isAdminOnlyApi = path.startsWith('/api/users') || path.startsWith('/api/workspace/members') || path.startsWith('/api/settings')
+
+  if ((isAdminOnly || isAdminOnlyApi) && session.role !== 'admin') {
+    const workspaceUrl = new URL('/workspace', req.url)
+    return NextResponse.redirect(workspaceUrl)
   }
 
   return NextResponse.next()
