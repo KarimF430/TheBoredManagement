@@ -1,21 +1,19 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import AppShell from '@/components/AppShell'
-import PreWarm from '@/components/PreWarm'
+import CampaignShell from '@/components/cp/CampaignShell'
 import Providers from '@/components/Providers'
 
 export const metadata: Metadata = {
-  title: 'SOV Panel — YouTube Share-of-Voice | TheBoredMonkey',
-  description: 'Enterprise YouTube analytics platform tracking brand Share-of-Voice, keyword rankings, video growth, and competitor intelligence — built by TheBoredMonkey.',
+  title: 'Campaign Management Panel | TheBoredMonkey',
+  description: 'Enterprise Influencer Campaign CRM tracking workflow SLAs, creator status, and live post analytics — built by TheBoredMonkey.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
         <Providers>
-          <PreWarm />
-          <AppShell>{children}</AppShell>
+          <CampaignShell>{children}</CampaignShell>
         </Providers>
       </body>
     </html>

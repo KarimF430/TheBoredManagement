@@ -179,16 +179,7 @@ async function fetchViaWhisper(youtubeId: string): Promise<{ text: string; langu
 
     // Inject brand names as initial_prompt to improve transcription accuracy
     // This biases Whisper's language model toward correct spelling of brand names
-    try {
-      const { getBrandsForWhisper } = await import('./brand-gazetteer')
-      const brandSeeds = getBrandsForWhisper()
-      if (brandSeeds.length > 0) {
-        const initialPrompt = `Brand names: ${brandSeeds.join(', ')}. Product names include brand names listed above. This is an Indian market review video.`
-        formData.append('initial_prompt', initialPrompt)
-      }
-    } catch {
-      // Gazetteer not available — proceed without brand seeds
-    }
+    // Brand seeds feature disabled (Gazetteer removed)
 
     const whisperRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
       method: 'POST',

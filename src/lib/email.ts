@@ -1,6 +1,13 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+let resend: Resend | null = null
+function getResend() {
+  if (!resend) {
+    if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY not configured')
+    resend = new Resend(process.env.RESEND_API_KEY)
+  }
+  return resend
+}
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'SOV Panel <auth@theboredmonkey.com>'
 
@@ -9,7 +16,7 @@ export async function sendOTPEmail(
   code: string
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    await resend.emails.send({
+    await getResend().emails.send({
       from: FROM_EMAIL,
       to: email,
       subject: 'Your SOV Panel login code',

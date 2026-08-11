@@ -30,5 +30,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "sov-dashboard", ".next"]
+  "exclude": ["node_modules", ".next"]
 }

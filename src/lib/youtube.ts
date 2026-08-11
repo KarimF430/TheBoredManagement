@@ -301,4 +301,4 @@ export async function searchYouTube(keyword: string, maxResults = 50): Promise<{
   }
 }
 
-export { saveScrapeResults } from './scrape-pipeline'
+// Legacy scrape-pipeline export removed

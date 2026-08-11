@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth'
+import { getCampaignSession } from '@/lib/cp-auth'
 
 export async function GET(req: NextRequest) {
-  try {
-    const session = await getSession(req)
-    if (!session) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-    }
-    return NextResponse.json({ session })
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 })
+  const session = await getCampaignSession(req)
+  if (!session) {
+    return NextResponse.json({ user: null })
   }
+  return NextResponse.json({
+    user: {
+      id: session.id,
+      email: session.email,
+      name: session.name,
+      role: session.role,
+      campaign_ids: session.campaign_ids,
+      brand_name: session.brand_name,
+    },
+  })
 }

@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { clearCampaignSession } from '@/lib/cp-auth'
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   const res = NextResponse.json({ ok: true })
-  res.cookies.delete('sov_session')
-  return res
+  return clearCampaignSession(res)
 }

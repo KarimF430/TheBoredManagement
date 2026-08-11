@@ -1,92 +1,116 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase, queryAll } from '@/lib/supabase'
-import { getCached, cacheKey, CACHE_TTL, invalidateL1, redis } from '@/lib/cache'
-import { getSession } from '@/lib/auth'
+import { getCampaignSession } from '@/lib/cp-auth'
+import { getCPClient } from '@/lib/cp-db'
 
+// GET /api/campaigns — List all campaigns the user has access to
 export async function GET(req: NextRequest) {
-  const session = await getSession(req)
-  if (!session) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-  try {
-    const data = await getCached(cacheKey.campaigns(), fetchCampaigns, CACHE_TTL.campaigns)
-    return NextResponse.json(data)
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'Unknown error'
-    console.error('Campaigns API error:', e)
-    return NextResponse.json({ error: msg, campaigns: [] }, { status: 500 })
+  const session = await getCampaignSession(req)
+  if (!session) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }
-}
 
-async function fetchCampaigns() {
+  const client = getCPClient()
+
   try {
-    const enriched = await queryAll<any>(`
-      SELECT
-        c.id, c.name, c.category, c.sub_category, c.description, c.status, c.created_at,
-        COALESCE(k.cnt, 0)::INT as keyword_count,
-        COALESCE(b.cnt, 0)::INT as brand_count,
-        s.last_scraped
-      FROM campaigns c
-      LEFT JOIN (
-        SELECT campaign_id, COUNT(*)::INT as cnt
-        FROM keywords WHERE status = 'active'
-        GROUP BY campaign_id
-      ) k ON k.campaign_id = c.id
-      LEFT JOIN (
-        SELECT campaign_id, COUNT(*)::INT as cnt
-        FROM campaign_brands
-        GROUP BY campaign_id
-      ) b ON b.campaign_id = c.id
-      LEFT JOIN (
-        SELECT DISTINCT ON (campaign_id) campaign_id, created_at as last_scraped
-        FROM scrape_jobs
-        ORDER BY campaign_id, created_at DESC
-      ) s ON s.campaign_id = c.id
-      ORDER BY c.created_at DESC
-    `)
-    return { campaigns: enriched }
-  } catch (err: any) {
-    console.error('Campaigns GET SQL error:', err)
-    return { error: err.message, campaigns: [] }
-  }
-}
+    let query = client
+      .from('cp_campaigns')
+      .select('*')
+      .order('created_at', { ascending: false })
 
-export async function POST(req: NextRequest) {
-  try {
-    const session = await getSession(req)
-    if (!session) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-    if (session.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    // Client: only their assigned campaign
+    if (session.role === 'client') {
+      query = query.in('id', session.campaign_ids)
+    }
+    // ir_manager, ir_executive: only assigned campaigns
+    else if (session.role === 'ir_manager' || session.role === 'ir_executive') {
+      if (session.campaign_ids.length > 0) {
+        query = query.in('id', session.campaign_ids)
+      } else {
+        // No campaigns assigned
+        return NextResponse.json({ campaigns: [] })
+      }
+    }
+    // brand_solutions, campaign_manager: all campaigns
 
-    const { name, category, sub_category, description } = await req.json()
-    if (!name?.trim()) return NextResponse.json({ error: 'Campaign name is required' }, { status: 400 })
-
-    const { data, error } = await supabase
-      .from('campaigns')
-      .upsert(
-        { name: name.trim(), category: category ?? '', sub_category: sub_category ?? '', description: description ?? '' },
-        { onConflict: 'name', ignoreDuplicates: true }
-      )
-      .select()
-      .maybeSingle()
+    const { data: campaigns, error } = await query
 
     if (error) {
-      console.error('Campaigns POST error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
-    if (!data) return NextResponse.json({ error: 'Campaign name already exists' }, { status: 409 })
 
-    // Auto-add creator as project owner
-    await queryAll(
-      `INSERT INTO project_members (campaign_id, user_id, role)
-       VALUES ($1, $2, 'owner')
-       ON CONFLICT (campaign_id, user_id) DO NOTHING`,
-      [data.id, session.id]
-    )
+    return NextResponse.json({ campaigns: campaigns || [] })
+  } catch (err) {
+    console.error('List campaigns error:', err)
+    return NextResponse.json({ error: 'Failed to list campaigns' }, { status: 500 })
+  }
+}
 
-    invalidateL1('campaigns:all')
-    try { if (redis) await redis.del(cacheKey.campaigns()) } catch {}
-    return NextResponse.json({ campaign: data }, { status: 201 })
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'Unknown error'
-    console.error('Campaigns POST error:', e)
-    return NextResponse.json({ error: msg }, { status: 500 })
+// POST /api/campaigns — Create a new campaign
+export async function POST(req: NextRequest) {
+  const session = await getCampaignSession(req)
+  if (!session) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  }
+
+  // Only brand_solutions and campaign_manager can create
+  if (session.role !== 'brand_solutions' && session.role !== 'campaign_manager') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const body = await req.json()
+  const {
+    name, brand, campaign_type, objective,
+    platform_mix, deliverable_types, budget,
+    start_date, go_live_date,
+  } = body
+
+  if (!name?.trim() || !brand?.trim()) {
+    return NextResponse.json({ error: 'Campaign name and brand are required' }, { status: 400 })
+  }
+
+  const client = getCPClient()
+
+  try {
+    const { data: campaign, error } = await client
+      .from('cp_campaigns')
+      .insert({
+        name: name.trim(),
+        brand: brand.trim(),
+        campaign_type: campaign_type || 'brand_awareness',
+        objective: objective || '',
+        platform_mix: platform_mix || [],
+        deliverable_types: deliverable_types || [],
+        budget: budget || 0,
+        start_date: start_date || new Date().toISOString().split('T')[0],
+        go_live_date: go_live_date || new Date().toISOString().split('T')[0],
+        status: 'draft',
+        created_by: session.id,
+        brief_last_edited_by: session.id,
+        brief_last_edited_at: new Date().toISOString(),
+      })
+      .select()
+      .single()
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Log activity
+    await client.from('cp_activity_feed').insert({
+      campaign_id: campaign.id,
+      actor_user_id: session.id,
+      actor_role: session.role,
+      actor_name: session.name,
+      action_type: 'created',
+      entity_type: 'campaign',
+      entity_id: campaign.id,
+      entity_name: campaign.name,
+      details: { brand: campaign.brand },
+    })
+
+    return NextResponse.json({ campaign }, { status: 201 })
+  } catch (err) {
+    console.error('Create campaign error:', err)
+    return NextResponse.json({ error: 'Failed to create campaign' }, { status: 500 })
   }
 }
