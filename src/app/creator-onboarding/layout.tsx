@@ -11,11 +11,5 @@ export default function CreatorOnboardingLayout({
 }: {
   children: React.ReactNode
 }) {
-  return (
-    <html lang="en">
-      <body className="antialiased">
-        {children}
-      </body>
-    </html>
-  )
+  return <>{children}</>
 }

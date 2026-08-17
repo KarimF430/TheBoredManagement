@@ -4,7 +4,24 @@ import { getCampaignSession, type CampaignSession } from '@/lib/cp-auth'
 const COOKIE_NAME = 'cp_session'
 
 // Routes that don't need authentication
-const PUBLIC_ROUTES = ['/login', '/client/login', '/client/accept', '/api/auth/login', '/api/auth/logout', '/api/client/accept-invite', '/api/setup-campaign']
+const PUBLIC_ROUTES = [
+  '/login',
+  '/client/login',
+  '/client/accept',
+  '/api/auth/login',
+  '/api/auth/logout',
+  '/api/client/accept-invite',
+  '/api/setup-campaign',
+  '/creator-onboarding',
+  '/api/creator-onboarding/session',
+  '/api/creator-onboarding/sessions',
+  '/api/creator-onboarding/otp',
+  '/api/creator-onboarding/niches',
+  '/api/creator-onboarding/prefill',
+  '/api/creator-onboarding/save-step',
+  '/api/creator-onboarding/complete',
+  '/api/creator-onboarding/verify-handle'
+]
 
 // Campaign panel internal routes (require internal role)
 const INTERNAL_PREFIXES = ['/campaigns', '/api/campaigns', '/admin', '/api/admin']
@@ -17,7 +34,11 @@ export async function middleware(req: NextRequest) {
 
   // Skip public routes
   if (PUBLIC_ROUTES.some(r => pathname === r || pathname.startsWith(r + '/'))) {
-    return NextResponse.next()
+    if (pathname === '/api/creator-onboarding/session' && req.method !== 'GET') {
+      // POST/DELETE session actions are admin-only, do not skip auth
+    } else {
+      return NextResponse.next()
+    }
   }
 
   // Skip static files and Next.js internals

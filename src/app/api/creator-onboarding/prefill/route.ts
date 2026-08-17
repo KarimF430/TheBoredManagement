@@ -26,7 +26,7 @@ Be conservative with confidence. Only set high confidence (>=0.7) if the bio/con
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { token, bio, recentTitles, recentCaptions } = body
+    const { token, handle, bio: inputBio, recentTitles: inputRecentTitles, recentCaptions: inputRecentCaptions } = body
 
     if (!token) {
       return NextResponse.json({ error: 'Token is required' }, { status: 400 })
@@ -36,6 +36,29 @@ export async function POST(req: NextRequest) {
     const session = await getOnboardingSession(token)
     if (!session || !session.otp_verified) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    let bio = inputBio
+    let recentTitles = inputRecentTitles
+    let recentCaptions = inputRecentCaptions
+
+    // If handle is provided but no context data is given, try fetching from YouTube API
+    if (handle && !bio && (!recentTitles || recentTitles.length === 0)) {
+      try {
+        const { fetchYouTubeChannel, fetchChannelVideos } = await import('@/lib/youtube-api')
+        const cleanHandle = handle.trim()
+        const channelUrl = `https://youtube.com/${cleanHandle.startsWith('@') ? cleanHandle : '@' + cleanHandle}`
+        
+        const channel = await fetchYouTubeChannel(channelUrl)
+        if (channel) {
+          bio = channel.description
+          const videos = await fetchChannelVideos(channel.id, 5)
+          recentTitles = videos.map((v) => v.title)
+          recentCaptions = videos.map((v) => v.description)
+        }
+      } catch (err) {
+        console.error('Failed to pre-fetch YouTube channel for prefill:', err)
+      }
     }
 
     // Build context string from available signals

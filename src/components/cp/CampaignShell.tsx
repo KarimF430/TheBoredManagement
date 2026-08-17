@@ -10,7 +10,7 @@ import { ModalProvider } from './ModalProvider'
 import KeyboardShortcuts from './KeyboardShortcuts'
 import QuickActions from './QuickActions'
 
-const PUBLIC_PATHS = ['/login', '/client/login', '/client/accept']
+const PUBLIC_PATHS = ['/login', '/client/login', '/client/accept', '/creator-onboarding']
 const CLIENT_PATHS = ['/client']
 
 export default function CampaignShell({ children }: { children: React.ReactNode }) {

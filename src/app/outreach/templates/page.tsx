@@ -287,11 +287,17 @@ function TemplateModal({ template, onClose, onSave }: { template: Template | nul
           <div>
             <label className="section-title">Subject *</label>
             <input className="input" required value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} placeholder="Email subject line" />
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+              <strong>Variables:</strong> <code style={{ background: 'var(--bg-elevated)', padding: '1px 4px', borderRadius: 3 }}>{'{{onboarding_link}}'}</code> — per-creator onboarding URL (auto-creates session if needed). The link will be resolved when the campaign sends emails.
+            </div>
           </div>
           <div>
             <label className="section-title">Body Text *</label>
             <textarea className="textarea" required rows={8} value={form.body_text} onChange={e => setForm({ ...form, body_text: e.target.value })} placeholder="Plain text email body..." />
             <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{form.body_text.length} characters · {form.body_text.split(/\s+/).filter(Boolean).length} words</div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
+              <strong>Variables:</strong> <code style={{ background: 'var(--bg-elevated)', padding: '1px 4px', borderRadius: 3 }}>{'{{onboarding_link}}'}</code> — per-creator onboarding URL (auto-creates session if needed). The link will be resolved when the campaign sends emails.
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button type="button" onClick={onClose} className="btn btn-ghost" style={{ flex: 1 }}>Cancel</button>

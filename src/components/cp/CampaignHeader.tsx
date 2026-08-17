@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { Search, LogOut, ChevronDown, Sun, Moon } from 'lucide-react'
-import { useTheme } from 'next-themes'
+import { useTheme } from '@/components/CustomThemeProvider'
 import CommandPalette from './CommandPalette'
 import NotificationsDropdown from './NotificationsDropdown'
 

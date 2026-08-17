@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Users, Plus, Search, Filter, Upload, ChevronDown, ExternalLink,
-  Video, Camera, Star, TrendingUp, Eye, ArrowUpDown, Loader2, X
+  Video, Camera, Star, TrendingUp, Eye, ArrowUpDown, Loader2, X,
+  ArrowUpFromLine
 } from 'lucide-react'
 import { formatNumber } from '@/components/cp/CampaignUI'
 
@@ -37,6 +38,7 @@ export default function CreatorDatabasePage() {
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [form, setForm] = useState({ name: '', email: '', phone: '', youtube_url: '', instagram_url: '', niche: [] as string[], subscribers: '', avg_views: '', avg_engagement: '', tier: 'micro', notes: '' })
   const [saving, setSaving] = useState(false)
+  const [bridging, setBridging] = useState(false)
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type }); setTimeout(() => setToast(null), 3000)
@@ -61,6 +63,24 @@ export default function CreatorDatabasePage() {
   }, [search, nicheFilter, tierFilter, sort, page])
 
   useEffect(() => { fetchCreators() }, [fetchCreators])
+
+  const handlePushToOutreach = async () => {
+    setBridging(true)
+    try {
+      const res = await fetch('/api/outreach/creators/bridge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: 'crm' }),
+      })
+      const data = await res.json()
+      if (data.error) showToast(data.error, 'error')
+      else showToast(`Pushed ${data.pushed} creators to Outreach (${data.skipped} already exist)`)
+    } catch {
+      showToast('Failed to push to outreach', 'error')
+    } finally {
+      setBridging(false)
+    }
+  }
 
   const handleAdd = async () => {
     if (!form.name.trim()) return
@@ -88,6 +108,10 @@ export default function CreatorDatabasePage() {
           <p className="page-subtitle">{total} creators in your pool</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={handlePushToOutreach} disabled={bridging} className="btn btn-ghost btn-sm">
+            {bridging ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <ArrowUpFromLine size={14} />}
+            Push to Outreach
+          </button>
           <button onClick={() => setShowImport(true)} className="btn btn-ghost btn-sm"><Upload size={14} /> Import</button>
           <button onClick={() => setShowAdd(true)} className="btn btn-blue btn-sm"><Plus size={14} /> Add Creator</button>
         </div>
@@ -218,9 +242,92 @@ export default function CreatorDatabasePage() {
         </div>
       )}
 
+      {/* Import CSV Modal */}
+      {showImport && (
+        <div className="drawer-overlay" onClick={() => setShowImport(false)}>
+          <div className="drawer-panel" onClick={e => e.stopPropagation()} style={{ animation: 'slideIn 0.2s ease', width: 480 }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h2 style={{ fontSize: 16, fontWeight: 700 }}>Import Creators from CSV</h2>
+              <button onClick={() => setShowImport(false)} className="btn-subtle"><X size={18} /></button>
+            </div>
+            <div style={{ flex: 1, overflow: 'auto', padding: 20 }}>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--blue)', marginBottom: 6 }}>Expected CSV Format</div>
+                <code style={{ fontSize: 10, color: 'var(--text-secondary)', fontFamily: 'JetBrains Mono, monospace', display: 'block', whiteSpace: 'pre', background: 'var(--bg-elevated)', padding: 10, borderRadius: 'var(--radius)' }}>
+{`name,email,youtube_url,instagram_url,subscribers,avg_views,avg_engagement,tier,niche,notes
+John,john@example.com,https://youtube.com/@john,,15000,5000,4.2,micro,"Technology;Gaming",Great fit
+Jane,jane@example.com,,,85000,20000,6.1,mid,"Beauty;Fashion",`}
+                </code>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6 }}>
+                  Required: <strong>email</strong> · Optional: name, youtube_url, instagram_url, subscribers, avg_views, avg_engagement, tier, niche (semicolon-separated), notes
+                </div>
+              </div>
+              <CSVImportHelper onSuccess={() => { setShowImport(false); fetchCreators(); showToast('Creators imported successfully'); }} onError={(msg) => showToast(msg, 'error')} />
+            </div>
+          </div>
+        </div>
+      )}
+
       {toast && (
         <div className={`toast toast--${toast.type}`}>{toast.msg}</div>
       )}
+    </div>
+  )
+}
+
+function CSVImportHelper({ onSuccess, onError }: { onSuccess: () => void; onError: (msg: string) => void }) {
+  const [file, setFile] = useState<File | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
+  const fileRef = useRef<HTMLInputElement | null>(null)
+
+  const handleImport = async () => {
+    if (!file) return
+    setImporting(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/creators/import-csv', { method: 'POST', body: formData })
+      const data = await res.json()
+      if (data.error) onError(data.error)
+      else onSuccess()
+    } catch {
+      onError('Failed to import CSV')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  return (
+    <div>
+      <div
+        onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={e => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files.length > 0) setFile(e.dataTransfer.files[0]) }}
+        onClick={() => fileRef.current?.click()}
+        style={{
+          border: `2px dashed ${dragOver ? 'var(--blue)' : 'var(--border-2)'}`,
+          borderRadius: 'var(--radius)',
+          padding: 32,
+          textAlign: 'center',
+          cursor: 'pointer',
+          background: dragOver ? 'var(--blue-dim)' : 'var(--bg-elevated)',
+          transition: 'all 0.15s ease',
+        }}
+      >
+        <Upload size={24} style={{ color: dragOver ? 'var(--blue)' : 'var(--text-muted)', marginBottom: 8 }} />
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-bright)' }}>
+          {file ? file.name : 'Drop CSV file here or click to browse'}
+        </div>
+        {file && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>{(file.size / 1024).toFixed(1)} KB</div>}
+        <input ref={fileRef as any} type="file" accept=".csv" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) setFile(e.target.files[0]) }} />
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+        <button onClick={() => setFile(null)} className="btn btn-ghost btn-sm" style={{ flex: 1 }} disabled={!file}>Clear</button>
+        <button onClick={handleImport} disabled={!file || importing} className="btn btn-blue btn-sm" style={{ flex: 1, opacity: !file || importing ? 0.5 : 1 }}>
+          {importing ? 'Importing...' : 'Import'}
+        </button>
+      </div>
     </div>
   )
 }

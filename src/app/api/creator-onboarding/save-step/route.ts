@@ -66,6 +66,14 @@ export async function POST(req: NextRequest) {
     // ── Map step data to draft fields ────────────────────────
     const stepUpdates = mapStepToDraft(step, sanitizedData)
 
+    // Merge step_data to prevent overwriting keys from previous steps
+    if (stepUpdates.step_data) {
+      stepUpdates.step_data = {
+        ...(draft.step_data || {}),
+        ...stepUpdates.step_data
+      }
+    }
+
     // ── Update draft ─────────────────────────────────────────
     await updateDraft(session.id, stepUpdates as any)
 
@@ -187,68 +195,68 @@ function sanitizeObject(obj: Record<string, unknown>): Record<string, unknown> {
 
 function mapStepToDraft(step: number, data: Record<string, unknown>) {
   switch (step) {
-    case 1:
+    case 1: { // Identity Screen
+      const rawHandle = (data.handle as string) || ''
+      const cleanHandle = rawHandle.replace('@', '').trim()
       return {
         name: data.name,
-        phone: data.phone,
-        whatsapp: data.whatsapp,
-        location: data.location,
-        city: data.city,
-        state: data.state,
-        gender: data.gender,
-        age_range: data.age_range,
-        languages: data.languages,
+        youtube_handle: cleanHandle,
+        instagram_handle: cleanHandle,
+        step_data: {
+          consent: data.consent,
+          handle: rawHandle,
+          identity_completed_at: new Date().toISOString()
+        }
       }
-    case 2:
+    }
+    case 2: // Niche Screen
       return {
         primary_niche: data.primary_niche,
         secondary_niches: data.secondary_niches,
         sub_niches: data.sub_niches,
         content_types: data.content_types,
       }
-    case 3:
+    case 3: // Behavioral Screen (UI step 3)
       return {
-        youtube_url: data.youtube_url,
-        youtube_handle: data.youtube_handle,
-        youtube_subscribers: data.youtube_subscribers,
-        instagram_url: data.instagram_url,
-        instagram_handle: data.instagram_handle,
-        instagram_followers: data.instagram_followers,
-        tiktok_url: data.tiktok_url,
-        tiktok_followers: data.tiktok_followers,
-        twitter_url: data.twitter_url,
-        twitter_handle: data.twitter_handle,
-        twitter_followers: data.twitter_followers,
-        other_social: data.other_social,
+        content_frequency: data.posts_per_week,
+        age_range: data.audience_age,
+        languages: data.content_language ? [data.content_language as string] : [],
+        step_data: {
+          has_brand_deals: data.has_brand_deals,
+          monetization: data.monetization,
+        }
       }
-    case 4:
-      return {
-        avg_views: data.avg_views,
-        avg_engagement: data.avg_engagement,
-        avg_likes: data.avg_likes,
-        avg_comments: data.avg_comments,
-        total_videos: data.total_videos,
-        total_views: data.total_views,
-        audience_age_distribution: data.audience_age_distribution,
-        audience_gender_distribution: data.audience_gender_distribution,
-        audience_location_distribution: data.audience_location_distribution,
-      }
-    case 5:
+    case 4: // Cluster Screen (UI step 4)
       return {
         content_style: data.content_style,
-        brand_collab_preferences: data.brand_collab_preferences,
-        content_frequency: data.content_frequency,
         preferred_platforms: data.preferred_platforms,
-        past_brand_collabs: data.past_brand_collabs,
-        portfolio_url: data.portfolio_url,
       }
-    case 6:
+    case 5: // Willingness Screen (UI step 5)
       return {
-        rate_card: data.rate_card,
-        currency: data.currency,
-        negotiable: data.negotiable,
-        min_rate: data.min_rate,
+        step_data: {
+          wants_paid: data.wants_paid,
+          open_to_long_term: data.open_to_long_term,
+          open_exclusivity: data.open_exclusivity,
+          wants_gifting: data.wants_gifting,
+        }
       }
+    case 6: { // Rates Screen (UI step 6)
+      const rateCard = {
+        youtube_long: data.rate_youtube_long || 0,
+        youtube_shorts: data.rate_youtube_shorts || 0,
+        instagram_reel: data.rate_instagram_reel || 0,
+        instagram_post: data.rate_instagram_post || 0,
+      }
+      return {
+        rate_card: rateCard,
+        currency: data.currency || 'INR',
+        negotiable: data.negotiable !== false,
+        min_rate: data.min_rate || null,
+        step_data: {
+          rates_deferred: data.rates_deferred
+        }
+      }
+    }
     default:
       return {}
   }

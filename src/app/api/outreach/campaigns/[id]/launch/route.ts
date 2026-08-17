@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { outreachSelect, outreachUpdate } from '@/lib/outreach/db'
+import { outreachSelect, outreachUpdate, getOutreachClient } from '@/lib/outreach/db'
 import { enqueueRecipients } from '@/lib/outreach/queue/enqueue'
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -17,8 +17,23 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
     const campaign = campaigns[0]
 
-    if (campaign.status === 'sending' || campaign.status === 'completed') {
-      return NextResponse.json({ error: `Campaign is already ${campaign.status}` }, { status: 400 })
+    if (campaign.status === 'sending') {
+      return NextResponse.json({ error: 'Campaign is already sending' }, { status: 400 })
+    }
+
+    if (campaign.status === 'completed') {
+      return NextResponse.json({ error: 'Campaign is already completed' }, { status: 400 })
+    }
+
+    // For paused campaigns, reset queued items back to queued so they can be re-sent
+    const isResume = campaign.status === 'paused'
+    if (isResume) {
+      const client = getOutreachClient()
+      await client
+        .from('outreach_send_queue')
+        .update({ status: 'queued', claimed_at: null, claimed_by: null, mailbox_id: null })
+        .eq('campaign_id', id)
+        .in('status', ['claimed', 'sending'])
     }
 
     if (!campaign.template_id) {
@@ -62,10 +77,23 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       body_text: template.body_text,
       body_html: template.body_html || null,
       priority: 100000,
+      campaign_id: id,
     }))
 
-    // Enqueue
-    const result = await enqueueRecipients(recipients)
+    // Enqueue — skip for resume since items are already in queue
+    let result = { queued: 0, skipped: 0, invalid: 0, suppressed: 0 }
+    if (isResume) {
+      // Count remaining queued items
+      const client = getOutreachClient()
+      const { count } = await client
+        .from('outreach_send_queue')
+        .select('*', { count: 'exact', head: true })
+        .eq('campaign_id', id)
+        .eq('status', 'queued')
+      result = { queued: count || 0, skipped: 0, invalid: 0, suppressed: 0 }
+    } else {
+      result = await enqueueRecipients(recipients)
+    }
 
     // Update campaign status
     await outreachUpdate('outreach_campaigns', 'id', id, {

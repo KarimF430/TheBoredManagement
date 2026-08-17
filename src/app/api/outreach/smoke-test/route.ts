@@ -151,7 +151,7 @@ const checkSuppressions = {
     const testEmail = `_smoke_test_${Date.now()}@test.com`
     await outreachInsert('outreach_suppressions', {
       email: testEmail,
-      reason: 'smoke_test',
+      reason: 'manual',
       source: 'smoke_test',
     })
     const count = await outreachCount('outreach_suppressions', { email: testEmail })

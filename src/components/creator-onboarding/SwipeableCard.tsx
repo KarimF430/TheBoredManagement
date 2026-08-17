@@ -67,25 +67,25 @@ export default function SwipeableCard({
             {canGoBack && onBack && (
               <button
                 onClick={onBack}
-                className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="p-1.5 rounded-lg hover:bg-slate-800/60 text-slate-400 hover:text-slate-200 transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
             )}
             <div>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">{title}</h2>
+              <h2 className="text-lg font-bold text-slate-100">{title}</h2>
               {subtitle && (
-                <p className="text-xs text-gray-500 dark:text-gray-400">{subtitle}</p>
+                <p className="text-xs text-slate-400">{subtitle}</p>
               )}
             </div>
           </div>
-          <div className="text-xs font-medium text-gray-400">
+          <div className="text-xs font-medium text-slate-500">
             {step} / {totalSteps}
           </div>
         </div>
 
         {/* Progress Bar */}
-        <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+        <div className="h-1.5 bg-slate-850 rounded-full overflow-hidden">
           <motion.div
             className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full"
             initial={{ width: 0 }}
@@ -99,7 +99,7 @@ export default function SwipeableCard({
       <AnimatePresence mode="wait">
         <motion.div
           ref={cardRef}
-          className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800 overflow-hidden"
+          className="relative bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 rounded-2xl overflow-hidden"
           style={{ x, rotate, opacity }}
           drag={disableSwipe ? false : 'x'}
           dragConstraints={{ left: 0, right: 0 }}
@@ -123,7 +123,7 @@ export default function SwipeableCard({
                 NEXT →
               </motion.div>
               <motion.div
-                className="absolute top-4 left-4 z-10 bg-gray-500 text-white px-3 py-1.5 rounded-lg font-bold text-sm shadow-lg"
+                className="absolute top-4 left-4 z-10 bg-slate-500 text-white px-3 py-1.5 rounded-lg font-bold text-sm shadow-lg"
                 style={{
                   opacity: useTransform(x, [-100, 0], [1, 0]),
                 }}
@@ -134,7 +134,7 @@ export default function SwipeableCard({
           )}
 
           {/* Card Content */}
-          <div className="p-6">{children}</div>
+          <div className="p-6 text-slate-100">{children}</div>
 
           {/* Card Footer */}
           <div className="px-6 pb-6">
@@ -142,19 +142,19 @@ export default function SwipeableCard({
               {!disableSwipe && onSwipeLeft && (
                 <button
                   onClick={onSwipeLeft}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all font-medium text-sm"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-slate-800 bg-slate-950/60 text-slate-400 hover:bg-slate-900/60 hover:text-slate-200 transition-all font-medium text-sm"
                 >
                   <ChevronLeft className="w-4 h-4" />
                   Skip
                   {isOptional && (
-                    <span className="text-xs text-gray-400">(Optional)</span>
+                    <span className="text-xs text-slate-500">(Optional)</span>
                   )}
                 </button>
               )}
               {onConfirm && (
                 <button
                   onClick={onConfirm}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:from-blue-600 hover:to-indigo-600 transition-all font-medium text-sm shadow-lg shadow-blue-500/25"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:from-blue-600 hover:to-indigo-600 transition-all font-medium text-sm shadow-lg shadow-blue-500/15"
                 >
                   <Check className="w-4 h-4" />
                   Continue
@@ -163,7 +163,7 @@ export default function SwipeableCard({
               {!disableSwipe && onSwipeRight && (
                 <button
                   onClick={onSwipeRight}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:from-blue-600 hover:to-indigo-600 transition-all font-medium text-sm shadow-lg shadow-blue-500/25"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:from-blue-600 hover:to-indigo-600 transition-all font-medium text-sm shadow-lg shadow-blue-500/15"
                 >
                   Continue
                   <ChevronRight className="w-4 h-4" />
@@ -176,11 +176,11 @@ export default function SwipeableCard({
 
       {/* Swipe Hint */}
       {!disableSwipe && (
-        <div className="mt-4 flex items-center justify-center gap-4 text-xs text-gray-400">
+        <div className="mt-4 flex items-center justify-center gap-4 text-xs text-slate-500">
           <span className="flex items-center gap-1">
             <ChevronLeft className="w-3 h-3" /> Swipe left to skip
           </span>
-          <span className="w-1 h-1 rounded-full bg-gray-300" />
+          <span className="w-1 h-1 rounded-full bg-slate-850" />
           <span className="flex items-center gap-1">
             Swipe right to continue <ChevronRight className="w-3 h-3" />
           </span>

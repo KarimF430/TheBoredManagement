@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createOnboardingSession, getOnboardingSession } from '@/lib/creator-onboarding'
+import { createOnboardingSession, getOnboardingSession, updateOnboardingSession } from '@/lib/creator-onboarding'
 
 export async function POST(req: NextRequest) {
   try {
@@ -32,6 +32,32 @@ export async function POST(req: NextRequest) {
   }
 }
 
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get('id')
+    const token = searchParams.get('token')
+
+    if (!id && !token) {
+      return NextResponse.json({ error: 'Session id or token is required' }, { status: 400 })
+    }
+
+    const client = (await import('@/lib/cp-db')).getCPClient()
+    const filter = id ? { column: 'id', value: id } : { column: 'token', value: token }
+
+    const { error } = await client
+      .from('creator_onboarding_sessions')
+      .delete()
+      .eq(filter.column, filter.value)
+
+    if (error) throw new Error(`Failed to delete session: ${error.message}`)
+    return NextResponse.json({ ok: true })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Internal server error'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
@@ -51,7 +77,18 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Link has expired' }, { status: 410 })
     }
 
-    return NextResponse.json({ session })
+    // Auto-verify OTP and set started_at if not already verified
+    let updatedSession = session
+    if (!session.otp_verified || !session.started_at) {
+      const updates: any = {}
+      if (!session.otp_verified) updates.otp_verified = true
+      if (!session.started_at) updates.started_at = new Date().toISOString()
+      if (session.status === 'pending') updates.status = 'in_progress'
+
+      updatedSession = await updateOnboardingSession(session.id, updates)
+    }
+
+    return NextResponse.json({ session: updatedSession })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal server error'
     return NextResponse.json({ error: message }, { status: 500 })

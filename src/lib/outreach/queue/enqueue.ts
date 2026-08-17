@@ -19,6 +19,7 @@ interface EnqueueItem {
   body_text: string
   body_html?: string | null
   priority?: number
+  campaign_id?: string | null
 }
 
 interface EnqueueResult {
@@ -83,6 +84,7 @@ export async function enqueueRecipients(
         priority,
         status: 'queued',
         scheduled_for: new Date().toISOString(),
+        campaign_id: item.campaign_id || null,
       })
 
       queued++

@@ -17,27 +17,27 @@ export default function RateChip({ label, value, onChange, icon, deferred = fals
       className={`
         p-3 rounded-xl border transition-all
         ${value > 0
-          ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20'
+          ? 'border-green-800 bg-green-950/20'
           : deferred
-          ? 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/10'
-          : 'border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900'
+          ? 'border-amber-800/80 bg-amber-950/10'
+          : 'border-slate-800 bg-slate-950/40'
         }
       `}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
     >
       <div className="flex items-center gap-2 mb-2">
-        {icon || <DollarSign className="w-4 h-4 text-gray-400" />}
-        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{label}</span>
+        {icon || <DollarSign className="w-4 h-4 text-slate-500" />}
+        <span className="text-sm font-medium text-slate-300">{label}</span>
       </div>
       <div className="flex items-center gap-2">
-        <span className="text-sm text-gray-400">₹</span>
+        <span className="text-sm text-slate-500">₹</span>
         <input
           type="number"
           value={value || ''}
           onChange={(e) => onChange(parseInt(e.target.value) || 0)}
           placeholder="0"
-          className="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 tabular-nums"
+          className="flex-1 px-3 py-2 bg-slate-950 border border-slate-800/80 text-slate-100 placeholder-slate-700 rounded-lg text-sm focus:outline-none focus:border-green-500 transition-all tabular-nums"
         />
       </div>
     </motion.div>

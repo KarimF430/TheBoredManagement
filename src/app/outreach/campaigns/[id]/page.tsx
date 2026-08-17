@@ -163,6 +163,12 @@ export default function CampaignDetailPage() {
               <Pause size={13} /> Pause
             </button>
           )}
+          {campaign.status === 'paused' && (
+            <button onClick={handleLaunch} disabled={launching} className="btn btn-green btn-sm">
+              {launching ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={13} />}
+              {launching ? 'Resuming...' : 'Resume Campaign'}
+            </button>
+          )}
           <button onClick={loadCampaign} className="btn btn-ghost btn-sm" title="Refresh">
             <RefreshCw size={13} />
           </button>

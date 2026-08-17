@@ -5,7 +5,8 @@ import Link from 'next/link'
 import {
   Upload, Plus, Search, Trash2, Edit3, FileText,
   CheckCircle, XCircle, AlertCircle, Loader2, Download,
-  Filter, RefreshCw, Mail, Globe, Shield, Zap, Rocket
+  Filter, RefreshCw, Mail, Globe, Shield, Zap, Rocket,
+  ArrowDownToLine, Database
 } from 'lucide-react'
 import { StatusBadge, Toast, EmptyState, ErrorState, KPISkeleton } from '@/components/cp/CampaignUI'
 
@@ -33,6 +34,7 @@ export default function OutreachCreatorsPage() {
   const [showLaunchModal, setShowLaunchModal] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [page, setPage] = useState(1)
+  const [bridging, setBridging] = useState(false)
   const pageSize = 25
 
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -108,6 +110,27 @@ export default function OutreachCreatorsPage() {
     }
   }
 
+  const handleBridge = async (src: 'scraper' | 'crm' | 'both') => {
+    setBridging(true)
+    try {
+      const res = await fetch('/api/outreach/creators/bridge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: src }),
+      })
+      const data = await res.json()
+      if (data.error) showToast(data.error, 'error')
+      else {
+        showToast(`Pushed ${data.pushed} creators from ${src} (${data.skipped} skipped, ${data.errors} errors)`)
+        loadCreators()
+      }
+    } catch {
+      showToast('Failed to bridge creators', 'error')
+    } finally {
+      setBridging(false)
+    }
+  }
+
   const handleDeleteSelected = async () => {
     if (selectedIds.size === 0) return
     try {
@@ -150,6 +173,10 @@ export default function OutreachCreatorsPage() {
           <p className="page-subtitle">{creators.length} total · {filtered.length} showing</p>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={() => handleBridge('both')} disabled={bridging} className="btn btn-ghost btn-sm" title="Pull creators from Scraper and CRM databases">
+            {bridging ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <ArrowDownToLine size={13} />}
+            Push from DB
+          </button>
           <button onClick={() => setShowImportModal(true)} className="btn btn-ghost btn-sm">
             <Upload size={13} /> Import CSV
           </button>

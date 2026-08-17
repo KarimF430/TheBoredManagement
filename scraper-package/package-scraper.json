@@ -1,0 +1,17 @@
+{
+  "name": "instagram-scraper-robust",
+  "version": "1.0.0",
+  "description": "Robust Instagram scraper using Puppeteer with session persistence",
+  "main": "scraper-robust.js",
+  "scripts": {
+    "start": "node scraper-robust.js",
+    "test": "node test-session.js"
+  },
+  "dependencies": {
+    "puppeteer": "^22.0.0",
+    "@supabase/supabase-js": "^2.39.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "user-agents": "^1.1.0"
+  }
+}

@@ -5,7 +5,8 @@ import Link from 'next/link'
 import {
   Plus, Search, Trash2, Play, Pause, CheckCircle,
   XCircle, AlertCircle, Loader2, Mail, Send, Clock,
-  Eye, BarChart3, Rocket, ArrowUpRight, Filter
+  Eye, BarChart3, Rocket, ArrowUpRight, Filter,
+  RefreshCw
 } from 'lucide-react'
 import { StatusBadge, Toast, EmptyState, ErrorState, KPISkeleton } from '@/components/cp/CampaignUI'
 
@@ -89,6 +90,20 @@ export default function OutreachCampaignsPage() {
       loadCampaigns()
     } catch {
       showToast('Failed to pause', 'error')
+    }
+  }
+
+  const handleResume = async (campaign: Campaign) => {
+    try {
+      const res = await fetch(`/api/outreach/campaigns/${campaign.id}/launch`, { method: 'POST' })
+      const data = await res.json()
+      if (data.error) showToast(data.error, 'error')
+      else {
+        showToast(`Resumed! ${data.enqueue.queued} items queued`)
+        loadCampaigns()
+      }
+    } catch {
+      showToast('Failed to resume', 'error')
     }
   }
 
@@ -264,6 +279,11 @@ export default function OutreachCampaignsPage() {
                         {c.status === 'sending' && (
                           <button onClick={() => handlePause(c)} className="btn-subtle btn-xs" title="Pause">
                             <Pause size={11} style={{ color: 'var(--orange)' }} />
+                          </button>
+                        )}
+                        {c.status === 'paused' && (
+                          <button onClick={() => handleResume(c)} className="btn-subtle btn-xs" title="Resume">
+                            <RefreshCw size={11} style={{ color: 'var(--green)' }} />
                           </button>
                         )}
                         {c.status === 'draft' && (

@@ -8,6 +8,7 @@ import { outreachSelect, outreachInsert, outreachUpdate, outreachUpdateWhere, ou
 import { sendGmail } from '../lib/outreach/senders/gmailSender'
 import { sendSES } from '../lib/outreach/senders/sesSender'
 import { outreachConfig } from '../lib/outreach/config'
+import { resolveTemplatePlaceholders } from '../lib/outreach/templateResolver'
 
 const workerId = `worker-${process.pid}-${Date.now()}`
 
@@ -151,22 +152,31 @@ async function markSending(queueId: string, mailboxId: string): Promise<void> {
 }
 
 async function dispatchSend(item: any, mailbox: any): Promise<any> {
+  // Resolve template placeholders (e.g. {{onboarding_link}})
+  const resolved = await resolveTemplatePlaceholders(
+    item.subject,
+    item.body_text,
+    item.body_html,
+    item.creator_id || null,
+    item.recipient_email,
+  )
+
   if (mailbox.provider === 'gmail') {
     return await sendGmail(
       { id: mailbox.id, email: mailbox.email, display_name: mailbox.display_name, oauth_token_ref: mailbox.oauth_token_ref },
       item.recipient_email,
-      item.subject,
-      item.body_text,
-      item.body_html,
+      resolved.subject,
+      resolved.body_text,
+      resolved.body_html,
       item.id
     )
   } else {
     return await sendSES(
       { id: mailbox.id, email: mailbox.email, display_name: mailbox.display_name },
       item.recipient_email,
-      item.subject,
-      item.body_text,
-      item.body_html,
+      resolved.subject,
+      resolved.body_text,
+      resolved.body_html,
       item.id
     )
   }

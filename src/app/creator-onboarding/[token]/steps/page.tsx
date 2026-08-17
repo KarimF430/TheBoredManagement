@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, useParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Loader2, X, ChevronLeft, Sparkles, Zap, Hand, DollarSign, Shield } from 'lucide-react'
 import AutoAdvanceButton from '@/components/creator-onboarding/AutoAdvanceButton'
@@ -107,7 +107,8 @@ const WILLINGNESS_QUESTIONS = [
 export default function OnboardingStepsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const token = searchParams.get('token')
+  const params = useParams()
+  const token = (params?.token as string) || searchParams.get('token')
 
   const [session, setSession] = useState<Session | null>(null)
   const [currentScreen, setCurrentScreen] = useState(0)
@@ -323,120 +324,129 @@ export default function OnboardingStepsPage() {
   const completeness = computeCompleteness()
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 p-4">
-      <div className="max-w-lg mx-auto py-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={handleSaveAndQuit}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            title="Save & quit"
-          >
-            <X className="w-5 h-5 text-gray-400" />
-          </button>
-          <div className="flex items-center gap-1.5 text-xs font-medium text-gray-400">
-            {SCREENS.map((s, i) => (
-              <div
-                key={s.id}
-                className={`w-2 h-2 rounded-full transition-all ${
-                  i < currentScreen ? 'bg-green-500' : i === currentScreen ? 'bg-blue-500 scale-125' : 'bg-gray-200 dark:bg-gray-700'
-                }`}
-              />
-            ))}
+    <div data-theme="dark" className="relative min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4 overflow-x-hidden select-none">
+      {/* Premium glowing backdrops */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] bg-blue-500/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-1/4 left-1/2 -translate-x-1/2 translate-y-1/2 w-[350px] h-[350px] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
+
+      {/* Decorative background grid */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.1),rgba(255,255,255,0))] pointer-events-none" />
+
+      <div className="max-w-lg w-full py-8 relative z-10 flex flex-col justify-center">
+        <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 rounded-3xl p-8 shadow-2xl">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <button
+              onClick={handleSaveAndQuit}
+              className="p-2 rounded-lg hover:bg-slate-800/60 transition-colors"
+              title="Save & quit"
+            >
+              <X className="w-5 h-5 text-slate-500 hover:text-slate-300" />
+            </button>
+            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+              {SCREENS.map((s, i) => (
+                <div
+                  key={s.id}
+                  className={`w-2 h-2 rounded-full transition-all ${
+                    i < currentScreen ? 'bg-emerald-500' : i === currentScreen ? 'bg-blue-500 scale-125' : 'bg-slate-800'
+                  }`}
+                />
+              ))}
+            </div>
+            <span className="text-xs font-medium text-slate-500 tabular-nums">
+              {currentScreen + 1}/{SCREENS.length}
+            </span>
           </div>
-          <span className="text-xs font-medium text-gray-400 tabular-nums">
-            {currentScreen + 1}/{SCREENS.length}
-          </span>
+
+          {/* Progress Cue */}
+          <ProgressCue completeness={completeness} />
+
+          {/* Back button */}
+          {currentScreen > 0 && (
+            <button
+              onClick={goBack}
+              className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 mb-4 transition-colors"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              Back
+            </button>
+          )}
+
+          {/* Saving indicator */}
+          {saving && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-4 flex items-center justify-center gap-2 text-xs text-slate-500"
+            >
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Saving...
+            </motion.div>
+          )}
+
+          {/* Screen Content */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentScreen}
+              initial={{ opacity: 0, x: 15 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -15 }}
+              transition={{ duration: 0.2 }}
+            >
+              {currentScreen === 0 && (
+                <IdentityScreen
+                  formData={formData}
+                  onUpdate={updateField}
+                  onConfirm={() => advanceScreen(0)}
+                />
+              )}
+              {currentScreen === 1 && (
+                <NicheScreen
+                  niches={niches}
+                  formData={formData}
+                  confidence={nicheConfidence}
+                  onUpdate={updateField}
+                  onConfirm={() => advanceScreen(1)}
+                />
+              )}
+              {currentScreen === 2 && (
+                <BehavioralScreen
+                  formData={formData}
+                  onUpdate={updateField}
+                  onConfirm={() => advanceScreen(2)}
+                />
+              )}
+              {currentScreen === 3 && (
+                <ClusterScreen
+                  formData={formData}
+                  onUpdate={updateField}
+                  onConfirm={() => advanceScreen(3)}
+                />
+              )}
+              {currentScreen === 4 && (
+                <WillingnessScreen
+                  formData={formData}
+                  onUpdate={updateField}
+                  questionIdx={willingnessIdx}
+                  onNextQuestion={() => {
+                    if (willingnessIdx < WILLINGNESS_QUESTIONS.length - 1) {
+                      setWillingnessIdx(willingnessIdx + 1)
+                    } else {
+                      advanceScreen(4)
+                    }
+                  }}
+                />
+              )}
+              {currentScreen === 5 && (
+                <RateScreen
+                  formData={formData}
+                  onUpdate={updateField}
+                  onConfirm={() => advanceScreen(5)}
+                />
+              )}
+            </motion.div>
+          </AnimatePresence>
         </div>
-
-        {/* Progress Cue */}
-        <ProgressCue completeness={completeness} />
-
-        {/* Back button */}
-        {currentScreen > 0 && (
-          <button
-            onClick={goBack}
-            className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 mb-3 transition-colors"
-          >
-            <ChevronLeft className="w-3 h-3" />
-            Back
-          </button>
-        )}
-
-        {/* Saving indicator */}
-        {saving && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-3 flex items-center justify-center gap-2 text-xs text-gray-400"
-          >
-            <Loader2 className="w-3 h-3 animate-spin" />
-            Saving...
-          </motion.div>
-        )}
-
-        {/* Screen Content */}
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentScreen}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.25 }}
-          >
-            {currentScreen === 0 && (
-              <IdentityScreen
-                formData={formData}
-                onUpdate={updateField}
-                onConfirm={() => advanceScreen(0)}
-              />
-            )}
-            {currentScreen === 1 && (
-              <NicheScreen
-                niches={niches}
-                formData={formData}
-                confidence={nicheConfidence}
-                onUpdate={updateField}
-                onConfirm={() => advanceScreen(1)}
-              />
-            )}
-            {currentScreen === 2 && (
-              <BehavioralScreen
-                formData={formData}
-                onUpdate={updateField}
-                onConfirm={() => advanceScreen(2)}
-              />
-            )}
-            {currentScreen === 3 && (
-              <ClusterScreen
-                formData={formData}
-                onUpdate={updateField}
-                onConfirm={() => advanceScreen(3)}
-              />
-            )}
-            {currentScreen === 4 && (
-              <WillingnessScreen
-                formData={formData}
-                onUpdate={updateField}
-                questionIdx={willingnessIdx}
-                onNextQuestion={() => {
-                  if (willingnessIdx < WILLINGNESS_QUESTIONS.length - 1) {
-                    setWillingnessIdx(willingnessIdx + 1)
-                  } else {
-                    advanceScreen(4)
-                  }
-                }}
-              />
-            )}
-            {currentScreen === 5 && (
-              <RateScreen
-                formData={formData}
-                onUpdate={updateField}
-                onConfirm={() => advanceScreen(5)}
-              />
-            )}
-          </motion.div>
-        </AnimatePresence>
       </div>
     </div>
   )
@@ -456,25 +466,25 @@ function IdentityScreen({
   const canProceed = formData.consent && formData.name.trim().length > 0 && formData.handle.trim().length > 0
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Let&apos;s get started</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        <h2 className="text-xl font-bold text-slate-100">Let&apos;s get started</h2>
+        <p className="text-sm text-slate-400 mt-1">
           We need a few basics to set up your profile
         </p>
       </div>
 
       {/* Consent */}
-      <label className="flex items-start gap-3 p-4 rounded-xl border border-gray-100 dark:border-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+      <label className="flex items-start gap-3 p-4 rounded-xl border border-slate-800 bg-slate-900/20 cursor-pointer hover:bg-slate-800/40 transition-colors">
         <input
           type="checkbox"
           checked={formData.consent}
           onChange={(e) => onUpdate('consent', e.target.checked)}
-          className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+          className="mt-0.5 w-4 h-4 rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-blue-500"
         />
         <div>
-          <div className="text-sm font-medium text-gray-900 dark:text-white">I agree to share my creator info</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+          <div className="text-sm font-semibold text-slate-200">I agree to share my creator info</div>
+          <div className="text-xs text-slate-400 mt-1">
             This helps brands find and partner with you. You can opt out anytime.
           </div>
         </div>
@@ -482,7 +492,7 @@ function IdentityScreen({
 
       {/* Name */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
           Your name
         </label>
         <input
@@ -490,13 +500,13 @@ function IdentityScreen({
           value={formData.name}
           onChange={(e) => onUpdate('name', e.target.value)}
           placeholder="e.g. Priya Sharma"
-          className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-4 py-3.5 bg-slate-950/60 border border-slate-800/80 rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
         />
       </div>
 
       {/* Handle */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
           Instagram / YouTube handle
         </label>
         <input
@@ -504,7 +514,7 @@ function IdentityScreen({
           value={formData.handle}
           onChange={(e) => onUpdate('handle', e.target.value)}
           placeholder="@yourhandle"
-          className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-4 py-3.5 bg-slate-950/60 border border-slate-800/80 rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
         />
       </div>
 
@@ -516,7 +526,7 @@ function IdentityScreen({
           w-full py-3.5 rounded-xl font-semibold text-sm transition-all
           ${canProceed
             ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/25'
-            : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
+            : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-800/50'
           }
         `}
         whileTap={canProceed ? { scale: 0.98 } : {}}
@@ -543,10 +553,10 @@ function NicheScreen({
   const hasConfirmed = !!formData.primary_niche
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Your niche</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        <h2 className="text-xl font-bold text-slate-100">Your niche</h2>
+        <p className="text-sm text-slate-400 mt-1">
           {confidence >= 0.7 && !hasConfirmed
             ? `We think you create ${formData.primary_niche || 'content'} — does that look right?`
             : 'Pick the category that best describes your content'
@@ -559,26 +569,26 @@ function NicheScreen({
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800"
+          className="p-4 bg-blue-900/20 rounded-2xl border border-blue-800/80"
         >
           <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="w-4 h-4 text-blue-500" />
-            <span className="text-xs font-medium text-blue-600 dark:text-blue-400">AI detected</span>
+            <Sparkles className="w-4 h-4 text-blue-400" />
+            <span className="text-xs font-semibold text-blue-400 uppercase tracking-wider">AI pre-fill detected</span>
           </div>
-          <div className="text-lg font-bold text-gray-900 dark:text-white mb-3">
+          <div className="text-lg font-bold text-slate-100 mb-3">
             {formData.primary_niche}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-3 mt-4">
             <motion.button
               onClick={onConfirm}
-              className="flex-1 py-2.5 rounded-xl bg-blue-500 text-white font-semibold text-sm hover:bg-blue-600 transition-colors"
+              className="flex-1 py-3 rounded-xl bg-blue-500 text-white font-semibold text-sm hover:bg-blue-600 transition-colors shadow-lg shadow-blue-500/20"
               whileTap={{ scale: 0.98 }}
             >
               Looks right
             </motion.button>
             <motion.button
               onClick={() => onUpdate('primary_niche', null)}
-              className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 font-semibold text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              className="flex-1 py-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 font-semibold text-sm hover:bg-slate-900 transition-colors"
               whileTap={{ scale: 0.98 }}
             >
               Let me choose
@@ -587,7 +597,7 @@ function NicheScreen({
         </motion.div>
       )}
 
-      {/* Full niche grid (fallback or after "let me choose") */}
+      {/* Full niche grid */}
       {(!formData.primary_niche || confidence < 0.7) && (
         <NicheSelector
           niches={niches.map((n) => ({ name: n.niche_name, icon: n.icon, sub_niches: n.sub_niches, content_types: n.content_types }))}
@@ -642,18 +652,18 @@ function BehavioralScreen({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Quick questions</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        <h2 className="text-xl font-bold text-slate-100">Quick questions</h2>
+        <p className="text-sm text-slate-400 mt-1">
           Tap your answer — we&apos;ll move you along
         </p>
-        <div className="flex items-center gap-1.5 mt-2">
+        <div className="flex items-center gap-1.5 mt-3">
           {BEHAVIORAL_QUESTIONS.map((_, i) => (
             <div
               key={i}
               className={`h-1 flex-1 rounded-full transition-all ${
-                i < step ? 'bg-green-500' : i === step ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'
+                i < step ? 'bg-emerald-500' : i === step ? 'bg-blue-500' : 'bg-slate-800'
               }`}
             />
           ))}
@@ -668,10 +678,10 @@ function BehavioralScreen({
           exit={{ opacity: 0, x: -15 }}
           transition={{ duration: 0.2 }}
         >
-          <p className="text-base font-semibold text-gray-900 dark:text-white mb-4">
+          <p className="text-base font-semibold text-slate-200 mb-4">
             {q.question}
           </p>
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             {q.options.map((opt) => (
               <AutoAdvanceButton
                 key={opt.value}
@@ -701,16 +711,16 @@ function ClusterScreen({
   const platforms = ['YouTube', 'Instagram', 'TikTok', 'Twitter']
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Content details</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Optional — helps match you with the right brands
+        <h2 className="text-xl font-bold text-slate-100">Content details</h2>
+        <p className="text-sm text-slate-400 mt-1">
+          Optional — helps match you with the right campaigns
         </p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2.5">
           Content style
         </label>
         <div className="flex flex-wrap gap-2">
@@ -723,10 +733,10 @@ function ClusterScreen({
                   : [...formData.content_style, style]
                 onUpdate('content_style', styles)
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 formData.content_style.includes(style)
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                  ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20'
+                  : 'bg-slate-950/60 text-slate-400 border border-slate-800/80 hover:bg-slate-800/60 hover:text-slate-200'
               }`}
             >
               {style}
@@ -736,7 +746,7 @@ function ClusterScreen({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2.5">
           Preferred platforms
         </label>
         <div className="flex flex-wrap gap-2">
@@ -749,10 +759,10 @@ function ClusterScreen({
                   : [...formData.preferred_platforms, platform]
                 onUpdate('preferred_platforms', p)
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 formData.preferred_platforms.includes(platform)
-                  ? 'bg-indigo-500 text-white'
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                  ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20'
+                  : 'bg-slate-950/60 text-slate-400 border border-slate-800/80 hover:bg-slate-800/60 hover:text-slate-200'
               }`}
             >
               {platform}
@@ -786,10 +796,10 @@ function WillingnessScreen({
   const q = WILLINGNESS_QUESTIONS[questionIdx]
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Your preferences</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        <h2 className="text-xl font-bold text-slate-100">Your preferences</h2>
+        <p className="text-sm text-slate-400 mt-1">
           Swipe or tap — {questionIdx + 1} of {WILLINGNESS_QUESTIONS.length}
         </p>
       </div>
@@ -825,15 +835,15 @@ function RateScreen({
     formData.rate_instagram_reel > 0 || formData.rate_instagram_post > 0
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Your rates</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        <h2 className="text-xl font-bold text-slate-100">Your rates</h2>
+        <p className="text-sm text-slate-400 mt-1">
           Set your base rates or skip — we&apos;ll show them to brands
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3.5">
         <RateChip
           label="YouTube Long"
           value={formData.rate_youtube_long}
@@ -856,22 +866,22 @@ function RateScreen({
         />
       </div>
 
-      <label className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+      <label className="flex items-center gap-3 p-4 rounded-xl border border-slate-800 bg-slate-900/20 cursor-pointer hover:bg-slate-800/40 transition-colors">
         <input
           type="checkbox"
           checked={formData.rates_deferred}
           onChange={(e) => onUpdate('rates_deferred', e.target.checked)}
-          className="w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+          className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-blue-500"
         />
         <div>
-          <div className="text-sm font-medium text-gray-900 dark:text-white">Skip for now</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">We&apos;ll ask you later</div>
+          <div className="text-sm font-semibold text-slate-200">Skip for now</div>
+          <div className="text-xs text-slate-400 mt-0.5">We&apos;ll ask you later</div>
         </div>
       </label>
 
       <motion.button
         onClick={onConfirm}
-        className="w-full py-3.5 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold text-sm hover:from-green-600 hover:to-emerald-600 shadow-lg shadow-green-500/25 transition-all"
+        className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-green-500 text-white font-semibold text-sm hover:from-emerald-600 hover:to-green-600 shadow-lg shadow-emerald-500/25 transition-all"
         whileTap={{ scale: 0.98 }}
       >
         {hasAnyRate || formData.rates_deferred ? 'Complete setup' : 'Skip rates'}

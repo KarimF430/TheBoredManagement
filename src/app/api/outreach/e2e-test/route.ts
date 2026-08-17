@@ -90,12 +90,20 @@ export async function POST(req: NextRequest) {
 
     const draft = await getOrCreateDraft(session.id)
 
+    // Step 1: Identity
+    const cleanHandle = handle.replace('@', '').trim()
     await updateDraft(session.id, {
       name,
-      handle,
-      consent: true,
+      youtube_handle: cleanHandle,
+      instagram_handle: cleanHandle,
+      step_data: {
+        consent: true,
+        handle: handle,
+        identity_completed_at: new Date().toISOString()
+      }
     } as any)
 
+    // Step 2: Niche
     await updateDraft(session.id, {
       primary_niche: 'Technology',
       secondary_niches: ['Gaming'],
@@ -103,32 +111,53 @@ export async function POST(req: NextRequest) {
       content_types: ['Reviews', 'Unboxing'],
     } as any)
 
+    // Step 3: Behavioral
+    const draft3 = await getOrCreateDraft(session.id)
     await updateDraft(session.id, {
-      posts_per_week: '3-4_week',
-      has_brand_deals: 'yes_once',
-      audience_age: '18-24',
-      content_language: 'hindi',
-      monetization: 'yt_ads',
+      content_frequency: '3-4_week',
+      age_range: '18-24',
+      languages: ['hindi'],
+      step_data: {
+        ...(draft3.step_data || {}),
+        has_brand_deals: 'yes_once',
+        monetization: 'yt_ads',
+      }
     } as any)
 
+    // Step 4: Cluster
     await updateDraft(session.id, {
       content_style: ['Educational', 'Review'],
       preferred_platforms: ['YouTube', 'Instagram'],
     } as any)
 
+    // Step 5: Willingness
+    const draft5 = await getOrCreateDraft(session.id)
     await updateDraft(session.id, {
-      wants_paid: 'yes',
-      open_to_long_term: 'yes',
-      open_exclusivity: 'no',
-      wants_gifting: 'yes',
+      step_data: {
+        ...(draft5.step_data || {}),
+        wants_paid: 'yes',
+        open_to_long_term: 'yes',
+        open_exclusivity: 'no',
+        wants_gifting: 'yes',
+      }
     } as any)
 
+    // Step 6: Rates
+    const draft6 = await getOrCreateDraft(session.id)
     await updateDraft(session.id, {
-      rate_youtube_long: 15000,
-      rate_youtube_shorts: 5000,
-      rate_instagram_reel: 8000,
-      rate_instagram_post: 6000,
-      rates_deferred: false,
+      rate_card: {
+        youtube_long: 15000,
+        youtube_shorts: 5000,
+        instagram_reel: 8000,
+        instagram_post: 6000,
+      },
+      currency: 'INR',
+      negotiable: true,
+      min_rate: null,
+      step_data: {
+        ...(draft6.step_data || {}),
+        rates_deferred: false,
+      }
     } as any)
 
     // Mark session as completed
@@ -178,9 +207,9 @@ const checkIdentityResolve = {
 
     const orphans = (poolRows || []).filter((r) => !r.outreach_creator_id)
 
-    // Check for outreach_creators with onboarding data
     const onboardingCreators = await outreachSelect<any>('outreach_creators', {
       filters: { profile_source: 'onboarding' },
+      order: { column: 'created_at', ascending: false },
       limit: 5,
     })
 
@@ -204,6 +233,7 @@ const checkRawSignals = {
 
     const creators = await outreachSelect<any>('outreach_creators', {
       filters: { profile_source: 'onboarding' },
+      order: { column: 'created_at', ascending: false },
       limit: 5,
     })
 
@@ -255,6 +285,7 @@ const checkVerifiedMetrics = {
 
     const creators = await outreachSelect<any>('outreach_creators', {
       filters: { profile_source: 'onboarding' },
+      order: { column: 'created_at', ascending: false },
       limit: 5,
     })
 
@@ -284,6 +315,7 @@ const checkPersonalizer = {
 
     const creators = await outreachSelect<any>('outreach_creators', {
       filters: { profile_source: 'onboarding' },
+      order: { column: 'created_at', ascending: false },
       limit: 1,
     })
 

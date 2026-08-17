@@ -51,20 +51,20 @@ export default function NicheSelector({
     <div className="space-y-4">
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
         <input
           type="text"
           placeholder="Search niches..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full pl-10 pr-4 py-2.5 bg-slate-950/60 border border-slate-800/80 rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
         />
       </div>
 
       {/* Primary Niche Label */}
       <div className="flex items-center gap-2">
         <div className="w-2 h-2 rounded-full bg-blue-500" />
-        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
           Primary Niche (Required)
         </span>
       </div>
@@ -98,12 +98,12 @@ export default function NicheSelector({
                 onMouseEnter={() => setHoveredNiche(niche.name)}
                 onMouseLeave={() => setHoveredNiche(null)}
                 className={`
-                  relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all text-center
+                  relative flex flex-col items-center gap-2 p-3 rounded-xl border transition-all text-center
                   ${isPrimary
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 shadow-lg shadow-blue-500/20'
+                    ? 'border-blue-500 bg-blue-950/30 text-blue-400 shadow-lg shadow-blue-500/10'
                     : isSecondary
-                    ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/30'
-                    : 'border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
+                    ? 'border-indigo-500 bg-indigo-950/30 text-indigo-400'
+                    : 'border-slate-800 bg-slate-950/40 text-slate-300 hover:border-slate-700 hover:bg-slate-900/60'
                   }
                 `}
                 whileHover={{ scale: 1.02 }}
@@ -126,12 +126,12 @@ export default function NicheSelector({
                 <span className="text-2xl">{niche.icon || '📁'}</span>
 
                 {/* Name */}
-                <span className={`text-xs font-medium ${isPrimary ? 'text-blue-700 dark:text-blue-300' : ''}`}>
+                <span className={`text-xs font-medium ${isPrimary ? 'text-blue-400' : isSecondary ? 'text-indigo-400' : 'text-slate-200'}`}>
                   {niche.name}
                 </span>
 
                 {/* Sub-niches count */}
-                <span className="text-[10px] text-gray-400">
+                <span className="text-[10px] text-slate-500">
                   {niche.sub_niches.length} sub-niches
                 </span>
               </motion.button>
@@ -145,19 +145,19 @@ export default function NicheSelector({
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl"
+          className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-xl"
         >
-          <div className="text-xs font-medium text-gray-500 mb-2">Selected:</div>
+          <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Selected:</div>
           <div className="flex flex-wrap gap-2">
             {selectedPrimary && (
-              <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-lg text-xs font-medium">
+              <span className="px-2 py-1 bg-blue-950/40 border border-blue-800/50 text-blue-400 rounded-lg text-xs font-medium">
                 P: {selectedPrimary}
               </span>
             )}
             {selectedSecondary.map((niche, index) => (
               <span
                 key={niche}
-                className="px-2 py-1 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded-lg text-xs font-medium"
+                className="px-2 py-1 bg-indigo-950/40 border border-indigo-800/50 text-indigo-400 rounded-lg text-xs font-medium"
               >
                 {index + 1}: {niche}
               </span>

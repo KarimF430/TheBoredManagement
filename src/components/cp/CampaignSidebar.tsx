@@ -7,7 +7,8 @@ import {
   LayoutDashboard, FileText, Users, Package,
   Radio, BarChart3, Settings, Bell, ChevronLeft,
   Plus, FolderOpen, Activity, Database, Globe,
-  ChevronDown, Search, Shield
+  ChevronDown, Search, Shield, Mail, Send,
+  Rocket, Link2, UserCheck
 } from 'lucide-react'
 
 export default function CampaignSidebar({ onNavigate }: { onNavigate?: () => void }) {
@@ -22,10 +23,24 @@ export default function CampaignSidebar({ onNavigate }: { onNavigate?: () => voi
 
   const prefix = activeCampaignId ? `/campaigns/${activeCampaignId}` : ''
 
+  const isOutreach = pathname.startsWith('/outreach')
+  const isOnboarding = pathname.startsWith('/onboarding')
+
   const TOP_MODULES = [
     { href: '/admin', label: 'Command Centre', icon: Globe, active: pathname.startsWith('/admin') },
     { href: '/campaigns', label: 'Campaigns', icon: FolderOpen, active: isCampaignList || isInCampaign },
-    { href: '/creators', label: 'Creators', icon: Database, active: pathname.startsWith('/creators') },
+    { href: '/creators', label: 'Creators', icon: Database, active: pathname.startsWith('/creators') && !pathname.startsWith('/outreach') },
+    { href: '/outreach', label: 'Outreach', icon: Mail, active: isOutreach },
+    { href: '/onboarding', label: 'Onboarding', icon: UserCheck, active: isOnboarding },
+  ]
+
+  const OUTREACH_NAV = [
+    { href: '/outreach', label: 'Dashboard', icon: BarChart3 },
+    { href: '/outreach/campaigns', label: 'Campaigns', icon: Rocket },
+    { href: '/outreach/creators', label: 'Creators', icon: Users },
+    { href: '/outreach/templates', label: 'Templates', icon: FileText },
+    { href: '/outreach/domains', label: 'Domains', icon: Globe },
+    { href: '/outreach/settings', label: 'Settings', icon: Settings },
   ]
 
   const CAMPAIGN_NAV = [
@@ -139,6 +154,31 @@ export default function CampaignSidebar({ onNavigate }: { onNavigate?: () => voi
           )
         })}
 
+        {isOutreach && !collapsed && (
+          <>
+            <div style={{ padding: '10px 12px 3px', fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.6px', textTransform: 'uppercase' }}>
+              OUTREACH
+            </div>
+            {OUTREACH_NAV.map(item => {
+              const Icon = item.icon
+              const active = pathname === item.href || (item.href !== '/outreach' && pathname.startsWith(item.href))
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="nav-item"
+                  data-active={active}
+                  onClick={onNavigate}
+                >
+                  <div className="nav-item__rail" />
+                  <Icon size={13} style={{ flexShrink: 0, color: active ? 'var(--blue)' : 'var(--text-muted)' }} />
+                  <span style={{ fontSize: 11 }}>{item.label}</span>
+                </Link>
+              )
+            })}
+          </>
+        )}
+
         {isInCampaign && !collapsed && (
           <>
             <div style={{ padding: '10px 12px 3px', fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.6px', textTransform: 'uppercase' }}>
@@ -166,6 +206,24 @@ export default function CampaignSidebar({ onNavigate }: { onNavigate?: () => voi
             })}
           </>
         )}
+
+        {isOutreach && collapsed && OUTREACH_NAV.map(item => {
+          const Icon = item.icon
+          const active = pathname === item.href || (item.href !== '/outreach' && pathname.startsWith(item.href))
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="nav-item nav-item--collapsed"
+              data-active={active}
+              onClick={onNavigate}
+              title={item.label}
+            >
+              <div className="nav-item__rail" />
+              <Icon size={13} style={{ flexShrink: 0, color: active ? 'var(--blue)' : 'var(--text-muted)' }} />
+            </Link>
+          )
+        })}
 
         {isInCampaign && collapsed && CAMPAIGN_NAV.map(item => {
           const Icon = item.icon

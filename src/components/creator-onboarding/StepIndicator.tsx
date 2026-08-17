@@ -25,9 +25,9 @@ export default function StepIndicator({ currentStep, totalSteps, steps }: StepIn
               className={`
                 relative flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold
                 transition-colors duration-300
-                ${isCompleted ? 'bg-green-500 text-white' : ''}
+                ${isCompleted ? 'bg-emerald-500 text-white' : ''}
                 ${isCurrent ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/30' : ''}
-                ${isUpcoming ? 'bg-gray-100 dark:bg-gray-800 text-gray-400' : ''}
+                ${isUpcoming ? 'bg-slate-800 text-slate-500' : ''}
               `}
               initial={false}
               animate={{
@@ -54,10 +54,10 @@ export default function StepIndicator({ currentStep, totalSteps, steps }: StepIn
 
             {/* Connector Line */}
             {index < steps.length - 1 && (
-              <div className="w-6 h-0.5 mx-1">
+              <div className="w-6 h-0.5 mx-1 bg-slate-850 rounded-full">
                 <motion.div
                   className={`h-full rounded-full ${
-                    isCompleted ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'
+                    isCompleted ? 'bg-emerald-500' : 'bg-slate-800'
                   }`}
                   initial={{ scaleX: 0 }}
                   animate={{ scaleX: isCompleted ? 1 : 0 }}

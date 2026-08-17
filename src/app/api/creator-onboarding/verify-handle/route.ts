@@ -85,11 +85,19 @@ export async function POST(req: NextRequest) {
         .single()
 
       if (session) {
+        // Fetch current draft to merge step_data and avoid overwriting other keys
+        const { data: draft } = await client
+          .from('creator_profile_drafts')
+          .select('step_data')
+          .eq('session_id', sessionId)
+          .single()
+
         // Update verified status in step_data
         await client
           .from('creator_profile_drafts')
           .update({
             step_data: {
+              ...(draft?.step_data || {}),
               [`${platform}_handle_verified`]: true,
               [`${platform}_verified_at`]: new Date().toISOString(),
             },

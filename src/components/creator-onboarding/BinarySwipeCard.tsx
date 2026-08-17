@@ -50,7 +50,7 @@ export default function BinarySwipeCard({
   return (
     <div className="relative w-full max-w-lg mx-auto">
       <motion.div
-        className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800 overflow-hidden cursor-grab active:cursor-grabbing"
+        className="relative bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 rounded-2xl overflow-hidden cursor-grab active:cursor-grabbing"
         style={{ x, rotate }}
         drag="x"
         dragConstraints={{ left: 0, right: 0 }}
@@ -70,7 +70,7 @@ export default function BinarySwipeCard({
           {yesLabel}
         </motion.div>
         <motion.div
-          className="absolute top-4 left-4 z-10 flex items-center gap-1.5 bg-gray-400 text-white px-3 py-1.5 rounded-lg font-bold text-sm shadow-lg"
+          className="absolute top-4 left-4 z-10 flex items-center gap-1.5 bg-slate-600 text-white px-3 py-1.5 rounded-lg font-bold text-sm shadow-lg"
           style={{ opacity: noOpacity }}
         >
           <ThumbsDown className="w-4 h-4" />
@@ -79,7 +79,7 @@ export default function BinarySwipeCard({
 
         {/* Question */}
         <div className="p-8 flex items-center justify-center min-h-[200px]">
-          <p className="text-lg font-semibold text-center text-gray-900 dark:text-white leading-relaxed">
+          <p className="text-lg font-semibold text-center text-slate-100 leading-relaxed">
             {question}
           </p>
         </div>
@@ -89,14 +89,14 @@ export default function BinarySwipeCard({
       <div className="mt-4 flex gap-3">
         <button
           onClick={() => { setExitX(-200); setSwiped(true); onSwipeLeft() }}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all font-medium text-sm"
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-slate-800 bg-slate-950/60 text-slate-400 hover:bg-slate-900/60 hover:text-slate-200 transition-all font-medium text-sm"
         >
           <ThumbsDown className="w-4 h-4" />
           {noLabel}
         </button>
         <button
           onClick={() => { setExitX(200); setSwiped(true); onSwipeRight() }}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600 transition-all font-medium text-sm shadow-lg shadow-green-500/25"
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600 transition-all font-medium text-sm shadow-lg shadow-green-500/15"
         >
           <ThumbsUp className="w-4 h-4" />
           {yesLabel}
@@ -104,9 +104,9 @@ export default function BinarySwipeCard({
       </div>
 
       {/* Swipe hint */}
-      <div className="mt-3 flex items-center justify-center gap-4 text-[11px] text-gray-400">
+      <div className="mt-3 flex items-center justify-center gap-4 text-[11px] text-slate-500">
         <span>← Not now</span>
-        <span className="w-1 h-1 rounded-full bg-gray-300" />
+        <span className="w-1 h-1 rounded-full bg-slate-800" />
         <span>Yes →</span>
       </div>
     </div>
