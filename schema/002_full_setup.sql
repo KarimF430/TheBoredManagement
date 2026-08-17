@@ -245,13 +245,6 @@ CREATE INDEX IF NOT EXISTS idx_cp_client_users_token ON cp_client_users(invite_t
 CREATE INDEX IF NOT EXISTS idx_cp_rejection_channel ON cp_rejection_intelligence(creator_channel_url);
 
 -- ── First User (Haji Karim — Brand Solutions) ─────────────────────
--- Password: Tbm@2026 (PBKDF2 hash, 100k iterations, SHA-512)
--- CHANGE THIS PASSWORD AFTER FIRST LOGIN
-INSERT INTO users (email, name, password_hash, role)
-VALUES (
-  'haji.karim@theboredmonkey.com',
-  'Haji Karim',
-  'PLACEHOLDER_HASH',
-  'brand_solutions'
-)
-ON CONFLICT (email) DO NOTHING;
+-- Run: GET /api/setup-campaign?create-user=true
+-- This creates the user with a properly hashed password (Tbm@2026).
+-- Do NOT insert users directly — passwords must be PBKDF2 hashed.

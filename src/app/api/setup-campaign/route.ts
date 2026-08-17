@@ -277,16 +277,52 @@ async function handleCreateUser() {
       .eq('email', 'haji.karim@theboredmonkey.com')
       .single()
 
+    const passwordHash = await hashPassword('Tbm@2026')
+
     if (existing) {
+      // Check if the existing user has a valid password hash (must contain ':' for PBKDF2 format)
+      const { data: fullUser } = await client
+        .from('users')
+        .select('id, password_hash')
+        .eq('email', 'haji.karim@theboredmonkey.com')
+        .single()
+
+      const hasValidHash = fullUser?.password_hash?.includes(':')
+
+      if (hasValidHash) {
+        return NextResponse.json({
+          ok: true,
+          message: `User already exists with valid password: ${existing.email}`
+        })
+      }
+
+      // Update the placeholder hash with a real one
+      const { error: updateError } = await client
+        .from('users')
+        .update({ password_hash: passwordHash })
+        .eq('email', 'haji.karim@theboredmonkey.com')
+
+      if (updateError) {
+        return NextResponse.json({
+          ok: false,
+          error: updateError.message,
+          hint: 'Failed to update password hash.'
+        }, { status: 400 })
+      }
+
       return NextResponse.json({
         ok: true,
-        message: `User already exists: ${existing.email} (id: ${existing.id})`
+        message: 'User password hash updated successfully',
+        credentials: {
+          email: 'haji.karim@theboredmonkey.com',
+          password: 'Tbm@2026',
+          role: 'brand_solutions'
+        },
+        login_url: '/login'
       })
     }
 
     // Create first user
-    const passwordHash = await hashPassword('Tbm@2026')
-
     const { data: user, error } = await client
       .from('users')
       .insert({
