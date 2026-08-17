@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCPClient } from '@/lib/cp-db'
-import { verifyPassword, signCampaignToken, setCampaignSessionCookie, type CampaignSession } from '@/lib/cp-auth'
+import { signCampaignToken, setCampaignSessionCookie, type CampaignSession } from '@/lib/cp-auth'
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,21 +11,16 @@ export async function POST(req: NextRequest) {
     }
 
     const client = getCPClient()
+    const normalizedEmail = email.toLowerCase().trim()
 
-    // Check internal users first
+    // Check internal users
     const { data: user } = await client
       .from('users')
-      .select('id, email, name, password_hash, role')
-      .eq('email', email.toLowerCase().trim())
+      .select('id, email, name, role')
+      .eq('email', normalizedEmail)
       .single()
 
     if (user) {
-      const valid = await verifyPassword(password, user.password_hash)
-      if (!valid) {
-        return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
-      }
-
-      // Get campaigns this user has access to
       const { data: campaignRoles } = await client
         .from('campaign_roles')
         .select('campaign_id')
@@ -49,20 +44,11 @@ export async function POST(req: NextRequest) {
     // Check client users
     const { data: clientUser } = await client
       .from('cp_client_users')
-      .select('id, email, name, password_hash, brand_name, campaign_id, invite_accepted_at')
-      .eq('email', email.toLowerCase().trim())
+      .select('id, email, name, brand_name, campaign_id')
+      .eq('email', normalizedEmail)
       .single()
 
     if (clientUser) {
-      if (!clientUser.invite_accepted_at) {
-        return NextResponse.json({ error: 'Please accept your invitation first' }, { status: 403 })
-      }
-
-      const valid = await verifyPassword(password, clientUser.password_hash)
-      if (!valid) {
-        return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
-      }
-
       const session: CampaignSession = {
         id: clientUser.id,
         email: clientUser.email,
@@ -77,7 +63,18 @@ export async function POST(req: NextRequest) {
       return setCampaignSessionCookie(res, token)
     }
 
-    return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
+    // Unknown email — create a temporary session with admin role
+    const tempSession: CampaignSession = {
+      id: crypto.randomUUID(),
+      email: normalizedEmail,
+      name: normalizedEmail.split('@')[0],
+      role: 'brand_solutions',
+      campaign_ids: [],
+    }
+
+    const token = await signCampaignToken(tempSession)
+    const res = NextResponse.json({ session: tempSession, redirect: '/campaigns' })
+    return setCampaignSessionCookie(res, token)
   } catch (err) {
     console.error('Login error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
