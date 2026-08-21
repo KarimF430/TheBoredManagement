@@ -2,167 +2,231 @@
 
 import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Check, Search } from 'lucide-react'
-
-interface NicheOption {
-  name: string
-  icon: string
-  sub_niches: string[]
-  content_types: string[]
-}
+import { ChevronLeft } from 'lucide-react'
+import { NICHE_CLUSTERS, type Cluster, type NicheItem } from '@/lib/creator-onboarding-taxonomy'
 
 interface NicheSelectorProps {
-  niches: NicheOption[]
+  selectedCluster: string | null
   selectedPrimary: string | null
   selectedSecondary: string[]
+  onSelectCluster: (clusterId: string) => void
   onSelectPrimary: (niche: string) => void
   onSelectSecondary: (niches: string[]) => void
+  onBack: () => void
 }
 
 export default function NicheSelector({
-  niches,
+  selectedCluster,
   selectedPrimary,
   selectedSecondary,
+  onSelectCluster,
   onSelectPrimary,
   onSelectSecondary,
+  onBack,
 }: NicheSelectorProps) {
-  const [search, setSearch] = useState('')
-  const [hoveredNiche, setHoveredNiche] = useState<string | null>(null)
-
-  const filteredNiches = niches.filter((niche) =>
-    niche.name.toLowerCase().includes(search.toLowerCase())
+  const [view, setView] = useState<'clusters' | 'niches'>(selectedCluster ? 'niches' : 'clusters')
+  const [activeCluster, setActiveCluster] = useState<Cluster | null>(
+    selectedCluster ? NICHE_CLUSTERS.find(c => c.id === selectedCluster) || null : null
   )
 
-  const handleToggleSecondary = useCallback(
-    (nicheName: string) => {
-      if (nicheName === selectedPrimary) return
-      
+  const handleClusterClick = useCallback((cluster: Cluster) => {
+    setActiveCluster(cluster)
+    onSelectCluster(cluster.id)
+    setView('niches')
+  }, [onSelectCluster])
+
+  const handleBack = useCallback(() => {
+    setView('clusters')
+    setActiveCluster(null)
+    onBack()
+  }, [onBack])
+
+  const handleNicheClick = useCallback((nicheName: string) => {
+    if (nicheName === selectedPrimary) {
+      onSelectPrimary(null as unknown as string)
+    } else if (!selectedPrimary) {
+      onSelectPrimary(nicheName)
+    } else {
       const isSelected = selectedSecondary.includes(nicheName)
       if (isSelected) {
         onSelectSecondary(selectedSecondary.filter((n) => n !== nicheName))
-      } else if (selectedSecondary.length < 3) {
+      } else if (selectedSecondary.length < 4) {
         onSelectSecondary([...selectedSecondary, nicheName])
       }
-    },
-    [selectedPrimary, selectedSecondary, onSelectSecondary]
-  )
+    }
+  }, [selectedPrimary, selectedSecondary, onSelectPrimary, onSelectSecondary])
+
+  const hasSelection = !!selectedPrimary || selectedSecondary.length > 0
 
   return (
     <div className="space-y-4">
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-        <input
-          type="text"
-          placeholder="Search niches..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 bg-slate-950/60 border border-slate-800/80 rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-        />
-      </div>
-
-      {/* Primary Niche Label */}
-      <div className="flex items-center gap-2">
-        <div className="w-2 h-2 rounded-full bg-blue-500" />
-        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-          Primary Niche (Required)
-        </span>
-      </div>
-
-      {/* Niche Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        <AnimatePresence mode="popLayout">
-          {filteredNiches.map((niche) => {
-            const isPrimary = selectedPrimary === niche.name
-            const isSecondary = selectedSecondary.includes(niche.name)
-            const isHovered = hoveredNiche === niche.name
-
-            return (
-              <motion.button
-                key={niche.name}
-                layout
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                onClick={() => {
-                  if (isPrimary) {
-                    onSelectPrimary(null as unknown as string)
-                  } else if (isSecondary) {
-                    handleToggleSecondary(niche.name)
-                  } else if (!selectedPrimary) {
-                    onSelectPrimary(niche.name)
-                  } else {
-                    handleToggleSecondary(niche.name)
-                  }
-                }}
-                onMouseEnter={() => setHoveredNiche(niche.name)}
-                onMouseLeave={() => setHoveredNiche(null)}
-                className={`
-                  relative flex flex-col items-center gap-2 p-3 rounded-xl border transition-all text-center
-                  ${isPrimary
-                    ? 'border-blue-500 bg-blue-950/30 text-blue-400 shadow-lg shadow-blue-500/10'
-                    : isSecondary
-                    ? 'border-indigo-500 bg-indigo-950/30 text-indigo-400'
-                    : 'border-slate-800 bg-slate-950/40 text-slate-300 hover:border-slate-700 hover:bg-slate-900/60'
-                  }
-                `}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                {/* Selection Badge */}
-                {(isPrimary || isSecondary) && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className={`absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold ${
-                      isPrimary ? 'bg-blue-500' : 'bg-indigo-500'
-                    }`}
-                  >
-                    {isPrimary ? 'P' : selectedSecondary.indexOf(niche.name) + 1}
-                  </motion.div>
-                )}
-
-                {/* Icon */}
-                <span className="text-2xl">{niche.icon || '📁'}</span>
-
-                {/* Name */}
-                <span className={`text-xs font-medium ${isPrimary ? 'text-blue-400' : isSecondary ? 'text-indigo-400' : 'text-slate-200'}`}>
-                  {niche.name}
-                </span>
-
-                {/* Sub-niches count */}
-                <span className="text-[10px] text-slate-500">
-                  {niche.sub_niches.length} sub-niches
-                </span>
-              </motion.button>
-            )
-          })}
-        </AnimatePresence>
-      </div>
-
-      {/* Selected Summary */}
-      {(selectedPrimary || selectedSecondary.length > 0) && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-xl"
+      {/* Breadcrumb */}
+      {view === 'niches' && (
+        <button
+          onClick={handleBack}
+          className="flex items-center gap-1.5 text-xs hover:opacity-80 transition-opacity"
+          style={{ color: 'var(--onb-text-muted)', fontFamily: 'var(--onb-font-body)' }}
         >
-          <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Selected:</div>
-          <div className="flex flex-wrap gap-2">
-            {selectedPrimary && (
-              <span className="px-2 py-1 bg-blue-950/40 border border-blue-800/50 text-blue-400 rounded-lg text-xs font-medium">
-                P: {selectedPrimary}
-              </span>
-            )}
-            {selectedSecondary.map((niche, index) => (
+          <ChevronLeft className="w-3.5 h-3.5" />
+          All clusters
+        </button>
+      )}
+
+      <AnimatePresence mode="wait">
+        {/* ── Cluster Grid (Screen A) ── */}
+        {view === 'clusters' && (
+          <motion.div
+            key="clusters"
+            initial={{ opacity: 0, x: -15 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -15 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="onb-label">Choose a cluster</div>
+            <div className="grid grid-cols-2 gap-3">
+              {NICHE_CLUSTERS.map((cluster) => {
+                const clusterHasSelected = cluster.niches.some(
+                  n => n.niche_name === selectedPrimary || selectedSecondary.includes(n.niche_name)
+                )
+                return (
+                  <motion.button
+                    key={cluster.id}
+                    onClick={() => handleClusterClick(cluster)}
+                    className="onb-cluster-card"
+                    data-selected={clusterHasSelected}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.97 }}
+                  >
+                    <span className="onb-cluster-card__emoji">{cluster.emoji}</span>
+                    <div className="onb-cluster-card__name">{cluster.name}</div>
+                    <div className="onb-cluster-card__vibe">{cluster.vibe}</div>
+                    <div className="onb-cluster-card__count">{cluster.niches.length} niches</div>
+                  </motion.button>
+                )
+              })}
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── Niche Grid (Screen B) ── */}
+        {view === 'niches' && activeCluster && (
+          <motion.div
+            key="niches"
+            initial={{ opacity: 0, x: 15 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -15 }}
+            transition={{ duration: 0.2 }}
+          >
+            {/* Cluster header */}
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xl">{activeCluster.emoji}</span>
               <span
-                key={niche}
-                className="px-2 py-1 bg-indigo-950/40 border border-indigo-800/50 text-indigo-400 rounded-lg text-xs font-medium"
+                className="text-sm font-semibold"
+                style={{ color: 'var(--onb-text)', fontFamily: 'var(--onb-font-display)' }}
               >
-                {index + 1}: {niche}
+                {activeCluster.name}
               </span>
-            ))}
-          </div>
+            </div>
+
+            {/* Selection instruction */}
+            <div className="onb-label" style={{ marginTop: 12 }}>
+              {!selectedPrimary ? 'Pick your primary niche' : 'Add secondary niches (optional)'}
+            </div>
+
+            {/* Niche chips — all niches in cluster */}
+            <div className="flex flex-wrap gap-2">
+              {activeCluster.niches.map((niche) => {
+                const isPrimary = selectedPrimary === niche.niche_name
+                const isSecondary = selectedSecondary.includes(niche.niche_name)
+                return (
+                  <motion.button
+                    key={niche.id}
+                    onClick={() => handleNicheClick(niche.niche_name)}
+                    className="onb-chip"
+                    data-selected={isSecondary}
+                    data-primary={isPrimary}
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    style={{ gap: 8 }}
+                  >
+                    <span>{niche.icon}</span>
+                    <span>{niche.niche_name}</span>
+                    {isPrimary && (
+                      <span style={{
+                        fontSize: 9,
+                        fontWeight: 700,
+                        background: 'var(--onb-coral)',
+                        color: '#FFF',
+                        padding: '1px 5px',
+                        borderRadius: 4,
+                      }}>P</span>
+                    )}
+                    {isSecondary && (
+                      <span style={{
+                        fontSize: 9,
+                        fontWeight: 700,
+                        background: 'var(--onb-violet)',
+                        color: '#FFF',
+                        padding: '1px 5px',
+                        borderRadius: 4,
+                      }}>
+                        {selectedSecondary.indexOf(niche.niche_name) + 1}
+                      </span>
+                    )}
+                  </motion.button>
+                )
+              })}
+            </div>
+
+            {/* Sub-niches hint */}
+            {selectedPrimary && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-3 p-3 rounded-xl"
+                style={{
+                  background: 'var(--onb-coral-dim)',
+                  border: '1px solid rgba(255,90,95,0.15)',
+                }}
+              >
+                <div style={{ fontSize: 11, color: 'var(--onb-text-dim)', fontFamily: 'var(--onb-font-body)' }}>
+                  Sub-niches for <strong style={{ color: 'var(--onb-coral)' }}>{selectedPrimary}</strong>:{' '}
+                  {activeCluster.niches
+                    .find(n => n.niche_name === selectedPrimary)
+                    ?.sub_niches.join(', ') || '—'}
+                </div>
+              </motion.div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Selected summary */}
+      {hasSelection && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-wrap gap-2"
+        >
+          {selectedPrimary && (
+            <span
+              className="onb-chip"
+              data-primary="true"
+              style={{ cursor: 'default', fontSize: 12, padding: '6px 10px' }}
+            >
+              {selectedPrimary}
+            </span>
+          )}
+          {selectedSecondary.map((niche, i) => (
+            <span
+              key={niche}
+              className="onb-chip"
+              data-selected="true"
+              style={{ cursor: 'default', fontSize: 12, padding: '6px 10px' }}
+            >
+              {niche}
+            </span>
+          ))}
         </motion.div>
       )}
     </div>

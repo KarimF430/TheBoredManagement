@@ -10,6 +10,8 @@ const PUBLIC_ROUTES = [
   '/client/accept',
   '/api/auth/login',
   '/api/auth/logout',
+  '/api/auth/gmail',
+  '/api/auth/gmail/callback',
   '/api/client/accept-invite',
   '/api/setup-campaign',
   '/creator-onboarding',
@@ -20,7 +22,12 @@ const PUBLIC_ROUTES = [
   '/api/creator-onboarding/prefill',
   '/api/creator-onboarding/save-step',
   '/api/creator-onboarding/complete',
-  '/api/creator-onboarding/verify-handle'
+  '/api/creator-onboarding/verify-handle',
+  '/api/outreach/smoke-test',
+  '/api/outreach/e2e-test',
+  '/api/outreach/cron',
+  '/api/outreach/unsubscribe',
+  '/api/outreach/webhooks',
 ]
 
 // Campaign panel internal routes (require internal role)

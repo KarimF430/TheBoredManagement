@@ -106,13 +106,18 @@ export function safeParse(raw: string | null | undefined): Record<string, unknow
 
 function isRetryable(err: Error): boolean {
   if (!err || !err.message) return false
+  const msg = err.message
   return (
-    err.message.includes('retryable') ||
-    err.message.includes('ETIMEDOUT') ||
-    err.message.includes('ECONNRESET') ||
-    err.message.includes('abort') ||
-    err.message.includes('429') ||
-    err.message.includes('5')
+    msg.includes('retryable') ||
+    msg.includes('ETIMEDOUT') ||
+    msg.includes('ECONNRESET') ||
+    msg.includes('abort') ||
+    msg.includes('429') ||
+    msg.includes('500') ||
+    msg.includes('502') ||
+    msg.includes('503') ||
+    msg.includes('504') ||
+    msg.includes('server had an error')
   )
 }
 

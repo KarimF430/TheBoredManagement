@@ -55,7 +55,8 @@ export async function sendGmail(
   bodyHtml?: string,
   rfcMessageId?: string
 ): Promise<SendResult> {
-  enforceLinkLimit(bodyText, bodyHtml, 1)
+  // No link limit for Gmail - we don't include links in personal-style emails
+  // enforceLinkLimit(bodyText, bodyHtml, 1)
 
   const { accessToken } = await getValidMailboxToken(mailbox.id)
 
@@ -68,9 +69,7 @@ export async function sendGmail(
 
   const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
 
-  const unsubscribeUrl = `https://${mailbox.email.split('@')[1]}/unsubscribe?email=${encodeURIComponent(to)}`
-
-  const { raw } = buildMimeMessage({
+  const { raw, rfcMessageId: msgId } = buildMimeMessage({
     from: mailbox.email,
     fromName: mailbox.display_name || mailbox.email.split('@')[0],
     to,
@@ -78,7 +77,7 @@ export async function sendGmail(
     bodyText,
     bodyHtml,
     rfcMessageId,
-    unsubscribeUrl,
+    // No List-Unsubscribe for Gmail - it signals marketing to Gmail's classifier
   })
 
   try {
@@ -89,7 +88,7 @@ export async function sendGmail(
 
     return {
       providerMessageId: res.data.id || '',
-      rfcMessageId: raw,
+      rfcMessageId: msgId,
       threadId: res.data.threadId || undefined,
     }
   } catch (err) {

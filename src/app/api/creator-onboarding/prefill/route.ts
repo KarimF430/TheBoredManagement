@@ -14,8 +14,9 @@ import { getOnboardingSession } from '@/lib/creator-onboarding'
 const PREFILL_SYSTEM = `You analyze a content creator's profile and predict their niche and style.
 Return ONLY a JSON object with these fields:
 {
-  "primary_niche": "one of: Technology, Gaming, Fashion, Beauty, Fitness, Travel, Food & Cooking, Lifestyle, Comedy, Music, Dance, Art & Craft, Photography, Film & Cinematography, Education, Business & Entrepreneurship, Finance & Investment, Health & Wellness, News & Politics, Vlogs, Relationships, Parenting, Spirituality, Automobiles, Pets & Animals",
-  "secondary_niches": ["up to 2 related niches"],
+  "primary_niche": "one of: Fashion, Beauty & Personal Care, Photography, Art & Craft, Home & Interior, Education, Finance & Investing, Technology, News & Commentary, Business & Entrepreneurship, Science & Research, Comedy & Skits, Music & Dance, Storytelling & Narratives, Gaming, Pop Culture & Reviews, Spirituality & Devotion, Relationships & Dating, Parenting & Family, Social Impact & Activism, Pets & Animals, Fitness & Gym, Yoga & Wellness, Sports & Cricket, Outdoor & Adventure, Health & Nutrition, Travel, Food & Cooking, Daily Vlogs, Automobiles, Lifestyle & Motivation",
+  "secondary_niches": ["up to 2 related niches from the same list"],
+  "cluster": "one of: visual-aesthetic, knowledge-trust, entertainment-performance, community-belief, physical-performance, lifestyle-vlogging",
   "tone": "one of: casual, professional, humorous, educational, inspirational, dramatic",
   "content_format": "one of: short-form, long-form, mixed",
   "confidence": 0.0 to 1.0,
@@ -111,6 +112,7 @@ Return ONLY the JSON object. No prose.`
       prediction: {
         primary_niche: data.primary_niche || null,
         secondary_niches: Array.isArray(data.secondary_niches) ? data.secondary_niches : [],
+        cluster: data.cluster || null,
         tone: data.tone || null,
         content_format: data.content_format || null,
         specificity_hook: data.specificity_hook || null,

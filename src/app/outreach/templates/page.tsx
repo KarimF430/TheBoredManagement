@@ -288,7 +288,13 @@ function TemplateModal({ template, onClose, onSave }: { template: Template | nul
             <label className="section-title">Subject *</label>
             <input className="input" required value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} placeholder="Email subject line" />
             <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-              <strong>Variables:</strong> <code style={{ background: 'var(--bg-elevated)', padding: '1px 4px', borderRadius: 3 }}>{'{{onboarding_link}}'}</code> — per-creator onboarding URL (auto-creates session if needed). The link will be resolved when the campaign sends emails.
+              <strong>Variables:</strong>{' '}
+              <code style={{ background: 'var(--bg-elevated)', padding: '1px 4px', borderRadius: 3 }}>{'{{first_name}}'}</code>{' '}
+              <code style={{ background: 'var(--bg-elevated)', padding: '1px 4px', borderRadius: 3 }}>{'{{last_name}}'}</code>{' '}
+              <code style={{ background: 'var(--bg-elevated)', padding: '1px 4px', borderRadius: 3 }}>{'{{full_name}}'}</code>{' '}
+              <code style={{ background: 'var(--bg-elevated)', padding: '1px 4px', borderRadius: 3 }}>{'{{niche}}'}</code>{' '}
+              <code style={{ background: 'var(--bg-elevated)', padding: '1px 4px', borderRadius: 3 }}>{'{{platform}}'}</code>{' '}
+              <code style={{ background: 'var(--bg-elevated)', padding: '1px 4px', borderRadius: 3 }}>{'{{onboarding_link}}'}</code>
             </div>
           </div>
           <div>
@@ -296,7 +302,13 @@ function TemplateModal({ template, onClose, onSave }: { template: Template | nul
             <textarea className="textarea" required rows={8} value={form.body_text} onChange={e => setForm({ ...form, body_text: e.target.value })} placeholder="Plain text email body..." />
             <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{form.body_text.length} characters · {form.body_text.split(/\s+/).filter(Boolean).length} words</div>
             <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
-              <strong>Variables:</strong> <code style={{ background: 'var(--bg-elevated)', padding: '1px 4px', borderRadius: 3 }}>{'{{onboarding_link}}'}</code> — per-creator onboarding URL (auto-creates session if needed). The link will be resolved when the campaign sends emails.
+              <strong>Variables:</strong>{' '}
+              <code style={{ background: 'var(--bg-elevated)', padding: '1px 4px', borderRadius: 3 }}>{'{{first_name}}'}</code>{' '}
+              <code style={{ background: 'var(--bg-elevated)', padding: '1px 4px', borderRadius: 3 }}>{'{{last_name}}'}</code>{' '}
+              <code style={{ background: 'var(--bg-elevated)', padding: '1px 4px', borderRadius: 3 }}>{'{{full_name}}'}</code>{' '}
+              <code style={{ background: 'var(--bg-elevated)', padding: '1px 4px', borderRadius: 3 }}>{'{{niche}}'}</code>{' '}
+              <code style={{ background: 'var(--bg-elevated)', padding: '1px 4px', borderRadius: 3 }}>{'{{platform}}'}</code>{' '}
+              <code style={{ background: 'var(--bg-elevated)', padding: '1px 4px', borderRadius: 3 }}>{'{{onboarding_link}}'}</code>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>

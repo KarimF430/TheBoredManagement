@@ -60,7 +60,7 @@ export const outreachConfig = {
   gmail: {
     clientId: process.env.GMAIL_CLIENT_ID,
     clientSecret: process.env.GMAIL_CLIENT_SECRET,
-    redirectUri: process.env.GMAIL_REDIRECT_URI || 'http://localhost:3000/auth/gmail/callback',
+    redirectUri: process.env.GMAIL_REDIRECT_URI || 'http://localhost:3000/api/auth/gmail/callback',
   },
 
   alerts: {
@@ -74,6 +74,10 @@ export const outreachConfig = {
 
   enqueue: {
     apiKey: required('OUTREACH_ENQUEUE_API_KEY'),
+  },
+
+  cron: {
+    secret: process.env.CRON_SECRET || null,
   },
 }
 

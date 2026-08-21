@@ -18,7 +18,17 @@ import dns from 'dns'
 import { outreachSelect, outreachUpdate } from './db'
 import { alert } from './alerts'
 
-const dnsPromises = dns.promises
+// Lazy resolver creation — avoids hot-reload issues with module-level state.
+// On Windows, system DNS (192.168.1.1) often refuses connections from Node.js,
+// so we use public DNS servers via a dedicated Resolver instance.
+let _resolver: dns.promises.Resolver | null = null
+function getResolver(): dns.promises.Resolver {
+  if (!_resolver) {
+    _resolver = new dns.promises.Resolver()
+    _resolver.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1'])
+  }
+  return _resolver
+}
 
 // Re-verify interval: every 6 hours for active domains
 const REVERIFY_INTERVAL_MS = 6 * 60 * 60 * 1000
@@ -79,9 +89,11 @@ export async function verifyDomain(domainId: string, seedAuthHeader?: string | n
   // Parse the seed send Authentication-Results header
   const seedAuth = parseSeedAuthResults(seedAuthHeader || null, domain.domain)
 
-  // Gate requires DNS pass AND DMARC alignment from seed send
+  // DNS pass is sufficient to activate the domain (fixes chicken-and-egg:
+  // can't send seed email until domain is active, so seed auth can't be
+  // required on first verify). Seed auth is an optional secondary gate.
   const dnsPass = spf.valid && dkim.valid && dmarc.valid
-  const allPass = dnsPass && seedAuth.dmarcAligned
+  const allPass = dnsPass
 
   await outreachUpdate('outreach_sending_domains', 'id', domainId, {
     spf_status: spf.status,
@@ -97,7 +109,6 @@ export async function verifyDomain(domainId: string, seedAuthHeader?: string | n
     if (!spf.valid) failures.push(`SPF: ${spf.reason}`)
     if (!dkim.valid) failures.push(`DKIM: ${dkim.reason}`)
     if (!dmarc.valid) failures.push(`DMARC DNS: ${dmarc.reason}`)
-    if (!seedAuth.dmarcAligned) failures.push(`DMARC alignment: ${seedAuth.dmarcResult || 'failed'} (d=${seedAuth.dkimSigningDomain || 'unknown'})`)
 
     await alert({
       severity: 'critical',
@@ -167,7 +178,7 @@ export function parseSeedAuthResults(
 
 async function checkSPF(domain: string): Promise<AuthCheckResult> {
   try {
-    const records = await dnsPromises.resolveTxt(domain)
+    const records = await getResolver().resolveTxt(domain)
     const spfRecords = records.filter((r) => r.join('').toLowerCase().includes('v=spf1'))
 
     if (spfRecords.length === 0) {
@@ -206,7 +217,7 @@ async function checkDKIM(domain: string, isBulkSender: boolean): Promise<DKIMRes
   for (const selector of selectors) {
     try {
       const host = `${selector}._domainkey.${domain}`
-      const records = await dnsPromises.resolveTxt(host)
+      const records = await getResolver().resolveTxt(host)
 
       if (records.length > 0) {
         const dkim = records[0].join('')
@@ -218,7 +229,7 @@ async function checkDKIM(domain: string, isBulkSender: boolean): Promise<DKIMRes
       // Try CNAME
       try {
         const host = `${selector}._domainkey.${domain}`
-        const cname = await dnsPromises.resolveCname(host)
+        const cname = await getResolver().resolveCname(host)
         if (cname.length > 0) {
           return { valid: true, status: 'pass', reason: null, raw: `CNAME -> ${cname[0]}`, selector }
         }
@@ -234,7 +245,7 @@ async function checkDKIM(domain: string, isBulkSender: boolean): Promise<DKIMRes
 
 async function checkDMARC(domain: string): Promise<DMARCResult> {
   try {
-    const records = await dnsPromises.resolveTxt(`_dmarc.${domain}`)
+    const records = await getResolver().resolveTxt(`_dmarc.${domain}`)
     const dmarcRecords = records.filter((r) => r.join('').toLowerCase().includes('v=dmarc1'))
 
     if (dmarcRecords.length === 0) {

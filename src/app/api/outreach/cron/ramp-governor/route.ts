@@ -1,19 +1,14 @@
 import { NextResponse } from 'next/server'
-import { evaluateAndAdvance, resetDailyGlobal } from '@/workers/rampGovernor'
+import { evaluateAndAdvance } from '@/workers/rampGovernor'
+import { verifyCronAuth } from '@/lib/outreach/cronAuth'
 
-export async function GET() {
+export async function GET(req: Request) {
+  const authError = verifyCronAuth(req)
+  if (authError) return authError
+
   try {
     const result = await evaluateAndAdvance()
     return NextResponse.json(result)
-  } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 })
-  }
-}
-
-export async function POST() {
-  try {
-    await resetDailyGlobal()
-    return NextResponse.json({ ok: true, message: 'Daily global counter reset' })
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 })
   }

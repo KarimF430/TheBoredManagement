@@ -1,0 +1,29 @@
+▲ Next.js 16.2.10 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.166:3000
+- Environments: .env
+✓ Ready in 1278ms
+Warning: Custom Cache-Control headers detected for the following routes:
+  - /_next/static/:path*
+
+Setting a custom Cache-Control header can break Next.js development behavior.
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+
+ GET /outreach/templates 200 in 875ms (next.js: 311ms, proxy.ts: 187ms, application-code: 377ms)
+ GET /api/auth/me 200 in 220ms (next.js: 94ms, proxy.ts: 13ms, application-code: 113ms)
+ GET /api/outreach/templates 200 in 776ms (next.js: 182ms, proxy.ts: 11ms, application-code: 583ms)
+[processor] Processing 1/1: rajdeep.more@theboredmonkey.com stage=first_touch
+[processor] Sending via gmail from hajikarimbeldaar@gmail.com to rajdeep.more@theboredmonkey.com
+[processor] SEND OK: messageId=1a01ef3ff37cd20d
+ GET /api/outreach/cron/processor?batch=1 200 in 4.9s (next.js: 1453ms, proxy.ts: 9ms, application-code: 3.4s)
+ GET /outreach/templates 200 in 659ms (next.js: 96ms, proxy.ts: 235ms, application-code: 328ms)
+ GET /api/auth/me 200 in 199ms (next.js: 30ms, proxy.ts: 16ms, application-code: 153ms)
+ GET /api/outreach/templates 200 in 1543ms (next.js: 105ms, proxy.ts: 15ms, application-code: 1423ms)
+[processor] Processing 1/2: rajdeep.more@theboredmonkey.com stage=followup_1
+[processor] Sending via gmail from karimbeldaar@gmail.com to rajdeep.more@theboredmonkey.com
+[processor] SEND OK: messageId=1a0231a37cf32ba2
+[processor] Processing 2/2: rajdeep.more@theboredmonkey.com stage=first_touch
+[processor] Waiting 84s before next send...
+[processor] Sending via gmail from hajikarimbeldaar@gmail.com to rajdeep.more@theboredmonkey.com
+[processor] SEND OK: messageId=1a0231b89397cf22
+ GET /api/outreach/cron/processor?batch=2 200 in 90s (next.js: 25ms, proxy.ts: 8ms, application-code: 90s)

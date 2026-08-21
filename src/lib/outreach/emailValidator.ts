@@ -8,7 +8,11 @@ import { outreachInsert, outreachSelect, outreachUpdate } from './db'
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-const dnsPromises = dns.promises
+function getResolver(): dns.promises.Resolver {
+  const resolver = new (dns.promises as any).Resolver()
+  resolver.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4'])
+  return resolver as dns.promises.Resolver
+}
 
 interface ValidationResult {
   email: string
@@ -38,7 +42,8 @@ export async function validateEmail(email: string): Promise<ValidationResult> {
   const domain = lower.split('@')[1]
   let mxFound = false
   try {
-    const records = await dnsPromises.resolveMx(domain)
+    const resolver = getResolver()
+    const records = await resolver.resolveMx(domain)
     mxFound = Array.isArray(records) && records.length > 0
   } catch {
     mxFound = false

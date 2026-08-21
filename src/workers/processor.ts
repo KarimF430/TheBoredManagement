@@ -36,10 +36,21 @@ export async function processBatch(batchSize = 50): Promise<{ processed: number;
   let processed = 0
   let mbIndex = 0
 
-  for (const item of claimed) {
+  for (let i = 0; i < claimed.length; i++) {
+    const item = claimed[i]
+    console.log(`[processor] Processing ${i+1}/${claimed.length}: ${item.recipient_email} stage=${item.stage}`)
+
+    // Random delay between sends (30-120 seconds) to mimic human behavior
+    if (i > 0) {
+      const delay = 30000 + Math.random() * 90000
+      console.log(`[processor] Waiting ${Math.round(delay/1000)}s before next send...`)
+      await new Promise(r => setTimeout(r, delay))
+    }
+
     try {
       const suppressed = await isSuppressed(item.recipient_email)
       if (suppressed) {
+        console.log(`[processor] ${item.recipient_email} is SUPPRESSED, skipping`)
         await markSuppressed(item.id)
         continue
       }
@@ -54,9 +65,11 @@ export async function processBatch(batchSize = 50): Promise<{ processed: number;
       }
 
       await markSending(item.id, mailbox.id)
+      console.log(`[processor] Sending via ${mailbox.provider} from ${mailbox.email} to ${item.recipient_email}`)
 
       try {
         const result = await dispatchSend(item, mailbox)
+        console.log(`[processor] SEND OK: messageId=${result.providerMessageId}`)
         await markSent(item.id, mailbox.id, result)
         processed++
       } catch (err: any) {
@@ -76,6 +89,9 @@ export async function processBatch(batchSize = 50): Promise<{ processed: number;
 
   await incrementGlobalSent(processed)
 
+  // Check if any campaigns should be marked completed
+  await checkCampaignCompletion()
+
   return { processed }
 }
 
@@ -91,14 +107,8 @@ async function atomicClaim(limit: number): Promise<any[]> {
   const now = new Date().toISOString()
   const ids = queued.map((q: any) => q.id)
 
-  const updated = await outreachUpdateWhere(
-    'outreach_send_queue',
-    { id: ids[0], status: 'queued' },
-    { status: 'claimed', claimed_at: now, claimed_by: workerId }
-  )
-
-  // Claim remaining one by one (Supabase doesn't support SKIP LOCKED directly)
-  for (let i = 1; i < ids.length; i++) {
+  // Claim all items one by one (Supabase doesn't support SKIP LOCKED)
+  for (let i = 0; i < ids.length; i++) {
     try {
       await outreachUpdateWhere(
         'outreach_send_queue',
@@ -153,13 +163,24 @@ async function markSending(queueId: string, mailboxId: string): Promise<void> {
 
 async function dispatchSend(item: any, mailbox: any): Promise<any> {
   // Resolve template placeholders (e.g. {{onboarding_link}})
-  const resolved = await resolveTemplatePlaceholders(
-    item.subject,
-    item.body_text,
-    item.body_html,
-    item.creator_id || null,
-    item.recipient_email,
-  )
+  // On failure, send with raw placeholder text rather than failing the send
+  let resolved: { subject: string; body_text: string; body_html: string | undefined }
+  try {
+    resolved = await resolveTemplatePlaceholders(
+      item.subject,
+      item.body_text,
+      item.body_html,
+      item.creator_id || null,
+      item.recipient_email,
+    )
+  } catch (err) {
+    console.error(`Template resolution failed for queue ${item.id}:`, err)
+    resolved = {
+      subject: item.subject,
+      body_text: item.body_text,
+      body_html: item.body_html || undefined,
+    }
+  }
 
   if (mailbox.provider === 'gmail') {
     return await sendGmail(
@@ -315,5 +336,40 @@ async function incrementCampaignCounter(campaignId: string, column: string): Pro
     })
   } catch {
     // Counter failure should not block sends
+  }
+}
+
+async function checkCampaignCompletion(): Promise<void> {
+  try {
+    // Find campaigns in 'sending' status
+    const sending = await outreachSelect<any>('outreach_campaigns', {
+      filters: { status: 'sending' },
+    })
+
+    for (const campaign of sending) {
+      // Count remaining queued/claimed/sending items for this campaign
+      const remaining = await outreachCount('outreach_send_queue', {
+        campaign_id: campaign.id,
+      })
+
+      // Count items still in pipeline (not yet sent/failed/suppressed/invalid)
+      const inPipeline = await outreachSelect<any>('outreach_send_queue', {
+        filters: { campaign_id: campaign.id },
+        select: 'status',
+      })
+
+      const activeStatuses = new Set(['queued', 'claimed', 'sending'])
+      const hasActiveItems = inPipeline.some((row: any) => activeStatuses.has(row.status))
+
+      if (!hasActiveItems && inPipeline.length > 0) {
+        await outreachUpdate('outreach_campaigns', 'id', campaign.id, {
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+      }
+    }
+  } catch {
+    // Completion check failure should not block processing
   }
 }

@@ -46,7 +46,7 @@ export async function sendSES(
   enforceLinkLimit(bodyText, bodyHtml, 1)
 
   const client = getSESClient()
-  const { raw } = buildMimeMessage({
+  const { raw, rfcMessageId: msgId } = buildMimeMessage({
     from: mailbox.email,
     fromName: mailbox.display_name || mailbox.email.split('@')[0],
     to,
@@ -70,7 +70,7 @@ export async function sendSES(
     const res = await client.send(command)
     return {
       providerMessageId: res.MessageId || '',
-      rfcMessageId: raw,
+      rfcMessageId: msgId,
     }
   } catch (err) {
     const error = err as { name?: string; $metadata?: { httpStatusCode?: number }; message?: string }

@@ -10,6 +10,10 @@ export async function POST(
     const result = await verifyDomain(id)
     return NextResponse.json(result)
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 })
+    console.error('[verify-domain] Error:', err)
+    return NextResponse.json(
+      { error: (err as Error).message, stack: (err as Error).stack },
+      { status: 500 }
+    )
   }
 }

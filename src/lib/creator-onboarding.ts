@@ -69,6 +69,7 @@ export interface CreatorProfileDraft {
   content_frequency: string | null
   preferred_platforms: string[]
   past_brand_collabs: string[]
+  brands_worked: Array<{ name: string; provenance: string }> | unknown
   portfolio_url: string | null
   rate_card: Record<string, unknown>
   currency: string

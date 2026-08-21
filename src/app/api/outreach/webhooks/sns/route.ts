@@ -67,6 +67,11 @@ async function handleSesEvent(message: any): Promise<void> {
         }
       }
     }
+
+    // Update campaign bounced count
+    if (logRow.campaign_id) {
+      await incrementCampaignCounter(logRow.campaign_id, 'bounced_count')
+    }
   }
 
   if (eventType === 'Complaint') {
@@ -100,5 +105,27 @@ async function handleSesEvent(message: any): Promise<void> {
     await outreachUpdate('outreach_log', 'id', logRow.id, {
       delivered_at: new Date().toISOString(),
     })
+
+    // Update campaign delivered count
+    if (logRow.campaign_id) {
+      await incrementCampaignCounter(logRow.campaign_id, 'delivered_count')
+    }
+  }
+}
+
+async function incrementCampaignCounter(campaignId: string, column: string): Promise<void> {
+  try {
+    const rows = await outreachSelect<any>('outreach_campaigns', {
+      filters: { id: campaignId },
+      limit: 1,
+    })
+    if (rows.length === 0) return
+    const current = rows[0][column] || 0
+    await outreachUpdate('outreach_campaigns', 'id', campaignId, {
+      [column]: current + 1,
+      updated_at: new Date().toISOString(),
+    })
+  } catch {
+    // Counter failure should not block event processing
   }
 }

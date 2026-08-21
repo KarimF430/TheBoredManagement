@@ -5,8 +5,9 @@
  */
 
 import { google } from 'googleapis'
-import { getGmailClient } from '../lib/outreach/senders/gmailSender'
+import { getValidMailboxToken } from '../lib/outreach/gmail-oauth'
 import { outreachSelect, outreachInsert, outreachUpdate } from '../lib/outreach/db'
+import { outreachConfig } from '../lib/outreach/config'
 
 export async function captureAllReplies(): Promise<{ captured: number }> {
   const mailboxes = await outreachSelect<any>('outreach_mailboxes', {
@@ -28,12 +29,15 @@ export async function captureAllReplies(): Promise<{ captured: number }> {
 }
 
 async function captureForMailbox(mailbox: any): Promise<number> {
-  const gmail = getGmailClient({
-    id: mailbox.id,
-    email: mailbox.email,
-    display_name: mailbox.display_name,
-    oauth_token_ref: mailbox.oauth_token_ref,
-  })
+  const { accessToken } = await getValidMailboxToken(mailbox.id)
+
+  const oauth2Client = new google.auth.OAuth2(
+    outreachConfig.gmail.clientId,
+    outreachConfig.gmail.clientSecret,
+    outreachConfig.gmail.redirectUri,
+  )
+  oauth2Client.setCredentials({ access_token: accessToken })
+  const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
 
   if (!mailbox.gmail_history_id) {
     const profile = await gmail.users.getProfile({ userId: 'me' })
@@ -160,6 +164,11 @@ async function ingestMessage(gmail: any, mailbox: any, messageId: string): Promi
         updated_at: new Date().toISOString(),
       })
     }
+
+    // Update campaign replied count
+    if (logRow.campaign_id) {
+      await incrementCampaignCounter(logRow.campaign_id)
+    }
   }
 
   return true
@@ -191,4 +200,21 @@ function extractMessageIds(headerValue: string): string[] {
 function parseEmail(fromHeader: string): string {
   const m = fromHeader.match(/<([^>]+)>/)
   return (m ? m[1] : fromHeader).trim().toLowerCase()
+}
+
+async function incrementCampaignCounter(campaignId: string): Promise<void> {
+  try {
+    const rows = await outreachSelect<any>('outreach_campaigns', {
+      filters: { id: campaignId },
+      limit: 1,
+    })
+    if (rows.length === 0) return
+    const current = rows[0].replied_count || 0
+    await outreachUpdate('outreach_campaigns', 'id', campaignId, {
+      replied_count: current + 1,
+      updated_at: new Date().toISOString(),
+    })
+  } catch {
+    // Counter failure should not block reply capture
+  }
 }

@@ -1,8 +1,8 @@
 /**
- * Creator Onboarding — Save Step
+ * Creator Onboarding — Save Step (Multi-Axis)
  *
- * Each step commit:
- * 1. Saves draft data
+ * Each axis commit:
+ * 1. Saves per-axis draft data
  * 2. Emits a funnel event
  * 3. Writes partial raw_signals to outreach_creators (idempotent)
  */
@@ -21,14 +21,18 @@ import {
   emitFunnelEvent,
 } from '@/lib/creator-onboarding-integration'
 
-const STEP_EVENTS: Record<number, 'step_1_completed' | 'step_2_completed' | 'step_3_completed' | 'step_4_completed' | 'step_5_completed' | 'step_6_completed'> = {
-  1: 'step_1_completed',
-  2: 'step_2_completed',
-  3: 'step_3_completed',
-  4: 'step_4_completed',
-  5: 'step_5_completed',
-  6: 'step_6_completed',
-}
+const STEP_EVENTS = [
+  'step_1_completed',
+  'step_2_completed',
+  'step_3_completed',
+  'step_4_completed',
+  'step_5_completed',
+  'step_6_completed',
+  'step_7_completed',
+  'step_8_completed',
+  'step_9_completed',
+  'step_10_completed',
+] as const
 
 export async function POST(req: NextRequest) {
   try {
@@ -39,7 +43,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Token, step, and data are required' }, { status: 400 })
     }
 
-    if (step < 1 || step > 6) {
+    if (step < 1 || step > 10) {
       return NextResponse.json({ error: 'Invalid step number' }, { status: 400 })
     }
 
@@ -57,7 +61,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Profile already completed' }, { status: 400 })
     }
 
-    // ── Sanitize input (section 5: injection prevention) ─────
+    // ── Sanitize input ───────────────────────────────────────
     const sanitizedData = sanitizeInput(data)
 
     // ── Get or create draft ──────────────────────────────────
@@ -85,29 +89,24 @@ export async function POST(req: NextRequest) {
     })
 
     // ── Emit funnel event ────────────────────────────────────
-    const eventName = STEP_EVENTS[step]
+    const eventName = STEP_EVENTS[step - 1]
     if (eventName) {
       await emitFunnelEvent(session.id, eventName, { step, fields_updated: Object.keys(stepUpdates) })
     }
 
     // ── Write partial raw_signals (idempotent, per step) ─────
-    // Only write after step 2 (niche) since that's when personalizer has enough context
+    // Write after step 2 (niche) since that's when personalizer has enough context
     if (step >= 2) {
       try {
-        // Resolve creator identity if not yet linked
         const { outreachCreatorId } = await resolveCreatorIdentity(session, {
           ...draft,
           ...stepUpdates,
         } as any)
 
-        // Build raw_signals from current draft state
         const mergedDraft = { ...draft, ...stepUpdates } as any
         const rawSignals = buildRawSignals(mergedDraft, session)
-
-        // Write to outreach_creators (idempotent)
         await writeRawSignalsToOutreach(outreachCreatorId, rawSignals)
       } catch (err) {
-        // Non-fatal: raw_signals write failure doesn't block the step save
         console.error('raw_signals write failed:', err)
       }
     }
@@ -123,7 +122,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ── Input Sanitization (section 5) ──────────────────────────────
+// ── Input Sanitization ──────────────────────────────────────────
 
 const MAX_STRING_LENGTH = 500
 const MAX_ARRAY_LENGTH = 20
@@ -139,32 +138,19 @@ function sanitizeInput(data: Record<string, unknown>): Record<string, unknown> {
 
   for (const [key, value] of Object.entries(data)) {
     if (typeof value === 'string') {
-      // Block injection payloads
       if (BLOCKED_PATTERNS.some((p) => p.test(value))) {
         sanitized[key] = ''
         continue
       }
-      // Length cap
       sanitized[key] = value.slice(0, MAX_STRING_LENGTH)
     } else if (Array.isArray(value)) {
-      // Array length cap + sanitize each element
       sanitized[key] = value
         .slice(0, MAX_ARRAY_LENGTH)
-        .map((v) =>
-          typeof v === 'string'
-            ? v.slice(0, MAX_STRING_LENGTH)
-            : v
-        )
+        .map((v) => typeof v === 'string' ? v.slice(0, MAX_STRING_LENGTH) : v)
     } else if (typeof value === 'object' && value !== null) {
-      // Shallow sanitize nested objects
       sanitized[key] = sanitizeObject(value as Record<string, unknown>)
     } else if (typeof value === 'number') {
-      // Range check for numbers (reject absurd values)
-      if (!Number.isFinite(value) || Math.abs(value) > 1e12) {
-        sanitized[key] = 0
-      } else {
-        sanitized[key] = value
-      }
+      sanitized[key] = Number.isFinite(value) && Math.abs(value) <= 1e12 ? value : 0
     } else if (typeof value === 'boolean') {
       sanitized[key] = value
     } else {
@@ -179,19 +165,19 @@ function sanitizeObject(obj: Record<string, unknown>): Record<string, unknown> {
   const sanitized: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(obj)) {
     if (typeof value === 'string') {
-      if (BLOCKED_PATTERNS.some((p) => p.test(value))) {
-        sanitized[key] = ''
-      } else {
-        sanitized[key] = value.slice(0, MAX_STRING_LENGTH)
-      }
-    } else if (typeof value === 'number' && (Number.isFinite(value) && Math.abs(value) <= 1e12)) {
+      sanitized[key] = BLOCKED_PATTERNS.some((p) => p.test(value)) ? '' : value.slice(0, MAX_STRING_LENGTH)
+    } else if (typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= 1e12) {
       sanitized[key] = value
     } else if (typeof value === 'boolean') {
       sanitized[key] = value
+    } else if (typeof value === 'object' && value !== null) {
+      sanitized[key] = sanitizeObject(value as Record<string, unknown>)
     }
   }
   return sanitized
 }
+
+// ── Per-Axis Step Mapping ───────────────────────────────────────
 
 function mapStepToDraft(step: number, data: Record<string, unknown>) {
   switch (step) {
@@ -200,8 +186,13 @@ function mapStepToDraft(step: number, data: Record<string, unknown>) {
       const cleanHandle = rawHandle.replace('@', '').trim()
       return {
         name: data.name,
+        phone: data.phone || null,
+        gender: data.gender || null,
+        city: data.city || null,
+        state: data.state || null,
         youtube_handle: cleanHandle,
         instagram_handle: cleanHandle,
+        consent_given: data.consent,
         step_data: {
           consent: data.consent,
           handle: rawHandle,
@@ -209,29 +200,64 @@ function mapStepToDraft(step: number, data: Record<string, unknown>) {
         }
       }
     }
-    case 2: // Niche Screen
+    case 2: { // Niche Screen (two-tap cluster → niche)
       return {
+        cluster: data.cluster,
         primary_niche: data.primary_niche,
-        secondary_niches: data.secondary_niches,
-        sub_niches: data.sub_niches,
-        content_types: data.content_types,
+        secondary_niches: data.secondary_niches || [],
+        niche_provenance: 'self_reported',
+        step_data: {
+          niche_completed_at: new Date().toISOString()
+        }
       }
-    case 3: // Behavioral Screen (UI step 3)
+    }
+    case 3: { // Language Screen (predictive multi-select)
+      return {
+        languages: data.languages || [],
+        languages_preselected: true,
+      }
+    }
+    case 4: { // Creator Type Screen (single-select)
+      return {
+        creator_type: data.creator_type,
+      }
+    }
+    case 5: { // Content Format Screen (multi-select)
+      return {
+        content_formats: data.content_formats || [],
+      }
+    }
+    case 6: { // Metrics Screen (handles + self-reported)
+      const ytHandle = (data.youtube_handle as string || '').replace('@', '').trim()
+      const igHandle = (data.instagram_handle as string || '').replace('@', '').trim()
+      return {
+        youtube_handle: ytHandle || null,
+        youtube_subscribers: data.youtube_subscribers || 0,
+        instagram_handle: igHandle || null,
+        instagram_followers: data.instagram_followers || 0,
+        metrics_provenance: 'self_reported',
+      }
+    }
+    case 7: { // Brands Screen (light tag input)
+      return {
+        brands_worked: data.brands_worked || [],
+        past_brand_collabs: Array.isArray(data.brands_worked)
+          ? (data.brands_worked as Array<{ name: string }>).map(b => b.name)
+          : [],
+      }
+    }
+    case 8: { // Behavioral Screen (multi-question auto-advance)
       return {
         content_frequency: data.posts_per_week,
         age_range: data.audience_age,
-        languages: data.content_language ? [data.content_language as string] : [],
+        languages: data.content_language ? [data.content_language as string] : undefined,
         step_data: {
           has_brand_deals: data.has_brand_deals,
           monetization: data.monetization,
         }
       }
-    case 4: // Cluster Screen (UI step 4)
-      return {
-        content_style: data.content_style,
-        preferred_platforms: data.preferred_platforms,
-      }
-    case 5: // Willingness Screen (UI step 5)
+    }
+    case 9: { // Willingness Screen (binary swipes)
       return {
         step_data: {
           wants_paid: data.wants_paid,
@@ -240,7 +266,8 @@ function mapStepToDraft(step: number, data: Record<string, unknown>) {
           wants_gifting: data.wants_gifting,
         }
       }
-    case 6: { // Rates Screen (UI step 6)
+    }
+    case 10: { // Rates Screen
       const rateCard = {
         youtube_long: data.rate_youtube_long || 0,
         youtube_shorts: data.rate_youtube_shorts || 0,

@@ -72,7 +72,7 @@ interface PilotStatus {
   replyRate: number
 }
 
-const STEP_NAMES = ['Identity', 'Niche', 'Behavioral', 'Cluster', 'Willingness', 'Rates']
+const STEP_NAMES = ['Identity', 'Niche', 'Language', 'Type', 'Format', 'Metrics', 'Brands', 'Behavioral', 'Willingness', 'Rates']
 
 export default function OnboardingAdminPage() {
   const [activeTab, setActiveTab] = useState<'analytics' | 'sessions' | 'pilot'>('analytics')
@@ -111,7 +111,9 @@ export default function OnboardingAdminPage() {
       const res = await fetch('/api/creator-onboarding/analytics?days=30')
       const data = await res.json()
       if (!data.error) setAnalytics(data)
-    } catch {}
+    } catch {
+      // Analytics unavailable — non-critical, UI shows empty state
+    }
   }, [])
 
   const loadSessions = useCallback(async () => {
@@ -125,8 +127,10 @@ export default function OnboardingAdminPage() {
         setSessions(data.sessions || [])
         setSessionsTotal(data.total || 0)
       }
-    } catch {}
-  }, [sessionsPage, statusFilter, searchFilter])
+    } catch {
+      showToast('Failed to load sessions', 'error')
+    }
+  }, [sessionsPage, statusFilter, searchFilter, showToast])
 
   const loadPilot = useCallback(async () => {
     try {
@@ -137,7 +141,9 @@ export default function OnboardingAdminPage() {
       })
       const data = await res.json()
       if (data.ok) setPilotStatus(data)
-    } catch {}
+    } catch {
+      // Pilot status unavailable — non-critical
+    }
   }, [pilotBatch])
 
   const loadAll = useCallback(async (silent = false) => {

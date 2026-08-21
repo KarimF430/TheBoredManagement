@@ -3,12 +3,19 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams, useParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Loader2, X, ChevronLeft, Sparkles, Zap, Hand, DollarSign, Shield } from 'lucide-react'
+import { Loader2, X, ChevronLeft, Zap, Hand, DollarSign, MapPin, Phone } from 'lucide-react'
 import AutoAdvanceButton from '@/components/creator-onboarding/AutoAdvanceButton'
-import ProgressCue from '@/components/creator-onboarding/ProgressCue'
+import IdentityConstellation from '@/components/creator-onboarding/IdentityConstellation'
 import BinarySwipeCard from '@/components/creator-onboarding/BinarySwipeCard'
 import RateChip from '@/components/creator-onboarding/RateChip'
 import NicheSelector from '@/components/creator-onboarding/NicheSelector'
+import PredictiveLanguageSelect from '@/components/creator-onboarding/PredictiveLanguageSelect'
+import TypeCard from '@/components/creator-onboarding/TypeCard'
+import FormatChips from '@/components/creator-onboarding/FormatChips'
+import BrandTagInput from '@/components/creator-onboarding/BrandTagInput'
+import MetricStat from '@/components/creator-onboarding/MetricStat'
+import ConfirmPrompt from '@/components/creator-onboarding/ConfirmPrompt'
+import { INDIAN_STATES_LIST } from '@/lib/creator-onboarding-taxonomy'
 
 interface Session {
   id: string
@@ -18,21 +25,30 @@ interface Session {
   completed_steps: number[]
 }
 
-interface NicheData {
-  niche_name: string
-  icon: string
-  sub_niches: string[]
-  content_types: string[]
+interface BrandTag {
+  name: string
+  provenance: 'self_reported' | 'verified' | 'enriched'
 }
 
 interface FormData {
   consent: boolean
   name: string
   handle: string
+  phone: string
+  gender: string
+  city: string
+  state: string
+  cluster: string | null
   primary_niche: string | null
   secondary_niches: string[]
-  sub_niches: string[]
-  content_types: string[]
+  languages: string[]
+  creator_type: string | null
+  content_formats: string[]
+  youtube_handle: string
+  youtube_subscribers: number
+  instagram_handle: string
+  instagram_followers: number
+  brands_worked: BrandTag[]
   posts_per_week: string
   has_brand_deals: string
   audience_age: string
@@ -42,8 +58,6 @@ interface FormData {
   open_to_long_term: string
   open_exclusivity: string
   wants_gifting: string
-  content_style: string[]
-  preferred_platforms: string[]
   rate_youtube_long: number
   rate_youtube_shorts: number
   rate_instagram_reel: number
@@ -54,8 +68,12 @@ interface FormData {
 const SCREENS = [
   { id: 'identity', label: 'Identity' },
   { id: 'niche', label: 'Niche' },
+  { id: 'language', label: 'Language' },
+  { id: 'type', label: 'Type' },
+  { id: 'format', label: 'Format' },
+  { id: 'metrics', label: 'Metrics' },
+  { id: 'brands', label: 'Brands' },
   { id: 'behavioral', label: 'Behavioral' },
-  { id: 'cluster', label: 'Cluster' },
   { id: 'willingness', label: 'Willingness' },
   { id: 'rates', label: 'Rates' },
 ]
@@ -74,11 +92,11 @@ const BEHAVIORAL_QUESTIONS = [
     { value: 'no', label: 'No, but interested', icon: <Hand className="w-4 h-4" /> },
   ]},
   { key: 'audience_age' as const, question: 'What age group is your audience mainly?', options: [
-    { value: '13-17', label: '13-17 (Gen Z)', icon: <Sparkles className="w-4 h-4" /> },
-    { value: '18-24', label: '18-24', icon: <Sparkles className="w-4 h-4" /> },
-    { value: '25-34', label: '25-34', icon: <Sparkles className="w-4 h-4" /> },
-    { value: '35+', label: '35+', icon: <Sparkles className="w-4 h-4" /> },
-    { value: 'mixed', label: 'Mixed / Don\'t know', icon: <Sparkles className="w-4 h-4" /> },
+    { value: '13-17', label: '13-17 (Gen Z)', icon: null },
+    { value: '18-24', label: '18-24', icon: null },
+    { value: '25-34', label: '25-34', icon: null },
+    { value: '35+', label: '35+', icon: null },
+    { value: 'mixed', label: 'Mixed / Don\'t know', icon: null },
   ]},
   { key: 'content_language' as const, question: 'What language do you primarily create in?', options: [
     { value: 'hindi', label: 'Hindi', icon: null },
@@ -114,18 +132,32 @@ export default function OnboardingStepsPage() {
   const [currentScreen, setCurrentScreen] = useState(0)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [niches, setNiches] = useState<NicheData[]>([])
-  const [nicheConfidence, setNicheConfidence] = useState(0)
+  const [completing, setCompleting] = useState(false)
+  const [completeError, setCompleteError] = useState('')
   const [willingnessIdx, setWillingnessIdx] = useState(0)
+  const [behavIdx, setBehavIdx] = useState(0)
+  const [nichePrefillConfidence, setNichePrefillConfidence] = useState(0)
+  const [showNicheConfirm, setShowNicheConfirm] = useState(false)
 
   const [formData, setFormData] = useState<FormData>({
     consent: false,
     name: '',
     handle: '',
+    phone: '',
+    gender: '',
+    city: '',
+    state: '',
+    cluster: null,
     primary_niche: null,
     secondary_niches: [],
-    sub_niches: [],
-    content_types: [],
+    languages: [],
+    creator_type: null,
+    content_formats: [],
+    youtube_handle: '',
+    youtube_subscribers: 0,
+    instagram_handle: '',
+    instagram_followers: 0,
+    brands_worked: [],
     posts_per_week: '',
     has_brand_deals: '',
     audience_age: '',
@@ -135,8 +167,6 @@ export default function OnboardingStepsPage() {
     open_to_long_term: '',
     open_exclusivity: '',
     wants_gifting: '',
-    content_style: [],
-    preferred_platforms: [],
     rate_youtube_long: 0,
     rate_youtube_shorts: 0,
     rate_instagram_reel: 0,
@@ -152,13 +182,8 @@ export default function OnboardingStepsPage() {
 
     const fetchData = async () => {
       try {
-        const [sessionRes, nichesRes] = await Promise.all([
-          fetch(`/api/creator-onboarding/session?token=${token}`),
-          fetch('/api/creator-onboarding/niches'),
-        ])
-
+        const sessionRes = await fetch(`/api/creator-onboarding/session?token=${token}`)
         const sessionData = await sessionRes.json()
-        const nichesData = await nichesRes.json()
 
         if (!sessionRes.ok || !sessionData.session) {
           router.push('/creator-onboarding')
@@ -171,15 +196,15 @@ export default function OnboardingStepsPage() {
         }
 
         setSession(sessionData.session)
-        setNiches(nichesData.niches || [])
 
-        // Restore from localStorage if available
         const saved = localStorage.getItem(`onboarding_${token}`)
         if (saved) {
           try {
             const parsed = JSON.parse(saved)
             setFormData(parsed.formData)
             setCurrentScreen(parsed.currentScreen || 0)
+            setWillingnessIdx(parsed.willingnessIdx || 0)
+            setBehavIdx(parsed.behavIdx || 0)
           } catch {}
         }
       } catch {
@@ -192,15 +217,42 @@ export default function OnboardingStepsPage() {
     fetchData()
   }, [token, router])
 
-  // Save to localStorage on every change
   useEffect(() => {
     if (token && !loading) {
       localStorage.setItem(`onboarding_${token}`, JSON.stringify({
         formData,
         currentScreen,
+        willingnessIdx,
+        behavIdx,
       }))
     }
-  }, [token, loading, formData, currentScreen])
+  }, [token, loading, formData, currentScreen, willingnessIdx, behavIdx])
+
+  // Niche AI pre-fill
+  useEffect(() => {
+    if (currentScreen === 1 && formData.handle && !formData.primary_niche && !showNicheConfirm) {
+      fetch('/api/creator-onboarding/prefill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, handle: formData.handle }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.prefilled && data.prediction?.primary_niche) {
+            setNichePrefillConfidence(data.confidence || 0)
+            if ((data.confidence || 0) >= 0.7) {
+              setFormData(prev => ({
+                ...prev,
+                primary_niche: data.prediction.primary_niche,
+                cluster: data.prediction.cluster || prev.cluster,
+              }))
+              setShowNicheConfirm(true)
+            }
+          }
+        })
+        .catch(() => {})
+    }
+  }, [currentScreen, formData.handle, token])
 
   const saveStep = useCallback(async (step: number) => {
     if (!token) return
@@ -209,7 +261,7 @@ export default function OnboardingStepsPage() {
       await fetch('/api/creator-onboarding/save-step', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, step, data: getStepData(step) }),
+        body: JSON.stringify({ token, step: step + 1, data: getStepData(step) }),
       })
     } catch (err) {
       console.error('Failed to save step:', err)
@@ -220,12 +272,16 @@ export default function OnboardingStepsPage() {
 
   const getStepData = (step: number) => {
     switch (step) {
-      case 0: return { name: formData.name, handle: formData.handle, consent: formData.consent }
-      case 1: return { primary_niche: formData.primary_niche, secondary_niches: formData.secondary_niches, sub_niches: formData.sub_niches, content_types: formData.content_types }
-      case 2: return { posts_per_week: formData.posts_per_week, has_brand_deals: formData.has_brand_deals, audience_age: formData.audience_age, content_language: formData.content_language, monetization: formData.monetization }
-      case 3: return { content_style: formData.content_style, preferred_platforms: formData.preferred_platforms }
-      case 4: return { wants_paid: formData.wants_paid, open_to_long_term: formData.open_to_long_term, open_exclusivity: formData.open_exclusivity, wants_gifting: formData.wants_gifting }
-      case 5: return { rate_youtube_long: formData.rate_youtube_long, rate_youtube_shorts: formData.rate_youtube_shorts, rate_instagram_reel: formData.rate_instagram_reel, rate_instagram_post: formData.rate_instagram_post, rates_deferred: formData.rates_deferred }
+      case 0: return { name: formData.name, handle: formData.handle, consent: formData.consent, phone: formData.phone, gender: formData.gender, city: formData.city, state: formData.state }
+      case 1: return { cluster: formData.cluster, primary_niche: formData.primary_niche, secondary_niches: formData.secondary_niches }
+      case 2: return { languages: formData.languages }
+      case 3: return { creator_type: formData.creator_type }
+      case 4: return { content_formats: formData.content_formats }
+      case 5: return { youtube_handle: formData.youtube_handle, youtube_subscribers: formData.youtube_subscribers, instagram_handle: formData.instagram_handle, instagram_followers: formData.instagram_followers }
+      case 6: return { brands_worked: formData.brands_worked }
+      case 7: return { posts_per_week: formData.posts_per_week, has_brand_deals: formData.has_brand_deals, audience_age: formData.audience_age, content_language: formData.content_language, monetization: formData.monetization }
+      case 8: return { wants_paid: formData.wants_paid, open_to_long_term: formData.open_to_long_term, open_exclusivity: formData.open_exclusivity, wants_gifting: formData.wants_gifting }
+      case 9: return { rate_youtube_long: formData.rate_youtube_long, rate_youtube_shorts: formData.rate_youtube_shorts, rate_instagram_reel: formData.rate_instagram_reel, rate_instagram_post: formData.rate_instagram_post, rates_deferred: formData.rates_deferred }
       default: return {}
     }
   }
@@ -235,20 +291,28 @@ export default function OnboardingStepsPage() {
     if (fromScreen < SCREENS.length - 1) {
       setCurrentScreen(fromScreen + 1)
       setWillingnessIdx(0)
+      setBehavIdx(0)
+      setShowNicheConfirm(false)
     } else {
-      // Complete
+      setCompleting(true)
+      setCompleteError('')
       try {
         const res = await fetch('/api/creator-onboarding/complete', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token }),
         })
-        if (res.ok) {
+        const data = await res.json()
+        if (res.ok && data.ok) {
           localStorage.removeItem(`onboarding_${token}`)
           router.push(`/creator-onboarding/${token}/success`)
+        } else {
+          setCompleteError(data.error || 'Failed to complete setup. Please try again.')
         }
-      } catch (err) {
-        console.error('Failed to complete:', err)
+      } catch {
+        setCompleteError('Network error. Please check your connection and try again.')
+      } finally {
+        setCompleting(false)
       }
     }
   }
@@ -257,6 +321,7 @@ export default function OnboardingStepsPage() {
     if (currentScreen > 0) {
       await saveStep(currentScreen)
       setCurrentScreen(currentScreen - 1)
+      setShowNicheConfirm(false)
     }
   }
 
@@ -266,193 +331,171 @@ export default function OnboardingStepsPage() {
   }
 
   const updateField = <K extends keyof FormData>(key: K, value: FormData[K]) => {
-    setFormData((prev) => ({ ...prev, [key]: value }))
+    setFormData(prev => ({ ...prev, [key]: value }))
   }
 
-  const computeCompleteness = (): number => {
-    let filled = 0
-    let total = 12
-    if (formData.name) filled++
-    if (formData.handle) filled++
-    if (formData.primary_niche) filled++
-    if (formData.posts_per_week) filled++
-    if (formData.has_brand_deals) filled++
-    if (formData.audience_age) filled++
-    if (formData.content_language) filled++
-    if (formData.monetization) filled++
-    if (formData.wants_paid) filled++
-    if (formData.open_to_long_term) filled++
-    if (formData.content_style.length > 0) filled++
-    if (formData.rate_youtube_long > 0 || formData.rate_youtube_shorts > 0 || formData.rates_deferred) filled++
-    return Math.round((filled / total) * 100)
-  }
-
-  // Auto-fetch niche confidence
-  useEffect(() => {
-    if (currentScreen === 1 && niches.length > 0 && formData.handle && !formData.primary_niche) {
-      fetch('/api/creator-onboarding/prefill', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, handle: formData.handle }),
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.niche) {
-            const matched = niches.find((n) => n.niche_name.toLowerCase() === data.niche.toLowerCase())
-            if (matched) {
-              setNicheConfidence(data.confidence || 0)
-              if ((data.confidence || 0) >= 0.7) {
-                updateField('primary_niche', matched.niche_name)
-                updateField('sub_niches', matched.sub_niches)
-                updateField('content_types', matched.content_types)
-              }
-            }
-          }
-        })
-        .catch(() => {})
-    }
-  }, [currentScreen, niches, formData.handle])
+  // Constellation axes
+  const constellationAxes = [
+    { id: 'identity', label: 'Identity', filled: !!formData.name && !!formData.handle },
+    { id: 'niche', label: 'Niche', filled: !!formData.primary_niche },
+    { id: 'language', label: 'Language', filled: formData.languages.length > 0 },
+    { id: 'type', label: 'Type', filled: !!formData.creator_type },
+    { id: 'format', label: 'Format', filled: formData.content_formats.length > 0 },
+    { id: 'brands', label: 'Brands', filled: formData.brands_worked.length > 0 },
+  ]
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+      <div className="onb-shell">
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--onb-coral)' }} />
       </div>
     )
   }
 
-  const completeness = computeCompleteness()
-
   return (
-    <div data-theme="dark" className="relative min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4 overflow-x-hidden select-none">
-      {/* Premium glowing backdrops */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] bg-blue-500/10 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-1/4 left-1/2 -translate-x-1/2 translate-y-1/2 w-[350px] h-[350px] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
+    <div className="onb-shell">
+      <div className="onb-glow-top" />
+      <div className="onb-glow-bottom" />
 
-      {/* Decorative background grid */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.1),rgba(255,255,255,0))] pointer-events-none" />
-
-      <div className="max-w-lg w-full py-8 relative z-10 flex flex-col justify-center">
-        <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 rounded-3xl p-8 shadow-2xl">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <button
-              onClick={handleSaveAndQuit}
-              className="p-2 rounded-lg hover:bg-slate-800/60 transition-colors"
-              title="Save & quit"
-            >
-              <X className="w-5 h-5 text-slate-500 hover:text-slate-300" />
-            </button>
-            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
-              {SCREENS.map((s, i) => (
-                <div
-                  key={s.id}
-                  className={`w-2 h-2 rounded-full transition-all ${
-                    i < currentScreen ? 'bg-emerald-500' : i === currentScreen ? 'bg-blue-500 scale-125' : 'bg-slate-800'
-                  }`}
-                />
-              ))}
-            </div>
-            <span className="text-xs font-medium text-slate-500 tabular-nums">
-              {currentScreen + 1}/{SCREENS.length}
-            </span>
-          </div>
-
-          {/* Progress Cue */}
-          <ProgressCue completeness={completeness} />
-
-          {/* Back button */}
-          {currentScreen > 0 && (
-            <button
-              onClick={goBack}
-              className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 mb-4 transition-colors"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-              Back
-            </button>
-          )}
-
-          {/* Saving indicator */}
-          {saving && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-4 flex items-center justify-center gap-2 text-xs text-slate-500"
-            >
-              <Loader2 className="w-3 h-3 animate-spin" />
-              Saving...
-            </motion.div>
-          )}
-
-          {/* Screen Content */}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentScreen}
-              initial={{ opacity: 0, x: 15 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -15 }}
-              transition={{ duration: 0.2 }}
-            >
-              {currentScreen === 0 && (
-                <IdentityScreen
-                  formData={formData}
-                  onUpdate={updateField}
-                  onConfirm={() => advanceScreen(0)}
-                />
-              )}
-              {currentScreen === 1 && (
-                <NicheScreen
-                  niches={niches}
-                  formData={formData}
-                  confidence={nicheConfidence}
-                  onUpdate={updateField}
-                  onConfirm={() => advanceScreen(1)}
-                />
-              )}
-              {currentScreen === 2 && (
-                <BehavioralScreen
-                  formData={formData}
-                  onUpdate={updateField}
-                  onConfirm={() => advanceScreen(2)}
-                />
-              )}
-              {currentScreen === 3 && (
-                <ClusterScreen
-                  formData={formData}
-                  onUpdate={updateField}
-                  onConfirm={() => advanceScreen(3)}
-                />
-              )}
-              {currentScreen === 4 && (
-                <WillingnessScreen
-                  formData={formData}
-                  onUpdate={updateField}
-                  questionIdx={willingnessIdx}
-                  onNextQuestion={() => {
-                    if (willingnessIdx < WILLINGNESS_QUESTIONS.length - 1) {
-                      setWillingnessIdx(willingnessIdx + 1)
-                    } else {
-                      advanceScreen(4)
-                    }
-                  }}
-                />
-              )}
-              {currentScreen === 5 && (
-                <RateScreen
-                  formData={formData}
-                  onUpdate={updateField}
-                  onConfirm={() => advanceScreen(5)}
-                />
-              )}
-            </motion.div>
-          </AnimatePresence>
+      <div className="onb-card" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={handleSaveAndQuit}
+            className="p-2 rounded-lg transition-colors"
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--onb-text-muted)' }}
+            title="Save & quit"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <span
+            style={{
+              fontFamily: 'var(--onb-font-body)',
+              fontSize: 12,
+              fontWeight: 600,
+              color: 'var(--onb-text-muted)',
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {currentScreen + 1}/{SCREENS.length}
+          </span>
         </div>
+
+        {/* Constellation */}
+        <IdentityConstellation axes={constellationAxes} />
+
+        {/* Back button */}
+        {currentScreen > 0 && (
+          <button
+            onClick={goBack}
+            className="flex items-center gap-1 mb-4 transition-colors"
+            style={{
+              fontFamily: 'var(--onb-font-body)',
+              fontSize: 12,
+              color: 'var(--onb-text-muted)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+            Back
+          </button>
+        )}
+
+        {/* Saving indicator */}
+        {saving && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 flex items-center justify-center gap-2"
+            style={{ fontSize: 11, color: 'var(--onb-text-muted)', fontFamily: 'var(--onb-font-body)' }}
+          >
+            <Loader2 className="w-3 h-3 animate-spin" />
+            Saving...
+          </motion.div>
+        )}
+
+        {/* Screen content */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentScreen}
+            initial={{ opacity: 0, x: 15 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -15 }}
+            transition={{ duration: 0.2 }}
+          >
+            {currentScreen === 0 && (
+              <IdentityScreen formData={formData} onUpdate={updateField} onConfirm={() => advanceScreen(0)} />
+            )}
+            {currentScreen === 1 && (
+              <NicheScreen
+                formData={formData}
+                onUpdate={updateField}
+                onConfirm={() => advanceScreen(1)}
+                showConfirm={showNicheConfirm}
+                confidence={nichePrefillConfidence}
+                onDismissConfirm={() => { setShowNicheConfirm(false); setFormData(prev => ({ ...prev, primary_niche: null, cluster: null })) }}
+              />
+            )}
+            {currentScreen === 2 && (
+              <LanguageScreen formData={formData} onUpdate={updateField} onConfirm={() => advanceScreen(2)} />
+            )}
+            {currentScreen === 3 && (
+              <TypeScreen formData={formData} onUpdate={updateField} onConfirm={() => advanceScreen(3)} />
+            )}
+            {currentScreen === 4 && (
+              <FormatScreen formData={formData} onUpdate={updateField} onConfirm={() => advanceScreen(4)} />
+            )}
+            {currentScreen === 5 && (
+              <MetricsScreen formData={formData} onUpdate={updateField} onConfirm={() => advanceScreen(5)} />
+            )}
+            {currentScreen === 6 && (
+              <BrandsScreen formData={formData} onUpdate={updateField} onConfirm={() => advanceScreen(6)} />
+            )}
+            {currentScreen === 7 && (
+              <BehavioralScreen
+                formData={formData}
+                onUpdate={updateField}
+                behavIdx={behavIdx}
+                setBehavIdx={setBehavIdx}
+                onConfirm={() => advanceScreen(7)}
+              />
+            )}
+            {currentScreen === 8 && (
+              <WillingnessScreen
+                formData={formData}
+                onUpdate={updateField}
+                questionIdx={willingnessIdx}
+                onNextQuestion={() => {
+                  if (willingnessIdx < WILLINGNESS_QUESTIONS.length - 1) {
+                    setWillingnessIdx(willingnessIdx + 1)
+                  } else {
+                    advanceScreen(8)
+                  }
+                }}
+              />
+            )}
+            {currentScreen === 9 && (
+              <RateScreen
+                formData={formData}
+                onUpdate={updateField}
+                onConfirm={() => advanceScreen(9)}
+                completing={completing}
+                completeError={completeError}
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   )
 }
 
-// ─── Screen Components ─────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════
+// Screen Components
+// ═════════════════════════════════════════════════════════════════════
 
 function IdentityScreen({
   formData,
@@ -463,72 +506,166 @@ function IdentityScreen({
   onUpdate: <K extends keyof FormData>(key: K, value: FormData[K]) => void
   onConfirm: () => void
 }) {
+  // Constellation axes — identity fields
+  const identityAxes = [
+    { id: 'consent', label: 'Consent', filled: formData.consent },
+    { id: 'name', label: 'Name', filled: formData.name.trim().length > 0 },
+    { id: 'handle', label: 'Handle', filled: formData.handle.trim().length > 0 },
+    { id: 'location', label: 'Location', filled: formData.city.trim().length > 0 || formData.state.trim().length > 0 },
+  ]
+
   const canProceed = formData.consent && formData.name.trim().length > 0 && formData.handle.trim().length > 0
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-slate-100">Let&apos;s get started</h2>
-        <p className="text-sm text-slate-400 mt-1">
-          We need a few basics to set up your profile
-        </p>
+    <div>
+      {/* Title */}
+      <div style={{ marginBottom: 16 }}>
+        <h2 className="onb-title">Who are you?</h2>
+        <p className="onb-subtitle" style={{ marginTop: 6 }}>Just the basics — we&apos;ll keep it between us.</p>
       </div>
 
-      {/* Consent */}
-      <label className="flex items-start gap-3 p-4 rounded-xl border border-slate-800 bg-slate-900/20 cursor-pointer hover:bg-slate-800/40 transition-colors">
+      {/* Visibility constellation */}
+      <IdentityConstellation axes={identityAxes} />
+
+      {/* Consent gate */}
+      <label
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 12,
+          padding: '14px 16px',
+          borderRadius: 14,
+          border: `1px solid ${formData.consent ? 'rgba(255,90,95,0.3)' : 'var(--onb-border)'}`,
+          background: formData.consent ? 'rgba(255,90,95,0.06)' : 'rgba(22,20,40,0.3)',
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+          marginBottom: 28,
+        }}
+      >
         <input
           type="checkbox"
           checked={formData.consent}
           onChange={(e) => onUpdate('consent', e.target.checked)}
-          className="mt-0.5 w-4 h-4 rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-blue-500"
+          style={{ marginTop: 2, accentColor: 'var(--onb-coral)', width: 16, height: 16, flexShrink: 0 }}
         />
         <div>
-          <div className="text-sm font-semibold text-slate-200">I agree to share my creator info</div>
-          <div className="text-xs text-slate-400 mt-1">
-            This helps brands find and partner with you. You can opt out anytime.
+          <div style={{ fontFamily: 'var(--onb-font-display)', fontSize: 13, fontWeight: 700, color: 'var(--onb-text)', lineHeight: 1.3 }}>
+            I agree to share my creator info
+          </div>
+          <div style={{ fontFamily: 'var(--onb-font-body)', fontSize: 11, color: 'var(--onb-text-muted)', marginTop: 3, lineHeight: 1.4 }}>
+            This helps brands find and partner with you. Opt out anytime.
           </div>
         </div>
       </label>
 
-      {/* Name */}
-      <div>
-        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-          Your name
-        </label>
-        <input
-          type="text"
-          value={formData.name}
-          onChange={(e) => onUpdate('name', e.target.value)}
-          placeholder="e.g. Priya Sharma"
-          className="w-full px-4 py-3.5 bg-slate-950/60 border border-slate-800/80 rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-        />
+      {/* Section: Who you are */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{
+          fontFamily: 'var(--onb-font-display)',
+          fontSize: 10,
+          fontWeight: 700,
+          color: 'var(--onb-text-muted)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.8px',
+          marginBottom: 12,
+        }}>
+          Who you are
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => onUpdate('name', e.target.value)}
+              placeholder="Your name"
+              className="onb-input"
+            />
+          </div>
+          <div>
+            <input
+              type="text"
+              value={formData.handle}
+              onChange={(e) => onUpdate('handle', e.target.value)}
+              placeholder="@instagram or YouTube handle"
+              className="onb-input"
+            />
+          </div>
+          <div>
+            <div style={{ position: 'relative' }}>
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--onb-text-muted)' }} />
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => onUpdate('phone', e.target.value)}
+                placeholder="Phone number (optional)"
+                className="onb-input"
+                style={{ paddingLeft: 36 }}
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Handle */}
-      <div>
-        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-          Instagram / YouTube handle
-        </label>
-        <input
-          type="text"
-          value={formData.handle}
-          onChange={(e) => onUpdate('handle', e.target.value)}
-          placeholder="@yourhandle"
-          className="w-full px-4 py-3.5 bg-slate-950/60 border border-slate-800/80 rounded-xl text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-        />
+      {/* Section: Where you are */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{
+          fontFamily: 'var(--onb-font-display)',
+          fontSize: 10,
+          fontWeight: 700,
+          color: 'var(--onb-text-muted)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.8px',
+          marginBottom: 12,
+        }}>
+          Where you are
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <select
+              value={formData.gender}
+              onChange={(e) => onUpdate('gender', e.target.value)}
+              className="onb-input"
+              style={{ fontSize: 14 }}
+            >
+              <option value="">Gender</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="non_binary">Non-binary</option>
+              <option value="prefer_not">Prefer not to say</option>
+            </select>
+            <div style={{ position: 'relative' }}>
+              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--onb-text-muted)' }} />
+              <input
+                type="text"
+                value={formData.city}
+                onChange={(e) => onUpdate('city', e.target.value)}
+                placeholder="City"
+                className="onb-input"
+                style={{ paddingLeft: 36, fontSize: 14 }}
+              />
+            </div>
+          </div>
+          <select
+            value={formData.state}
+            onChange={(e) => onUpdate('state', e.target.value)}
+            className="onb-input"
+            style={{ fontSize: 14 }}
+          >
+            <option value="">State</option>
+            {INDIAN_STATES_LIST.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Confirm */}
       <motion.button
         onClick={onConfirm}
         disabled={!canProceed}
-        className={`
-          w-full py-3.5 rounded-xl font-semibold text-sm transition-all
-          ${canProceed
-            ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/25'
-            : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-800/50'
-          }
-        `}
+        className="onb-btn-primary"
         whileTap={canProceed ? { scale: 0.98 } : {}}
       >
         Continue
@@ -538,85 +675,278 @@ function IdentityScreen({
 }
 
 function NicheScreen({
-  niches,
   formData,
-  confidence,
   onUpdate,
   onConfirm,
+  showConfirm,
+  confidence,
+  onDismissConfirm,
 }: {
-  niches: NicheData[]
   formData: FormData
-  confidence: number
   onUpdate: <K extends keyof FormData>(key: K, value: FormData[K]) => void
   onConfirm: () => void
+  showConfirm: boolean
+  confidence: number
+  onDismissConfirm: () => void
 }) {
-  const hasConfirmed = !!formData.primary_niche
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-100">Your niche</h2>
-        <p className="text-sm text-slate-400 mt-1">
-          {confidence >= 0.7 && !hasConfirmed
+        <h2 className="onb-title">Your niche</h2>
+        <p className="onb-subtitle">
+          {showConfirm && confidence >= 0.7
             ? `We think you create ${formData.primary_niche || 'content'} — does that look right?`
-            : 'Pick the category that best describes your content'
-          }
+            : 'Pick the cluster that best describes your content'}
         </p>
       </div>
 
-      {/* Confidence confirm prompt */}
-      {confidence >= 0.7 && !hasConfirmed && formData.primary_niche && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="p-4 bg-blue-900/20 rounded-2xl border border-blue-800/80"
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="w-4 h-4 text-blue-400" />
-            <span className="text-xs font-semibold text-blue-400 uppercase tracking-wider">AI pre-fill detected</span>
-          </div>
-          <div className="text-lg font-bold text-slate-100 mb-3">
-            {formData.primary_niche}
-          </div>
-          <div className="flex gap-3 mt-4">
-            <motion.button
-              onClick={onConfirm}
-              className="flex-1 py-3 rounded-xl bg-blue-500 text-white font-semibold text-sm hover:bg-blue-600 transition-colors shadow-lg shadow-blue-500/20"
-              whileTap={{ scale: 0.98 }}
-            >
-              Looks right
-            </motion.button>
-            <motion.button
-              onClick={() => onUpdate('primary_niche', null)}
-              className="flex-1 py-3 rounded-xl border border-slate-800 bg-slate-950 text-slate-400 font-semibold text-sm hover:bg-slate-900 transition-colors"
-              whileTap={{ scale: 0.98 }}
-            >
-              Let me choose
-            </motion.button>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Full niche grid */}
-      {(!formData.primary_niche || confidence < 0.7) && (
-        <NicheSelector
-          niches={niches.map((n) => ({ name: n.niche_name, icon: n.icon, sub_niches: n.sub_niches, content_types: n.content_types }))}
-          selectedPrimary={formData.primary_niche}
-          selectedSecondary={formData.secondary_niches}
-          onSelectPrimary={(niche) => {
-            const match = niches.find((n) => n.niche_name === niche)
-            onUpdate('primary_niche', niche)
-            onUpdate('sub_niches', match?.sub_niches || [])
-            onUpdate('content_types', match?.content_types || [])
-          }}
-          onSelectSecondary={(niches) => onUpdate('secondary_niches', niches)}
+      {/* AI pre-fill confirm */}
+      {showConfirm && confidence >= 0.7 && formData.primary_niche && (
+        <ConfirmPrompt
+          title={formData.primary_niche}
+          subtitle="We predicted this from your handle and content"
+          onConfirm={onConfirm}
+          onReject={onDismissConfirm}
         />
       )}
 
-      {formData.primary_niche && (
+      {/* Two-tap cluster → niche selector */}
+      {!showConfirm && (
+        <NicheSelector
+          selectedCluster={formData.cluster}
+          selectedPrimary={formData.primary_niche}
+          selectedSecondary={formData.secondary_niches}
+          onSelectCluster={(id) => onUpdate('cluster', id)}
+          onSelectPrimary={(niche) => onUpdate('primary_niche', niche)}
+          onSelectSecondary={(niches) => onUpdate('secondary_niches', niches)}
+          onBack={() => {}}
+        />
+      )}
+
+      {/* Continue button (when not in confirm mode) */}
+      {!showConfirm && formData.primary_niche && (
         <motion.button
           onClick={onConfirm}
-          className="w-full py-3.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold text-sm hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/25 transition-all"
+          className="onb-btn-primary"
+          whileTap={{ scale: 0.98 }}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          Continue
+        </motion.button>
+      )}
+    </div>
+  )
+}
+
+function LanguageScreen({
+  formData,
+  onUpdate,
+  onConfirm,
+}: {
+  formData: FormData
+  onUpdate: <K extends keyof FormData>(key: K, value: FormData[K]) => void
+  onConfirm: () => void
+}) {
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="onb-title">Languages</h2>
+        <p className="onb-subtitle">What languages do you create content in?</p>
+      </div>
+
+      <PredictiveLanguageSelect
+        selected={formData.languages}
+        onChange={(langs) => onUpdate('languages', langs)}
+        creatorState={formData.state}
+      />
+
+      {formData.languages.length > 0 && (
+        <motion.button
+          onClick={onConfirm}
+          className="onb-btn-primary"
+          whileTap={{ scale: 0.98 }}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          Continue
+        </motion.button>
+      )}
+    </div>
+  )
+}
+
+function TypeScreen({
+  formData,
+  onUpdate,
+  onConfirm,
+}: {
+  formData: FormData
+  onUpdate: <K extends keyof FormData>(key: K, value: FormData[K]) => void
+  onConfirm: () => void
+}) {
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="onb-title">Who creates?</h2>
+        <p className="onb-subtitle">Select the option that fits best</p>
+      </div>
+
+      <TypeCard selected={formData.creator_type} onSelect={(type) => onUpdate('creator_type', type)} />
+
+      {formData.creator_type && (
+        <motion.button
+          onClick={onConfirm}
+          className="onb-btn-primary"
+          whileTap={{ scale: 0.98 }}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          Continue
+        </motion.button>
+      )}
+    </div>
+  )
+}
+
+function FormatScreen({
+  formData,
+  onUpdate,
+  onConfirm,
+}: {
+  formData: FormData
+  onUpdate: <K extends keyof FormData>(key: K, value: FormData[K]) => void
+  onConfirm: () => void
+}) {
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="onb-title">Content format</h2>
+        <p className="onb-subtitle">How do you create?</p>
+      </div>
+
+      <FormatChips
+        selected={formData.content_formats}
+        onChange={(formats) => onUpdate('content_formats', formats)}
+      />
+
+      {formData.content_formats.length > 0 && (
+        <motion.button
+          onClick={onConfirm}
+          className="onb-btn-primary"
+          whileTap={{ scale: 0.98 }}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          Continue
+        </motion.button>
+      )}
+    </div>
+  )
+}
+
+function MetricsScreen({
+  formData,
+  onUpdate,
+  onConfirm,
+}: {
+  formData: FormData
+  onUpdate: <K extends keyof FormData>(key: K, value: FormData[K]) => void
+  onConfirm: () => void
+}) {
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="onb-title">Your channel</h2>
+        <p className="onb-subtitle">Add your social handles — we'll verify metrics automatically</p>
+      </div>
+
+      {/* YouTube */}
+      <div>
+        <label className="onb-label">YouTube handle</label>
+        <input
+          type="text"
+          value={formData.youtube_handle}
+          onChange={(e) => onUpdate('youtube_handle', e.target.value)}
+          placeholder="@yourchannel"
+          className="onb-input"
+        />
+      </div>
+
+      {/* Instagram */}
+      <div>
+        <label className="onb-label">Instagram handle</label>
+        <input
+          type="text"
+          value={formData.instagram_handle}
+          onChange={(e) => onUpdate('instagram_handle', e.target.value)}
+          placeholder="@yourhandle"
+          className="onb-input"
+        />
+      </div>
+
+      {/* Metrics display (self-reported for now, verified on completion) */}
+      {(formData.youtube_subscribers > 0 || formData.instagram_followers > 0) && (
+        <div className="space-y-2">
+          {formData.youtube_subscribers > 0 && (
+            <MetricStat
+              label="YouTube subscribers"
+              value={formData.youtube_subscribers}
+              provenance="self_reported"
+              format="views"
+            />
+          )}
+          {formData.instagram_followers > 0 && (
+            <MetricStat
+              label="Instagram followers"
+              value={formData.instagram_followers}
+              provenance="self_reported"
+              format="views"
+            />
+          )}
+        </div>
+      )}
+
+      <motion.button
+        onClick={onConfirm}
+        className="onb-btn-primary"
+        whileTap={{ scale: 0.98 }}
+      >
+        Continue
+      </motion.button>
+    </div>
+  )
+}
+
+function BrandsScreen({
+  formData,
+  onUpdate,
+  onConfirm,
+}: {
+  formData: FormData
+  onUpdate: <K extends keyof FormData>(key: K, value: FormData[K]) => void
+  onConfirm: () => void
+}) {
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="onb-title">Brand work</h2>
+        <p className="onb-subtitle">Any brands you've collaborated with? Totally optional.</p>
+      </div>
+
+      <BrandTagInput
+        brands={formData.brands_worked}
+        onChange={(brands) => onUpdate('brands_worked', brands)}
+      />
+
+      <button onClick={onConfirm} className="onb-skip" style={{ width: '100%', textAlign: 'center' }}>
+        Skip for now
+      </button>
+
+      {formData.brands_worked.length > 0 && (
+        <motion.button
+          onClick={onConfirm}
+          className="onb-btn-primary"
           whileTap={{ scale: 0.98 }}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -631,20 +961,23 @@ function NicheScreen({
 function BehavioralScreen({
   formData,
   onUpdate,
+  behavIdx,
+  setBehavIdx,
   onConfirm,
 }: {
   formData: FormData
   onUpdate: <K extends keyof FormData>(key: K, value: FormData[K]) => void
+  behavIdx: number
+  setBehavIdx: (idx: number) => void
   onConfirm: () => void
 }) {
-  const [step, setStep] = useState(0)
-  const q = BEHAVIORAL_QUESTIONS[step]
+  const q = BEHAVIORAL_QUESTIONS[behavIdx]
 
   const handleSelect = (value: string) => {
     onUpdate(q.key, value as any)
     setTimeout(() => {
-      if (step < BEHAVIORAL_QUESTIONS.length - 1) {
-        setStep(step + 1)
+      if (behavIdx < BEHAVIORAL_QUESTIONS.length - 1) {
+        setBehavIdx(behavIdx + 1)
       } else {
         onConfirm()
       }
@@ -654,17 +987,18 @@ function BehavioralScreen({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-slate-100">Quick questions</h2>
-        <p className="text-sm text-slate-400 mt-1">
-          Tap your answer — we&apos;ll move you along
-        </p>
-        <div className="flex items-center gap-1.5 mt-3">
+        <h2 className="onb-title">Quick questions</h2>
+        <p className="onb-subtitle">Tap your answer — we&apos;ll move you along</p>
+        {/* Sub-step progress */}
+        <div className="flex gap-1.5 mt-3">
           {BEHAVIORAL_QUESTIONS.map((_, i) => (
             <div
               key={i}
-              className={`h-1 flex-1 rounded-full transition-all ${
-                i < step ? 'bg-emerald-500' : i === step ? 'bg-blue-500' : 'bg-slate-800'
-              }`}
+              className="h-1 flex-1 rounded-full transition-all"
+              style={{
+                background: i < behavIdx ? 'var(--onb-coral)' : i === behavIdx ? 'var(--onb-coral)' : 'var(--onb-border)',
+                opacity: i < behavIdx ? 0.5 : 1,
+              }}
             />
           ))}
         </div>
@@ -672,13 +1006,21 @@ function BehavioralScreen({
 
       <AnimatePresence mode="wait">
         <motion.div
-          key={step}
+          key={behavIdx}
           initial={{ opacity: 0, x: 15 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -15 }}
           transition={{ duration: 0.2 }}
         >
-          <p className="text-base font-semibold text-slate-200 mb-4">
+          <p
+            style={{
+              fontFamily: 'var(--onb-font-display)',
+              fontSize: 16,
+              fontWeight: 700,
+              color: 'var(--onb-text)',
+              marginBottom: 16,
+            }}
+          >
             {q.question}
           </p>
           <div className="space-y-2.5">
@@ -694,90 +1036,6 @@ function BehavioralScreen({
           </div>
         </motion.div>
       </AnimatePresence>
-    </div>
-  )
-}
-
-function ClusterScreen({
-  formData,
-  onUpdate,
-  onConfirm,
-}: {
-  formData: FormData
-  onUpdate: <K extends keyof FormData>(key: K, value: FormData[K]) => void
-  onConfirm: () => void
-}) {
-  const styles = ['Educational', 'Entertainment', 'Lifestyle', 'Review', 'Tutorial', 'Vlog', 'Short-form', 'Long-form']
-  const platforms = ['YouTube', 'Instagram', 'TikTok', 'Twitter']
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-slate-100">Content details</h2>
-        <p className="text-sm text-slate-400 mt-1">
-          Optional — helps match you with the right campaigns
-        </p>
-      </div>
-
-      <div>
-        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2.5">
-          Content style
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {styles.map((style) => (
-            <button
-              key={style}
-              onClick={() => {
-                const styles = formData.content_style.includes(style)
-                  ? formData.content_style.filter((s) => s !== style)
-                  : [...formData.content_style, style]
-                onUpdate('content_style', styles)
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                formData.content_style.includes(style)
-                  ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20'
-                  : 'bg-slate-950/60 text-slate-400 border border-slate-800/80 hover:bg-slate-800/60 hover:text-slate-200'
-              }`}
-            >
-              {style}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2.5">
-          Preferred platforms
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {platforms.map((platform) => (
-            <button
-              key={platform}
-              onClick={() => {
-                const p = formData.preferred_platforms.includes(platform)
-                  ? formData.preferred_platforms.filter((p) => p !== platform)
-                  : [...formData.preferred_platforms, platform]
-                onUpdate('preferred_platforms', p)
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                formData.preferred_platforms.includes(platform)
-                  ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20'
-                  : 'bg-slate-950/60 text-slate-400 border border-slate-800/80 hover:bg-slate-800/60 hover:text-slate-200'
-              }`}
-            >
-              {platform}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <motion.button
-        onClick={onConfirm}
-        className="w-full py-3.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold text-sm hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/25 transition-all"
-        whileTap={{ scale: 0.98 }}
-      >
-        Continue
-      </motion.button>
     </div>
   )
 }
@@ -798,8 +1056,8 @@ function WillingnessScreen({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-slate-100">Your preferences</h2>
-        <p className="text-sm text-slate-400 mt-1">
+        <h2 className="onb-title">Your preferences</h2>
+        <p className="onb-subtitle">
           Swipe or tap — {questionIdx + 1} of {WILLINGNESS_QUESTIONS.length}
         </p>
       </div>
@@ -826,10 +1084,14 @@ function RateScreen({
   formData,
   onUpdate,
   onConfirm,
+  completing,
+  completeError,
 }: {
   formData: FormData
   onUpdate: <K extends keyof FormData>(key: K, value: FormData[K]) => void
   onConfirm: () => void
+  completing: boolean
+  completeError: string
 }) {
   const hasAnyRate = formData.rate_youtube_long > 0 || formData.rate_youtube_shorts > 0 ||
     formData.rate_instagram_reel > 0 || formData.rate_instagram_post > 0
@@ -837,54 +1099,74 @@ function RateScreen({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-slate-100">Your rates</h2>
-        <p className="text-sm text-slate-400 mt-1">
-          Set your base rates or skip — we&apos;ll show them to brands
-        </p>
+        <h2 className="onb-title">Your rates</h2>
+        <p className="onb-subtitle">Set your base rates or skip — we&apos;ll show them to brands</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3.5">
-        <RateChip
-          label="YouTube Long"
-          value={formData.rate_youtube_long}
-          onChange={(v) => onUpdate('rate_youtube_long', v)}
-        />
-        <RateChip
-          label="YouTube Shorts"
-          value={formData.rate_youtube_shorts}
-          onChange={(v) => onUpdate('rate_youtube_shorts', v)}
-        />
-        <RateChip
-          label="Instagram Reel"
-          value={formData.rate_instagram_reel}
-          onChange={(v) => onUpdate('rate_instagram_reel', v)}
-        />
-        <RateChip
-          label="Instagram Post"
-          value={formData.rate_instagram_post}
-          onChange={(v) => onUpdate('rate_instagram_post', v)}
-        />
+      <div className="grid grid-cols-2 gap-3">
+        <RateChip label="YouTube Long" value={formData.rate_youtube_long} onChange={(v) => onUpdate('rate_youtube_long', v)} />
+        <RateChip label="YouTube Shorts" value={formData.rate_youtube_shorts} onChange={(v) => onUpdate('rate_youtube_shorts', v)} />
+        <RateChip label="Instagram Reel" value={formData.rate_instagram_reel} onChange={(v) => onUpdate('rate_instagram_reel', v)} />
+        <RateChip label="Instagram Post" value={formData.rate_instagram_post} onChange={(v) => onUpdate('rate_instagram_post', v)} />
       </div>
 
-      <label className="flex items-center gap-3 p-4 rounded-xl border border-slate-800 bg-slate-900/20 cursor-pointer hover:bg-slate-800/40 transition-colors">
+      <label
+        className="flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-colors"
+        style={{
+          border: '1px solid var(--onb-border)',
+          background: 'rgba(22,20,40,0.3)',
+        }}
+      >
         <input
           type="checkbox"
           checked={formData.rates_deferred}
           onChange={(e) => onUpdate('rates_deferred', e.target.checked)}
-          className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-blue-500"
+          style={{ accentColor: 'var(--onb-coral)' }}
         />
         <div>
-          <div className="text-sm font-semibold text-slate-200">Skip for now</div>
-          <div className="text-xs text-slate-400 mt-0.5">We&apos;ll ask you later</div>
+          <div style={{ fontFamily: 'var(--onb-font-display)', fontSize: 13, fontWeight: 700, color: 'var(--onb-text)' }}>
+            Skip for now
+          </div>
+          <div style={{ fontFamily: 'var(--onb-font-body)', fontSize: 11, color: 'var(--onb-text-muted)', marginTop: 2 }}>
+            We&apos;ll ask you later
+          </div>
         </div>
       </label>
 
+      {completeError && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-3 rounded-xl"
+          style={{
+            background: 'rgba(220,38,38,0.1)',
+            border: '1px solid rgba(220,38,38,0.2)',
+            fontFamily: 'var(--onb-font-body)',
+            fontSize: 13,
+            color: '#FCA5A5',
+          }}
+        >
+          {completeError}
+        </motion.div>
+      )}
+
       <motion.button
         onClick={onConfirm}
-        className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-green-500 text-white font-semibold text-sm hover:from-emerald-600 hover:to-green-600 shadow-lg shadow-emerald-500/25 transition-all"
-        whileTap={{ scale: 0.98 }}
+        disabled={completing}
+        className="onb-btn-primary"
+        style={completing ? { opacity: 0.6 } : {}}
+        whileTap={!completing ? { scale: 0.98 } : {}}
       >
-        {hasAnyRate || formData.rates_deferred ? 'Complete setup' : 'Skip rates'}
+        {completing ? (
+          <span className="flex items-center justify-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Setting up your profile...
+          </span>
+        ) : hasAnyRate || formData.rates_deferred ? (
+          'Complete setup'
+        ) : (
+          'Skip rates'
+        )}
       </motion.button>
     </div>
   )

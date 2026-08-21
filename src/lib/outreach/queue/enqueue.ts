@@ -105,13 +105,15 @@ async function loadSuppressions(emails: string[]): Promise<Set<string>> {
   const unique = [...new Set(emails)]
   const set = new Set<string>()
 
-  for (let i = 0; i < unique.length; i += 500) {
-    const chunk = unique.slice(i, i + 500)
-    const rows = await outreachSelect<any>('outreach_suppressions', {
-      filters: {},
-    })
-    for (const row of rows) {
-      if (chunk.includes(row.email)) set.add(row.email)
+  // Fetch all suppressions once, then filter in memory
+  const allSuppressions = await outreachSelect<any>('outreach_suppressions', {
+    filters: {},
+  })
+
+  const emailSet = new Set(unique)
+  for (const row of allSuppressions) {
+    if (emailSet.has(row.email)) {
+      set.add(row.email)
     }
   }
 

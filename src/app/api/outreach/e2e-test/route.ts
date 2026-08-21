@@ -387,13 +387,13 @@ const checkFunnelEvents = {
 
     const { data: events } = await client
       .from('onboarding_events')
-      .select('event_name, created_at')
+      .select('event, created_at')
       .order('created_at', { ascending: false })
       .limit(20)
 
     const eventCounts: Record<string, number> = {}
     for (const e of events || []) {
-      eventCounts[e.event_name] = (eventCounts[e.event_name] || 0) + 1
+      eventCounts[e.event] = (eventCounts[e.event] || 0) + 1
     }
 
     return {
